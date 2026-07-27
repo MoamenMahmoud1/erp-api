@@ -1,0 +1,6 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Confirm changing your account email to {{ new_email }}:
+{{ verification_url|safe }}
+
+If you did not request this change, do not use this link.

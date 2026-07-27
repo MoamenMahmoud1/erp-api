@@ -1,0 +1,5 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Your account email was changed to {{ new_email }}.
+
+If you did not make this change, contact support immediately.

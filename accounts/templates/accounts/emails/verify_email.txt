@@ -1,0 +1,4 @@
+Hi {{ user.get_full_name|default:user.username }},
+
+Verify your email address using this link:
+{{ verification_url|safe }}
