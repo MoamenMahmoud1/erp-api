@@ -9,3 +9,5 @@ env/
 staticfiles/
 media/
 .vscode/
+AGENTS.md
+CHANGELOG.md
