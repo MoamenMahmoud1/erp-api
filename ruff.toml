@@ -3,17 +3,17 @@ line-length = 100
 
 [lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "SIM", # flake8-simplify
+    "E",
+    "W",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
 ]
 ignore = [
-    "E501",  # line length handled by formatter
-    "B008",  # do not check function calls in arguments
+    "E501",
+    "B008",
 ]
 
 [format]
@@ -58,7 +58,6 @@ django = [
     "django.contrib",
     "rest_framework",
     "rest_framework_simplejwt",
-    "adrf",
     "corsheaders",
     "phonenumber_field",
     "django_filters",
