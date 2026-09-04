@@ -1,5 +1,5 @@
-from asgiref.sync import sync_to_async
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import F
 
 from inventory.models import StockBalance
 
@@ -11,33 +11,27 @@ class StockBalanceService:
         if quantity <= 0:
             raise ValueError("Quantity must be greater than zero.")
 
-        balance, _ = (
+        updated = (
             StockBalance.objects
-            .select_for_update()
-            .get_or_create(
-                location=location,
-                product=product,
-                defaults={"quantity": 0},
-            )
+            .filter(location=location, product=product)
+            .update(quantity=F("quantity") + quantity)
         )
 
-        balance.quantity += quantity
-        balance.save(
-            update_fields=["quantity", "updated_at"],
-        )
+        if updated == 0:
+            try:
+                with transaction.atomic():
+                    StockBalance.objects.create(
+                        location=location,
+                        product=product,
+                        quantity=quantity,
+                    )
+            except IntegrityError:
+                StockBalance.objects.filter(
+                    location=location,
+                    product=product,
+                ).update(quantity=F("quantity") + quantity)
 
-        return balance
-
-    @staticmethod
-    async def aincrease(*, location, product, quantity):
-        return await sync_to_async(
-            StockBalanceService.increase,
-            thread_sensitive=True,
-        )(
-            location=location,
-            product=product,
-            quantity=quantity,
-        )
+        return StockBalance.objects.get(location=location, product=product)
 
     @staticmethod
     @transaction.atomic
@@ -48,10 +42,7 @@ class StockBalanceService:
         balance = (
             StockBalance.objects
             .select_for_update()
-            .filter(
-                location=location,
-                product=product,
-            )
+            .filter(location=location, product=product)
             .first()
         )
 
@@ -59,19 +50,5 @@ class StockBalanceService:
             raise ValueError("Insufficient stock.")
 
         balance.quantity -= quantity
-        balance.save(
-            update_fields=["quantity", "updated_at"],
-        )
-
+        balance.save(update_fields=["quantity", "updated_at"])
         return balance
-
-    @staticmethod
-    async def adecrease(*, location, product, quantity):
-        return await sync_to_async(
-            StockBalanceService.decrease,
-            thread_sensitive=True,
-        )(
-            location=location,
-            product=product,
-            quantity=quantity,
-        )
