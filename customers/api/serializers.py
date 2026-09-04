@@ -1,7 +1,6 @@
-from adrf import serializers
+from rest_framework import serializers
 
 from customers.models import Customer
-from customers.services import CreateCustomer, UpdateCustomer
 from customers.services.create import create_customer_sync
 from customers.services.update import update_customer_sync
 
@@ -17,12 +16,3 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         return update_customer_sync(instance, validated_data)
-
-    async def acreate(self, validated_data):
-        return await CreateCustomer()(validated_data=validated_data)
-
-    async def aupdate(self, instance, validated_data):
-        return await UpdateCustomer()(
-            instance=instance,
-            validated_data=validated_data,
-        )

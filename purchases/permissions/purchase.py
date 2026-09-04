@@ -10,7 +10,7 @@ class PurchaseAccessPermission(BasePermission):
         "DELETE": "purchases.delete_purchase",
     }
 
-    async def has_permission(self, request, view):
+    def has_permission(self, request, view):
         user = request.user
 
         if not user or not user.is_authenticated:
@@ -20,13 +20,11 @@ class PurchaseAccessPermission(BasePermission):
             return True
 
         codename = getattr(view, "permission_codename", None)
-
         if codename:
-            return await user.ahas_perm(codename)
+            return user.has_perm(codename)
 
         codename = self.permission_map.get(request.method)
-
         if not codename:
             return False
 
-        return await user.ahas_perm(codename)
+        return user.has_perm(codename)

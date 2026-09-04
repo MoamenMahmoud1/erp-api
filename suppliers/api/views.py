@@ -1,4 +1,4 @@
-from adrf import generics
+from rest_framework import generics
 
 from suppliers.api.serializers import SupplierSerializer
 from suppliers.models import Supplier
