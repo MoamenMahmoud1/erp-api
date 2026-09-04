@@ -1,14 +1,11 @@
-"""Async ASGI views for immutable invoice operations."""
+"""Synchronous API views for invoice operations."""
 
-from asgiref.sync import sync_to_async
 from django.db.models import Prefetch
-from adrf import viewsets
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from authentication.throttling import SensitiveActionThrottle
-
 from common.exceptions import (
     CouponInvalid,
     InsufficientStock,
@@ -28,10 +25,10 @@ from invoices.services import (
 )
 
 
-async def _invoice_response(operation):
-    """Run an async use case and translate its domain errors to HTTP."""
+def _invoice_response(operation):
+    """Run an invoice use case and translate domain errors to HTTP."""
     try:
-        invoice = await operation()
+        invoice = operation()
     except InvalidStateTransition as exc:
         return Response(
             {"detail": str(exc), "code": "invalid_state_transition"},
@@ -58,16 +55,14 @@ async def _invoice_response(operation):
             status=status.HTTP_409_CONFLICT,
         )
 
-    serializer = InvoiceSerializer(invoice)
-    data = await sync_to_async(
-        lambda: serializer.data,
-        thread_sensitive=True,
-    )()
-    return Response(data, status=status.HTTP_200_OK)
+    return Response(
+        InvoiceSerializer(invoice).data,
+        status=status.HTTP_200_OK,
+    )
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
-    """List, retrieve, and create invoices plus explicit lifecycle actions."""
+    """List, retrieve, create, and execute explicit invoice lifecycle actions."""
 
     permission_classes = (InvoicePermission,)
     http_method_names = ("get", "post", "head", "options")
@@ -85,49 +80,42 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         )
 
     def get_serializer_class(self):
-        if self.action in {"list", "retrieve", "alist", "aretrieve"}:
+        if self.action in {"list", "retrieve"}:
             return InvoiceSummarySerializer
         return InvoiceSerializer
 
-    async def acreate(self, request, *args, **kwargs):
-        """Validate synchronously, then create through one transaction boundary."""
+    def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        await sync_to_async(
-            serializer.is_valid,
-            thread_sensitive=True,
-        )(raise_exception=True)
+        serializer.is_valid(raise_exception=True)
 
-        invoice = await CreateInvoice()(
+        invoice = CreateInvoice()(
             created_by_id=request.user.pk,
             validated_data=serializer.validated_data,
         )
-        response_serializer = InvoiceSerializer(invoice)
-        data = await sync_to_async(
-            lambda: response_serializer.data,
-            thread_sensitive=True,
-        )()
-        return Response(data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=["post"], throttle_classes=[SensitiveActionThrottle])
-    async def confirm(self, request, pk=None):
-        return await _invoice_response(
-            lambda: ConfirmInvoice()(invoice_id=pk)
+        return Response(
+            InvoiceSerializer(invoice).data,
+            status=status.HTTP_201_CREATED,
         )
 
     @action(detail=True, methods=["post"], throttle_classes=[SensitiveActionThrottle])
-    async def cancel(self, request, pk=None):
-        return await _invoice_response(
-            lambda: CancelInvoice()(invoice_id=pk)
-        )
+    def confirm(self, request, pk=None):
+        return _invoice_response(lambda: ConfirmInvoice()(invoice_id=pk))
 
-    @action(detail=True, methods=["post"], url_path="apply-coupon", throttle_classes=[SensitiveActionThrottle])
-    async def apply_coupon(self, request, pk=None):
+    @action(detail=True, methods=["post"], throttle_classes=[SensitiveActionThrottle])
+    def cancel(self, request, pk=None):
+        return _invoice_response(lambda: CancelInvoice()(invoice_id=pk))
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="apply-coupon",
+        throttle_classes=[SensitiveActionThrottle],
+    )
+    def apply_coupon(self, request, pk=None):
         code = (request.data or {}).get("code")
         if not code:
             return Response(
                 {"detail": "A coupon code is required.", "code": "coupon_required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        return await _invoice_response(
-            lambda: ApplyCoupon()(invoice_id=pk, code=code)
-        )
+        return _invoice_response(lambda: ApplyCoupon()(invoice_id=pk, code=code))
