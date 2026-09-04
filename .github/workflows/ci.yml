@@ -61,6 +61,32 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
+      - name: Verify synchronous-only runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if find . -type f -path '*async*' -not -path './.git/*' -print -quit | grep -q .; then
+            echo "Async-named files are not allowed on main."
+            find . -type f -path '*async*' -not -path './.git/*' -print
+            exit 1
+          fi
+
+          if [[ -e core/asgi.py ]]; then
+            echo "core/asgi.py must not exist on the synchronous main branch."
+            exit 1
+          fi
+
+          if grep -RInE --exclude-dir=.git --include='*.py' \
+            -e '(^|[[:space:]])from[[:space:]]+adrf([.]|[[:space:]])' \
+            -e '(^|[[:space:]])import[[:space:]]+adrf([.]|[[:space:]])' \
+            -e 'sync_to_async' \
+            -e '(^|[[:space:]])async[[:space:]]+def[[:space:]]' \
+            .; then
+            echo "Async-only code was found on the synchronous main branch."
+            exit 1
+          fi
+
       - name: Run Django checks
         run: python manage.py check
 
