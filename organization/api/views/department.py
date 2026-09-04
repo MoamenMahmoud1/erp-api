@@ -1,5 +1,5 @@
-from adrf import viewsets
-from adrf.shortcuts import aget_object_or_404
+from django.shortcuts import get_object_or_404
+from rest_framework import viewsets
 
 from common.permissions import ModelAccessPermission
 from organization.api.serializers import DepartmentSerializer
@@ -21,9 +21,9 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         "options",
     )
 
-    async def perform_acreate(self, serializer):
-        company = await aget_object_or_404(
+    def perform_create(self, serializer):
+        company = get_object_or_404(
             Company.objects.all(),
             singleton_marker=True,
         )
-        await serializer.asave(company=company)
+        serializer.save(company=company)

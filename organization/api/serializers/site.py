@@ -1,6 +1,5 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
-from adrf import serializers
-from asgiref.sync import sync_to_async
+from rest_framework import serializers
 
 from organization.models import Site
 
@@ -50,23 +49,10 @@ class SiteSerializer(serializers.ModelSerializer):
         try:
             return super().create(validated_data)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(
-                exc.message_dict
-            ) from exc
+            raise serializers.ValidationError(exc.message_dict) from exc
 
     def update(self, instance, validated_data):
         try:
             return super().update(instance, validated_data)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError(
-                exc.message_dict
-            ) from exc
-
-    async def acreate(self, validated_data):
-        return await sync_to_async(self.create, thread_sensitive=True)(validated_data)
-
-    async def aupdate(self, instance, validated_data):
-        return await sync_to_async(
-            self.update,
-            thread_sensitive=True,
-        )(instance, validated_data)
+            raise serializers.ValidationError(exc.message_dict) from exc
