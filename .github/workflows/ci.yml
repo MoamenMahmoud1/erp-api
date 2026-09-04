@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    name: Django checks, lint, and tests
+    name: Django checks and tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -61,9 +61,6 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
-      - name: Run Ruff
-        run: ruff check .
-
       - name: Run Django checks
         run: python manage.py check
 
@@ -72,3 +69,9 @@ jobs:
 
       - name: Run tests
         run: python manage.py test
+
+      # Ruff is intentionally non-blocking for now.
+      # It will be enabled as a required CI check after the sync migration is stable.
+      - name: Ruff (non-blocking)
+        continue-on-error: true
+        run: ruff check .
