@@ -1,5 +1,6 @@
 from asgiref.sync import sync_to_async
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import F
 
 from inventory.models import StockBalance
 
@@ -11,22 +12,38 @@ class StockBalanceService:
         if quantity <= 0:
             raise ValueError("Quantity must be greater than zero.")
 
-        balance, _ = (
+        # Atomic UPDATE is safe when the balance row already exists.  If it
+        # does not, create it and recover from the unique-constraint race.
+        # This avoids the read-modify-write race in get_or_create() while
+        # preserving correctness when two workers create the first balance
+        # concurrently.
+        updated = (
             StockBalance.objects
-            .select_for_update()
-            .get_or_create(
-                location=location,
-                product=product,
-                defaults={"quantity": 0},
-            )
+            .filter(location=location, product=product)
+            .update(quantity=F("quantity") + quantity)
         )
 
-        balance.quantity += quantity
-        balance.save(
-            update_fields=["quantity", "updated_at"],
-        )
+        if updated == 0:
+            try:
+                with transaction.atomic():
+                    StockBalance.objects.create(
+                        location=location,
+                        product=product,
+                        quantity=quantity,
+                    )
+            except IntegrityError:
+                # Another transaction created the row first. The database
+                # unique constraint makes this deterministic; retry as an
+                # atomic UPDATE so the increment is not lost.
+                StockBalance.objects.filter(
+                    location=location,
+                    product=product,
+                ).update(quantity=F("quantity") + quantity)
 
-        return balance
+        return StockBalance.objects.get(
+            location=location,
+            product=product,
+        )
 
     @staticmethod
     async def aincrease(*, location, product, quantity):
