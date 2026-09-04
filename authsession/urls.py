@@ -1,5 +1,5 @@
 from django.urls import path
-from rest_framework.routers import SimpleRouter
+from adrf.routers import SimpleRouter
 
 from authsession.api.views import AuthSessionVerificationView, AuthSessionViewSet
 

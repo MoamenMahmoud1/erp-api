@@ -32,15 +32,21 @@ class AuthSessionApiTests(TestCase):
         self.client = APIClient(enforce_csrf_checks=True)
         csrf_response = self.client.get(reverse("accounts:csrf-token"))
         self.csrf_token = csrf_response.data["csrf_token"]
+        self.device_id = uuid.uuid4()
         self.login_response = self.client.post(
             reverse("accounts:login"),
             {"identifier": self.user.email, "password": self.password},
             format="json",
             HTTP_X_CSRFTOKEN=self.csrf_token,
+            HTTP_X_DEVICE_ID=str(self.device_id),
         )
+        # Login sets the httponly refresh_token and signed device_id cookies
+        # on the test client (path=/api/v1/auth/), which the authsession
+        # permission reads for its stateful session verification.
         self.client.credentials(
             HTTP_AUTHORIZATION=f"Bearer {self.login_response.data['access']}"
         )
+        self.refresh_token = self.login_response.cookies.get("refresh_token")
 
     def test_user_can_list_active_devices_and_identify_current_device(self):
         start_auth_session(

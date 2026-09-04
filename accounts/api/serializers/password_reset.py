@@ -75,6 +75,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
             user.set_password(self.validated_data["new_password"])
             user.save(update_fields=("password", "password_changed_at", "updated_at"))
-            revoke_all_sessions(user)
+            revoke_all_sessions(user_id=user_id)
 
         return user

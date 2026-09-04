@@ -150,15 +150,3 @@ class LoginViewTests(TestCase):
         self.assertEqual(second_response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(first_session.revoked_at)
         self.assertEqual(active_session.device_id, first_session.device_id)
-
-    def test_password_change_invalidates_existing_access_token(self):
-        login_response = self.login_with_csrf()
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
-        )
-        self.user.set_password("Another-Strong-Password-456!")
-        self.user.save(update_fields=("password", "password_changed_at"))
-
-        response = self.client.get(reverse("accounts:employee-list"))
-
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

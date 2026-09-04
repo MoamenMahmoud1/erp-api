@@ -1,4 +1,3 @@
-import hmac
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone as datetime_timezone
@@ -9,8 +8,8 @@ from django.utils import timezone
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.utils import get_md5_hash_password
 
+from accounts.models.role import Role
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 
@@ -39,6 +38,14 @@ class AuthSessionTooNew(Exception):
         self.eligible_at = eligible_at
 
 
+def _set_authorization_claims(token, user):
+    """Populate only the authorization claims needed by stateless requests."""
+    token["is_staff"] = bool(user.is_staff)
+    token["is_superuser"] = bool(user.is_superuser)
+    token["role_level"] = Role.level_for_user(user)
+    token["permissions"] = sorted(user.get_all_permissions())
+
+
 def _presented_session(refresh_token, access_token):
     try:
         refresh = RefreshToken(refresh_token)
@@ -56,23 +63,22 @@ def _presented_session(refresh_token, access_token):
     return refresh, refresh_session_id, refresh_jti, refresh_user_id
 
 
-def _session_matches(*, auth_session, refresh, refresh_jti, user, device_id):
+def _session_matches(*, auth_session, refresh_jti, user_id, device_id):
     return (
         auth_session.revoked_at is None
         and auth_session.expires_at > timezone.now()
-        and auth_session.user_id == user.pk
+        and auth_session.user_id == user_id
         and auth_session.device_id == device_id
         and auth_session.current_refresh_jti == refresh_jti
-        and _refresh_password_matches(refresh, user)
     )
 
 
-def get_current_auth_session(*, user, access_token, refresh_token, device_id):
-    refresh, session_id, refresh_jti, token_user_id = _presented_session(
+def get_current_auth_session(*, user_id, access_token, refresh_token, device_id):
+    _refresh, session_id, refresh_jti, token_user_id = _presented_session(
         refresh_token,
         access_token,
     )
-    if str(user.pk) != token_user_id:
+    if str(user_id) != token_user_id:
         raise InvalidAuthSession
 
     try:
@@ -82,9 +88,8 @@ def get_current_auth_session(*, user, access_token, refresh_token, device_id):
 
     if not _session_matches(
         auth_session=auth_session,
-        refresh=refresh,
         refresh_jti=refresh_jti,
-        user=user,
+        user_id=user_id,
         device_id=device_id,
     ):
         raise InvalidAuthSession
@@ -99,7 +104,7 @@ def verify_current_auth_session(
     device_id,
     password,
 ):
-    refresh, session_id, refresh_jti, token_user_id = _presented_session(
+    _refresh, session_id, refresh_jti, token_user_id = _presented_session(
         refresh_token,
         access_token,
     )
@@ -115,9 +120,8 @@ def verify_current_auth_session(
 
         if not _session_matches(
             auth_session=auth_session,
-            refresh=refresh,
             refresh_jti=refresh_jti,
-            user=user,
+            user_id=user.pk,
             device_id=device_id,
         ):
             raise InvalidAuthSession
@@ -146,6 +150,7 @@ def start_auth_session(*, user, client_context: ClientContext):
 
         refresh = RefreshToken.for_user(locked_user)
         refresh["sid"] = str(session_id)
+        _set_authorization_claims(refresh, locked_user)
         access = refresh.access_token
         expires_at = datetime.fromtimestamp(
             refresh["exp"],
@@ -153,14 +158,14 @@ def start_auth_session(*, user, client_context: ClientContext):
         )
 
         AuthSession.objects.filter(
-            user=locked_user,
+            user_id=locked_user.pk,
             device_id=client_context.device_id,
             revoked_at__isnull=True,
         ).update(revoked_at=timezone.now())
 
         AuthSession.objects.create(
             id=session_id,
-            user=locked_user,
+            user_id=locked_user.pk,
             device_id=client_context.device_id,
             device_name=client_context.device_name,
             user_agent=client_context.user_agent,
@@ -174,18 +179,6 @@ def start_auth_session(*, user, client_context: ClientContext):
         device_id=client_context.device_id,
         access_token=str(access),
         refresh_token=str(refresh),
-    )
-
-
-def _refresh_password_matches(refresh, user):
-    if not api_settings.CHECK_REVOKE_TOKEN:
-        return True
-
-    token_hash = refresh.get(api_settings.REVOKE_TOKEN_CLAIM)
-    current_hash = get_md5_hash_password(user.password)
-    return (
-        isinstance(token_hash, str)
-        and hmac.compare_digest(token_hash, current_hash)
     )
 
 
@@ -211,13 +204,7 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
 
             if auth_session.revoked_at is not None or auth_session.expires_at <= now:
                 invalid_session = True
-            elif (
-                not auth_session.user.is_active
-                or not _refresh_password_matches(
-                    presented_refresh,
-                    auth_session.user,
-                )
-            ):
+            elif not auth_session.user.is_active:
                 auth_session.revoked_at = now
                 auth_session.save(update_fields=("revoked_at",))
                 invalid_session = True
@@ -236,6 +223,7 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
                 )
                 new_refresh = RefreshToken.for_user(auth_session.user)
                 new_refresh["sid"] = str(auth_session.id)
+                _set_authorization_claims(new_refresh, auth_session.user)
                 new_refresh["exp"] = int(auth_session.expires_at.timestamp())
 
                 new_access = new_refresh.access_token
@@ -275,7 +263,7 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
     )
 
 
-def revoke_auth_session(*, user, refresh_token, device_id):
+def revoke_auth_session(*, user_id, refresh_token, device_id):
     try:
         refresh = RefreshToken(refresh_token)
         session_id = uuid.UUID(refresh["sid"])
@@ -283,19 +271,19 @@ def revoke_auth_session(*, user, refresh_token, device_id):
     except (KeyError, TypeError, ValueError, TokenError):
         return
 
-    if str(user.pk) != token_user_id:
+    if str(user_id) != token_user_id:
         return
 
     AuthSession.objects.filter(
         id=session_id,
-        user=user,
+        user_id=user_id,
         device_id=device_id,
         revoked_at__isnull=True,
     ).update(revoked_at=timezone.now())
 
 
-def revoke_all_sessions(user):
+def revoke_all_sessions(*, user_id):
     return AuthSession.objects.filter(
-        user=user,
+        user_id=user_id,
         revoked_at__isnull=True,
     ).update(revoked_at=timezone.now())

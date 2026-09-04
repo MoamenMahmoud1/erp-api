@@ -1,8 +1,9 @@
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from adrf.routers import DefaultRouter
 
 from .api.views import EmployeeViewSet
 from .api.views.login import CsrfTokenView, LoginView
+from .api.views.current_user import CurrentUserView
 from .api.views.refresh import RefreshView
 from .api.views.logout import LogoutAllView, LogoutView
 from .api.views.password_reset import (
@@ -24,6 +25,7 @@ router = DefaultRouter()
 router.register("employees", EmployeeViewSet, basename="employee")
 
 urlpatterns = [
+    path("auth/me/", CurrentUserView.as_view(), name="current-user"),
     path("auth/csrf/", CsrfTokenView.as_view(), name="csrf-token"),
     path("auth/signup/", SignUpView.as_view(), name="signup"),
     path(

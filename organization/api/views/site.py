@@ -1,12 +1,12 @@
-from django.shortcuts import get_object_or_404
-from rest_framework.viewsets import ModelViewSet
+from adrf import viewsets
+from adrf.shortcuts import aget_object_or_404
 
 from common.permissions import ModelAccessPermission
 from organization.api.serializers import SiteSerializer
 from organization.models import Company, Site
 
 
-class SiteViewSet(ModelViewSet):
+class SiteViewSet(viewsets.ModelViewSet):
     queryset = Site.objects.select_related(
         "company",
         "parent",
@@ -21,9 +21,9 @@ class SiteViewSet(ModelViewSet):
         "options",
     )
 
-    def perform_create(self, serializer):
-        company = get_object_or_404(
-            Company,
+    async def perform_acreate(self, serializer):
+        company = await aget_object_or_404(
+            Company.objects.all(),
             singleton_marker=True,
         )
-        serializer.save(company=company)
+        await serializer.asave(company=company)

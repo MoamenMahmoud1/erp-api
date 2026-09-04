@@ -8,15 +8,18 @@ from authsession.services import InvalidAuthSession, get_current_auth_session
 
 
 class CurrentAuthSessionPermission(BasePermission):
+    """Verify the stateful auth session using the JWT identity claim."""
+
     def has_permission(self, request, view):
         refresh_token = request.COOKIES.get("refresh_token")
         device_id = get_device_id(request)
-        if not refresh_token or device_id is None:
+        user_id = request.user.pk
+        if not refresh_token or device_id is None or user_id is None:
             raise AuthenticationFailed("Invalid authentication session.")
 
         try:
             auth_session = get_current_auth_session(
-                user=request.user,
+                user_id=user_id,
                 access_token=request.auth,
                 refresh_token=refresh_token,
                 device_id=device_id,

@@ -1,0 +1,81 @@
+target-version = "py313"
+line-length = 100
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # do not check function calls in arguments
+]
+
+[format]
+docstring-code-format = true
+
+[isort]
+known-first-party = [
+    "accounts",
+    "authsession",
+    "common",
+    "coupons",
+    "customers",
+    "invoices",
+    "inventory",
+    "payments",
+    "products",
+    "purchases",
+    "suppliers",
+]
+section-order = [
+    "future",
+    "standard-library",
+    "django",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[lint.isort]
+section-order = [
+    "future",
+    "standard-library",
+    "django",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[lint.isort.sections]
+django = [
+    "django",
+    "django.contrib",
+    "rest_framework",
+    "rest_framework_simplejwt",
+    "adrf",
+    "corsheaders",
+    "phonenumber_field",
+    "django_filters",
+    "django_redis",
+    "storages",
+]
+first-party = [
+    "accounts",
+    "authsession",
+    "common",
+    "coupons",
+    "customers",
+    "invoices",
+    "inventory",
+    "payments",
+    "products",
+    "purchases",
+    "suppliers",
+    "core",
+]

@@ -1,5 +1,5 @@
 from django.urls import path
-from rest_framework.routers import DefaultRouter
+from adrf.routers import DefaultRouter
 
 from organization.api.views import (
     CompanyDetailView,
