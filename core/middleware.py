@@ -1,8 +1,8 @@
 """Core middleware: proxy trusted headers + request correlation IDs."""
+
 import logging
 import uuid
 from contextvars import ContextVar
-from inspect import iscoroutinefunction, markcoroutinefunction
 
 from django.conf import settings
 
@@ -18,14 +18,6 @@ _current_request_id: ContextVar[str | None] = ContextVar(
 def get_current_request_id() -> str | None:
     """Return the request id of the current request (or ``None``)."""
     return _current_request_id.get()
-
-
-class _RequestIdFilter(logging.Filter):
-    """Add ``request_id`` to every log record for structured formatters."""
-
-    def filter(self, record):
-        record.request_id = get_current_request_id() or "-"
-        return True
 
 
 class _RequestIdLogRecordFactory:
@@ -46,22 +38,14 @@ logging.setLogRecordFactory(
 
 
 class RequestCorrelationMiddleware:
-    """Hybrid middleware that preserves the ASGI async path without adaptation."""
+    """Attach a correlation id to every synchronous request and response."""
 
     response_header = "X-Request-Id"
-    async_capable = True
-    sync_capable = True
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self._is_async = iscoroutinefunction(get_response)
-        if self._is_async:
-            markcoroutinefunction(self)
 
     def __call__(self, request):
-        if self._is_async:
-            return self._async_call(request)
-
         request_id = request.META.get(CORRELATION_HEADER) or uuid.uuid4().hex
         request.META[CORRELATION_HEADER] = request_id
         token = _current_request_id.set(request_id)
@@ -72,20 +56,9 @@ class RequestCorrelationMiddleware:
         response[self.response_header] = request_id
         return response
 
-    async def _async_call(self, request):
-        request_id = request.META.get(CORRELATION_HEADER) or uuid.uuid4().hex
-        request.META[CORRELATION_HEADER] = request_id
-        token = _current_request_id.set(request_id)
-        try:
-            response = await self.get_response(request)
-        finally:
-            _current_request_id.reset(token)
-        response[self.response_header] = request_id
-        return response
-
 
 class TrustedProxyHeadersMiddleware:
-    """Hybrid middleware that normalizes forwarded headers without sync adaptation."""
+    """Normalize forwarded headers for trusted proxies on sync requests."""
 
     forwarded_headers = (
         "HTTP_FORWARDED",
@@ -95,14 +68,8 @@ class TrustedProxyHeadersMiddleware:
         "HTTP_X_FORWARDED_PROTO",
     )
 
-    async_capable = True
-    sync_capable = True
-
     def __init__(self, get_response):
         self.get_response = get_response
-        self._is_async = iscoroutinefunction(get_response)
-        if self._is_async:
-            markcoroutinefunction(self)
 
     def _strip_headers(self, request):
         remote_address = normalize_ip(request.META.get("REMOTE_ADDR"))
@@ -116,11 +83,5 @@ class TrustedProxyHeadersMiddleware:
                 request.META.pop(header, None)
 
     def __call__(self, request):
-        if self._is_async:
-            return self._async_call(request)
         self._strip_headers(request)
         return self.get_response(request)
-
-    async def _async_call(self, request):
-        self._strip_headers(request)
-        return await self.get_response(request)
