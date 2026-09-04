@@ -1,8 +1,7 @@
 from django.urls import path
-from adrf.routers import SimpleRouter
+from rest_framework.routers import SimpleRouter
 
 from authsession.api.views import AuthSessionVerificationView, AuthSessionViewSet
-
 
 router = SimpleRouter()
 router.register("sessions", AuthSessionViewSet, basename="session")

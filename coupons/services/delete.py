@@ -1,13 +1,12 @@
 """Protected deletion service for coupons."""
 
-from asgiref.sync import sync_to_async
 from django.db import transaction
 from django.db.models import ProtectedError
 
 from common.exceptions import InvalidBusinessOperation
 
 
-def delete_coupon_sync(instance):
+def delete_coupon(instance):
     """Delete a coupon, translating invoice protection into a domain error."""
     try:
         with transaction.atomic():
@@ -19,10 +18,7 @@ def delete_coupon_sync(instance):
 
 
 class DeleteCoupon:
-    """Delete a coupon without allowing protected financial history to change."""
+    """Synchronous coupon deletion use case."""
 
-    async def __call__(self, *, instance):
-        return await sync_to_async(
-            delete_coupon_sync,
-            thread_sensitive=True,
-        )(instance)
+    def __call__(self, *, instance):
+        return delete_coupon(instance)

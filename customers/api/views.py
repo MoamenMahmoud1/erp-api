@@ -14,10 +14,10 @@ class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = (ReadAuthenticatedWriteStaffPermission,)
 
-    async def adestroy(self, request, *args, **kwargs):
-        instance = await self.aget_object()
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
         try:
-            await DeleteCustomer()(instance=instance)
+            DeleteCustomer()(instance=instance)
         except InvalidBusinessOperation as exc:
             return Response(
                 {"detail": str(exc), "code": "customer_in_use"},

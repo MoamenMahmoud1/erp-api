@@ -1,14 +1,13 @@
 """Application service for deleting customers."""
 
-from asgiref.sync import sync_to_async
 from django.db import transaction
 from django.db.models import ProtectedError
 
 from common.exceptions import InvalidBusinessOperation
 
 
-def delete_customer_sync(instance):
-    """Delete a customer through the synchronous ORM."""
+def delete_customer(instance):
+    """Delete a customer without allowing protected financial history to change."""
     try:
         with transaction.atomic():
             instance.delete()
@@ -19,10 +18,7 @@ def delete_customer_sync(instance):
 
 
 class DeleteCustomer:
-    """Delete a customer without blocking the ASGI event loop."""
+    """Synchronous customer deletion use case."""
 
-    async def __call__(self, *, instance):
-        return await sync_to_async(
-            delete_customer_sync,
-            thread_sensitive=True,
-        )(instance)
+    def __call__(self, *, instance):
+        return delete_customer(instance)

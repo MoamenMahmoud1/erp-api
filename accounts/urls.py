@@ -1,5 +1,5 @@
 from django.urls import include, path
-from adrf.routers import DefaultRouter
+from rest_framework.routers import DefaultRouter
 
 from .api.views import EmployeeViewSet
 from .api.views.login import CsrfTokenView, LoginView

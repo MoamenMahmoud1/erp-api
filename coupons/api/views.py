@@ -1,11 +1,8 @@
-from adrf import viewsets
-from rest_framework import status
-from rest_framework import filters
+from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
 
 from common.exceptions import InvalidBusinessOperation
 from common.permissions import ReadAuthenticatedWriteStaffPermission
-
 from coupons.api.serializers import CouponSerializer
 from coupons.models import Coupon
 from coupons.services import DeleteCoupon
@@ -23,9 +20,7 @@ class CouponViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
     )
 
-    search_fields = (
-        "code",
-    )
+    search_fields = ("code",)
 
     ordering_fields = (
         "code",
@@ -39,18 +34,15 @@ class CouponViewSet(viewsets.ModelViewSet):
         "updated_at",
     )
 
-    ordering = (
-        "code",
-        "pk",
-    )
+    ordering = ("code", "pk")
 
     def get_queryset(self):
         return Coupon.objects.all()
 
-    async def adestroy(self, request, *args, **kwargs):
-        instance = await self.aget_object()
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
         try:
-            await DeleteCoupon()(instance=instance)
+            DeleteCoupon()(instance=instance)
         except InvalidBusinessOperation as exc:
             return Response(
                 {"detail": str(exc), "code": "coupon_in_use"},

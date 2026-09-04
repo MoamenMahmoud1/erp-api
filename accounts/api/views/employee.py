@@ -1,4 +1,5 @@
-from adrf import viewsets
+from rest_framework import viewsets
+
 from accounts.api.serializers import EmployeeSerializer
 from accounts.models import Employee
 from accounts.permissions import EmployeeAccessPermission
