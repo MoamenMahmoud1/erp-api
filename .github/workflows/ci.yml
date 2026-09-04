@@ -11,9 +11,38 @@ permissions:
 
 jobs:
   test:
-    name: Django checks and tests
+    name: Django checks, lint, and tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: erp_test
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp -d erp_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DJANGO_SETTINGS_MODULE: core.settings.settings_test
+      SECRET_KEY: ci-test-secret
+      JWT_SIGNING_KEY: ci-test-jwt-secret
+      ALLOWED_HOSTS: testserver,localhost,127.0.0.1
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      CSRF_TRUSTED_ORIGINS: http://localhost:3000
+      DB_NAME: erp_test
+      DB_USER: erp
+      DB_PASSWORD: erp
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      REDIS_URL: redis://localhost:6379/0
 
     steps:
       - name: Checkout repository
@@ -31,6 +60,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip check
+
+      - name: Run Ruff
+        run: ruff check .
 
       - name: Run Django checks
         run: python manage.py check
