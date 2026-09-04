@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError as DjangoValidationError
-from adrf import serializers
-from asgiref.sync import sync_to_async
+from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from accounts.models import Employee, Role
@@ -106,15 +105,3 @@ class EmployeeSerializer(serializers.ModelSerializer):
             ) from exc
 
         return attrs
-
-    async def acreate(self, validated_data):
-        return await sync_to_async(
-            self.create,
-            thread_sensitive=True,
-        )(validated_data)
-
-    async def aupdate(self, instance, validated_data):
-        return await sync_to_async(
-            self.update,
-            thread_sensitive=True,
-        )(instance, validated_data)
