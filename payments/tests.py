@@ -1,5 +1,5 @@
-from decimal import Decimal
 import threading
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, connection, transaction
@@ -10,7 +10,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
 from payments.api.views import CollectionView, TransactionListView
-from payments.models import IdempotencyKey, PaymentAllocation, PaymentTransaction
+from payments.models import PaymentAllocation, PaymentTransaction
 from payments.services import (
     NoConfirmableInvoicesError,
     OverpaymentError,
