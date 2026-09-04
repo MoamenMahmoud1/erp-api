@@ -1,5 +1,4 @@
-from adrf import viewsets
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.response import Response
 
 from common.exceptions import InvalidBusinessOperation
