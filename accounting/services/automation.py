@@ -109,11 +109,11 @@ def post_sales_return(*, sales_return, actor_id, company=None):
     if existing:
         return existing
     accounts = ensure_default_accounts(company)
-    merchandise = sales_return.merchandise_amount
+    refund_amount = sales_return.refund_amount
     returned_cost = sum(((item.invoice_item.cost_price if item.invoice_item.cost_price is not None else item.invoice_item.product.purchase_price) * item.quantity for item in sales_return.items.select_related("invoice_item__product")), Decimal("0"))
     lines = [
-        {"account_id": accounts["sales_returns"].pk, "debit": merchandise, "credit": 0},
-        {"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": sales_return.refund_amount},
+        {"account_id": accounts["sales_returns"].pk, "debit": refund_amount, "credit": 0},
+        {"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": refund_amount},
     ]
     if returned_cost > 0:
         lines.extend([
