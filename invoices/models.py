@@ -59,6 +59,7 @@ class Invoice(models.Model):
             ("confirm_invoice", "Can confirm an invoice"),
             ("cancel_invoice", "Can cancel an invoice"),
             ("apply_invoice_coupon", "Can apply a coupon to an invoice"),
+            ("return_invoice", "Can return items from a paid invoice"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -85,22 +86,20 @@ class Invoice(models.Model):
 
     @property
     def paid_amount(self):
-        """Authoritative paid amount = sum of payment allocations.
-
-        Derived from ``PaymentAllocation`` rows — never independently editable.
-        """
         from common.money import quantize_money
 
-        return quantize_money(
-            sum(
-                (allocation.total_amount for allocation in self.payment_allocations.all()),
-                Decimal("0"),
-            )
+        allocation_total = sum(
+            (allocation.total_amount for allocation in self.payment_allocations.all()),
+            Decimal("0"),
         )
+        refund_total = sum(
+            (refund.total_amount for refund in self.payment_refunds.all()),
+            Decimal("0"),
+        )
+        return quantize_money(allocation_total - refund_total)
 
     @property
     def outstanding_amount(self):
-        """Remaining balance = total - paid_amount (no silent negative clamp)."""
         from common.money import quantize_money
 
         return quantize_money(self.total - self.paid_amount)
@@ -135,6 +134,79 @@ class InvoiceItem(models.Model):
             models.CheckConstraint(
                 condition=Q(unit_price__gte=Decimal("0")),
                 name="invoice_item_unit_price_non_negative",
+            ),
+        ]
+
+    @property
+    def line_total(self):
+        from common.money import quantize_money
+
+        return quantize_money(self.unit_price * self.quantity)
+
+
+class InvoiceReturn(models.Model):
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.PROTECT,
+        related_name="returns",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_invoice_returns",
+    )
+    reason = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    @property
+    def total_amount(self):
+        from common.money import quantize_money
+
+        return quantize_money(
+            sum((item.line_total for item in self.items.all()), Decimal("0"))
+        )
+
+
+class InvoiceReturnItem(models.Model):
+    class Condition(models.TextChoices):
+        SALEABLE = "saleable", "Saleable"
+
+    invoice_return = models.ForeignKey(
+        InvoiceReturn,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    invoice_item = models.ForeignKey(
+        InvoiceItem,
+        on_delete=models.PROTECT,
+        related_name="return_items",
+    )
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)],
+    )
+    condition = models.CharField(
+        max_length=20,
+        choices=Condition.choices,
+        default=Condition.SALEABLE,
+    )
+    unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("invoice_return", "invoice_item"),
+                name="invoice_return_item_unique_line",
+            ),
+            models.CheckConstraint(
+                condition=Q(quantity__gte=1),
+                name="invoice_return_item_quantity_positive",
+            ),
+            models.CheckConstraint(
+                condition=Q(unit_price__gte=Decimal("0")),
+                name="invoice_return_item_price_non_negative",
             ),
         ]
 
