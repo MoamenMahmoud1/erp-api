@@ -2,7 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
 from rest_framework.response import Response
 
-from common.exceptions import InvalidBusinessOperation
+from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from common.pagination import StandardPagination
 from inventory.api.filters import StockBalanceFilter, StockMovementFilter
 from inventory.api.serializers import (
@@ -71,6 +71,8 @@ class TransferView(generics.GenericAPIView):
                 created_by=request.user,
                 reference=data.get("reference", ""),
             )
+        except InsufficientStock as exc:
+            return Response({"detail": str(exc), "code": "insufficient_stock"}, status=409)
         except InvalidBusinessOperation as exc:
             return Response(
                 {"detail": str(exc), "code": "transfer_invalid"},
