@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from payments.models import PaymentTransaction
-from payments.querysets import PaymentTransactionQuerySet
 from .helpers import PaymentTestMixin
 
 
