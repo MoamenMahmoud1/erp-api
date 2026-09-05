@@ -1,8 +1,8 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.utils import timezone
 from django.test import TestCase
+from django.utils import timezone
 
 from accounting.services import customer_aging, customer_balances, supplier_aging, supplier_balances
 from accounts.models import CustomUserModel
@@ -23,7 +23,6 @@ class BalanceReportTests(TestCase):
             password="strong-password-123",
         )
         self.customer = Customer.objects.create(name="Acme Customer")
-        self.customer_two = Customer.objects.create(name="Beta Customer")
         self.supplier = Supplier.objects.create(name="Acme Supplier")
         self.product = Product.objects.create(
             name="Test Product",
