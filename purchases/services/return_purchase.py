@@ -7,8 +7,12 @@ from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
 
 @transaction.atomic
-def return_purchase(*, purchase_id, items, created_by_id, reason=""):
-    purchase = Purchase.objects.select_for_update().prefetch_related("items__return_items").get(pk=purchase_id)
+def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None):
+    purchases = Purchase.objects.visible_to(actor) if actor is not None else Purchase.objects
+    try:
+        purchase = purchases.select_for_update().prefetch_related("items__return_items").get(pk=purchase_id)
+    except Purchase.DoesNotExist as exc:
+        raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
     if purchase.status != Purchase.Status.CONFIRMED:
         raise InvalidBusinessOperation("Only confirmed purchases can be returned.")
     if not items:
@@ -59,10 +63,11 @@ def return_purchase(*, purchase_id, items, created_by_id, reason=""):
 
 
 class ReturnPurchase:
-    def __call__(self, *, purchase_id, items, created_by_id, reason=""):
+    def __call__(self, *, purchase_id, items, created_by_id, reason="", actor=None):
         return return_purchase(
             purchase_id=purchase_id,
             items=items,
             created_by_id=created_by_id,
             reason=reason,
+            actor=actor,
         )
