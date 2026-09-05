@@ -1,8 +1,9 @@
 from decimal import Decimal
 
+from django.db import IntegrityError
 from django.test import TransactionTestCase
 
-from payments.models import PaymentTransaction
+from payments.models import IdempotencyKey, PaymentAllocation, PaymentRefund, PaymentTransaction
 from payments.services import process_idempotent
 
 from .helpers import PaymentTestMixin
@@ -62,3 +63,63 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
         self.assertEqual(result, "mismatch")
+
+    def test_zero_value_payment_records_are_rejected_at_database_boundary(self):
+        with self.assertRaises(IntegrityError):
+            PaymentTransaction.objects.create(
+                customer=self.customer,
+                collected_by=self.user,
+                cash_amount=Decimal("0"),
+                transfer_amount=Decimal("0"),
+            )
+
+        transaction = PaymentTransaction.objects.create(
+            customer=self.customer,
+            collected_by=self.user,
+            cash_amount=Decimal("100"),
+            transfer_amount=Decimal("0"),
+        )
+        invoice = self.create_invoice()
+        with self.assertRaises(IntegrityError):
+            PaymentAllocation.objects.create(
+                transaction=transaction,
+                invoice=invoice,
+                cash_amount=Decimal("0"),
+                transfer_amount=Decimal("0"),
+            )
+        allocation = PaymentAllocation.objects.create(
+            transaction=transaction,
+            invoice=invoice,
+            cash_amount=Decimal("100"),
+            transfer_amount=Decimal("0"),
+        )
+        with self.assertRaises(IntegrityError):
+            PaymentRefund.objects.create(
+                transaction=transaction,
+                invoice=invoice,
+                allocation=allocation,
+                cash_amount=Decimal("0"),
+                transfer_amount=Decimal("0"),
+                created_by=self.user,
+            )
+
+    def test_idempotency_response_status_allows_pending_and_http_status_codes(self):
+        pending = IdempotencyKey.objects.create(
+            key="pending",
+            user=self.user,
+            path="/payments/collections/",
+            request_signature="a" * 64,
+            response_status=0,
+            response_body={},
+        )
+        self.assertEqual(pending.response_status, 0)
+
+        complete = IdempotencyKey.objects.create(
+            key="complete",
+            user=self.user,
+            path="/payments/collections/",
+            request_signature="b" * 64,
+            response_status=201,
+            response_body={"ok": True},
+        )
+        self.assertEqual(complete.response_status, 201)
