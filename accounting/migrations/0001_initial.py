@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import migrations, models
 import django.db.models.deletion
+from decimal import Decimal
 
 
 class Migration(migrations.Migration):
@@ -62,8 +64,8 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
                 ("description", models.CharField(blank=True, max_length=300)),
-                ("debit", models.DecimalField(decimal_places=2, default=0, max_digits=14)),
-                ("credit", models.DecimalField(decimal_places=2, default=0, max_digits=14)),
+                ("debit", models.DecimalField(decimal_places=2, default=0, max_digits=14, validators=[MinValueValidator(Decimal("0"))])),
+                ("credit", models.DecimalField(decimal_places=2, default=0, max_digits=14, validators=[MinValueValidator(Decimal("0"))])),
                 ("account", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="journal_lines", to="accounting.account")),
                 ("entry", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="lines", to="accounting.journalentry")),
             ],
