@@ -138,6 +138,21 @@ def post_purchase_return(*, purchase_return, actor_id, company=None):
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
+def post_supplier_payment(*, payment, actor_id, company=None):
+    company = company or get_default_company()
+    existing = _source_entry(company, "payment.supplier", payment.pk)
+    if existing:
+        return existing
+    accounts = ensure_default_accounts(company)
+    lines = [{"account_id": accounts["accounts_payable"].pk, "debit": payment.total_amount, "credit": 0}]
+    if payment.cash_amount > 0:
+        lines.append({"account_id": accounts["cash"].pk, "debit": 0, "credit": payment.cash_amount})
+    if payment.transfer_amount > 0:
+        lines.append({"account_id": accounts["bank"].pk, "debit": 0, "credit": payment.transfer_amount})
+    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(payment.created_at), description=f"Supplier payment #{payment.pk}", reference=payment.reference or f"Supplier Payment #{payment.pk}", source_type="payment.supplier", source_id=payment.pk, lines=lines, company=company)
+    return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
+
+
 def reverse_source_entry(*, source_entry, actor_id, source_type, source_id, company=None):
     company = company or get_default_company()
     reverse_type = f"{source_type}.reversal"
