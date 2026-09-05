@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 
 from inventory.querysets import StockLocationQuerySet, StockMovementQuerySet
 from products.models import Product
@@ -76,6 +76,35 @@ class StockMovement(models.Model):
         permissions = [
             ("transfer_stock", "Can transfer stock"),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        movement_type="TRANSFER",
+                        source_location__isnull=False,
+                        destination_location__isnull=False,
+                    )
+                    | Q(
+                        movement_type__in=("PURCHASE_RETURN", "SALE"),
+                        source_location__isnull=False,
+                        destination_location__isnull=True,
+                    )
+                    | Q(
+                        movement_type__in=("PURCHASE", "SALEABLE_RETURN", "DAMAGED_RETURN"),
+                        source_location__isnull=True,
+                        destination_location__isnull=False,
+                    )
+                ),
+                name="stock_movement_direction_matches_type",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(movement_type__in=("TRANSFER",), source_location__isnull=True)
+                    | ~Q(source_location=F("destination_location"))
+                ),
+                name="stock_transfer_locations_differ",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_movement_type_display()} #{self.pk}"
@@ -87,7 +116,15 @@ class StockMovementItem(models.Model):
     quantity = models.PositiveIntegerField()
 
     class Meta:
-        constraints = [models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_movement_item_quantity_positive")]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(quantity__gte=1),
+                name="stock_movement_item_quantity_positive",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=("product", "movement"), name="stock_move_item_product_idx"),
+        ]
         ordering = ("id",)
 
     def __str__(self):
@@ -101,7 +138,12 @@ class StockBalance(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=("location", "product"), name="stock_balance_unique_location_product")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("location", "product"),
+                name="stock_balance_unique_location_product",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.location_id} - {self.product_id}: {self.quantity}"
