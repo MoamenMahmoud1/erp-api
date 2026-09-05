@@ -32,8 +32,11 @@ def _validate_return_items(invoice, items):
 
 
 @transaction.atomic
-def create_sales_return(*, invoice_id, items, created_by_id, reason=""):
-    invoice = Invoice.objects.select_for_update().prefetch_related("items__return_items").get(pk=invoice_id)
+def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=None):
+    invoice_qs = Invoice.objects
+    if actor is not None:
+        invoice_qs = invoice_qs.visible_to(actor)
+    invoice = invoice_qs.select_for_update().prefetch_related("items__return_items").get(pk=invoice_id)
     if invoice.status != Invoice.Status.PAID:
         raise InvalidBusinessOperation("Sales returns require a paid invoice and a refund.")
 
@@ -48,24 +51,18 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason=""):
         amount=refund_amount,
         created_by_id=created_by_id,
         reason=reason or f"Sales return for invoice #{invoice.pk}",
+        actor=actor,
     )
 
     sale = (
-        StockMovement.objects.filter(
-            reference=f"Invoice #{invoice.pk}",
-            movement_type=StockMovement.MovementType.SALE,
-        )
+        StockMovement.objects.filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE)
         .select_related("source_location")
         .first()
     )
     if sale is None or sale.source_location is None:
         raise InvalidBusinessOperation("Cannot return sale: original sale movement was not found.")
 
-    sales_return = InvoiceReturn.objects.create(
-        invoice=invoice,
-        created_by_id=created_by_id,
-        reason=reason,
-    )
+    sales_return = InvoiceReturn.objects.create(invoice=invoice, created_by_id=created_by_id, reason=reason)
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.SALEABLE_RETURN,
         destination_location=sale.source_location,
@@ -74,21 +71,11 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason=""):
     )
     for line, quantity in cleaned:
         StockBalanceService.increase(location=sale.source_location, product=line.product, quantity=quantity)
-        InvoiceReturnItem.objects.create(
-            invoice_return=sales_return,
-            invoice_item=line,
-            quantity=quantity,
-            unit_price=line.unit_price,
-        )
+        InvoiceReturnItem.objects.create(invoice_return=sales_return, invoice_item=line, quantity=quantity, unit_price=line.unit_price)
         StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
     return sales_return
 
 
 class CreateSalesReturn:
-    def __call__(self, *, invoice_id, items, created_by_id, reason=""):
-        return create_sales_return(
-            invoice_id=invoice_id,
-            items=items,
-            created_by_id=created_by_id,
-            reason=reason,
-        )
+    def __call__(self, *, invoice_id, items, created_by_id, reason="", actor=None):
+        return create_sales_return(invoice_id=invoice_id, items=items, created_by_id=created_by_id, reason=reason, actor=actor)
