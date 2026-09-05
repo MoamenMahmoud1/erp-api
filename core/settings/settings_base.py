@@ -145,13 +145,13 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
     "SIGNING_KEY": config(
         "JWT_SIGNING_KEY",
         default="dev-only-jwt-signing-key-change-me-0123456789abcdef",
     ),
-    "CHECK_REVOKE_TOKEN": False,
+    "CHECK_REVOKE_TOKEN": True,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
 
@@ -207,6 +207,11 @@ LOGGING = {
             "propagate": False,
         },
         "accounts": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "erp.operations": {
             "handlers": ["console"],
             "level": LOG_LEVEL,
             "propagate": False,
