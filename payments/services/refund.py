@@ -17,53 +17,40 @@ class RefundAmountTooLarge(RefundError):
 
 
 @transaction.atomic
-def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=""):
+def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason="", actor=None):
     amount = quantize_money(amount)
     if amount <= 0:
         raise InvalidMoney("Refund amount must be greater than zero.")
 
-    invoice = Invoice.objects.select_for_update().get(pk=invoice_id)
+    invoice_qs = Invoice.objects
+    if actor is not None:
+        invoice_qs = invoice_qs.visible_to(actor)
+    invoice = invoice_qs.select_for_update().get(pk=invoice_id)
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise RefundError("Only confirmed or paid invoices can be refunded.")
 
-    allocations = list(
-        PaymentAllocation.objects.filter(
-            transaction_id=transaction_id,
-            invoice_id=invoice_id,
-        )
+    allocation = (
+        PaymentAllocation.objects.filter(transaction_id=transaction_id, invoice_id=invoice_id)
         .select_for_update()
         .prefetch_related("refunds")
-        .order_by("created_at", "id")
+        .first()
     )
-    if not allocations:
+    if allocation is None:
         raise RefundError("No matching payment allocation exists.")
-
-    remaining = amount
-    for allocation in allocations:
-        refundable = allocation.refundable_amount
-        if refundable <= 0:
-            continue
-        refund_amount = min(remaining, refundable)
-        cash_refund = min(refund_amount, allocation.cash_amount)
-        transfer_refund = refund_amount - cash_refund
-        PaymentRefund.objects.create(
-            transaction_id=transaction_id,
-            invoice=invoice,
-            allocation=allocation,
-            cash_amount=cash_refund,
-            transfer_amount=transfer_refund,
-            reason=reason,
-            created_by_id=created_by_id,
-        )
-        remaining -= refund_amount
-        if remaining <= 0:
-            break
-
-    if remaining > Decimal("0"):
+    if amount > allocation.refundable_amount:
         raise RefundAmountTooLarge("Refund amount exceeds refundable payment amount.")
 
+    cash_refund = min(amount, allocation.cash_amount)
+    PaymentRefund.objects.create(
+        transaction_id=transaction_id,
+        invoice=invoice,
+        allocation=allocation,
+        cash_amount=cash_refund,
+        transfer_amount=amount - cash_refund,
+        reason=reason,
+        created_by_id=created_by_id,
+    )
     if invoice.status == Invoice.Status.PAID and invoice.paid_amount < invoice.total:
         invoice.status = Invoice.Status.CONFIRMED
         invoice.save(update_fields=("status", "updated_at"))
-
     return invoice
