@@ -1,6 +1,7 @@
 """Core middleware: proxy trusted headers + request correlation IDs."""
 
 import logging
+import re
 import uuid
 from contextvars import ContextVar
 
@@ -9,6 +10,7 @@ from django.conf import settings
 from core.proxy import is_trusted_proxy, normalize_ip
 
 CORRELATION_HEADER = "HTTP_X_REQUEST_ID"
+_REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
 
 _current_request_id: ContextVar[str | None] = ContextVar(
     "erp_request_id", default=None
@@ -38,7 +40,7 @@ logging.setLogRecordFactory(
 
 
 class RequestCorrelationMiddleware:
-    """Attach a correlation id to every synchronous request and response."""
+    """Attach a bounded, header-safe correlation id to every request."""
 
     response_header = "X-Request-Id"
 
@@ -46,7 +48,12 @@ class RequestCorrelationMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request_id = request.META.get(CORRELATION_HEADER) or uuid.uuid4().hex
+        supplied_request_id = request.META.get(CORRELATION_HEADER, "")
+        request_id = (
+            supplied_request_id
+            if _REQUEST_ID_PATTERN.fullmatch(supplied_request_id)
+            else uuid.uuid4().hex
+        )
         request.META[CORRELATION_HEADER] = request_id
         token = _current_request_id.set(request_id)
         try:
