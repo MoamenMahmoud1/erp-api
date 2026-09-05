@@ -17,6 +17,7 @@ class Invoice(models.Model):
         CONFIRMED = "confirmed", "Confirmed"
         CANCELLED = "cancelled", "Cancelled"
         PAID = "paid", "Paid"
+        RETURNED = "returned", "Returned"
 
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="invoices")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoices")
@@ -59,9 +60,28 @@ class Invoice(models.Model):
     @property
     def paid_amount(self):
         from common.money import quantize_money
-        allocation_total = sum((item.total_amount for item in self.payment_allocations.all()), Decimal("0"))
-        refund_total = sum((item.total_amount for item in self.payment_refunds.all()), Decimal("0"))
-        return quantize_money(allocation_total - refund_total)
+        return quantize_money(
+            sum((item.total_amount for item in self.payment_allocations.all()), Decimal("0"))
+        )
+
+    @property
+    def refunded_amount(self):
+        from common.money import quantize_money
+        return quantize_money(
+            sum((item.total_amount for item in self.payment_refunds.all()), Decimal("0"))
+        )
+
+    @property
+    def net_paid_amount(self):
+        from common.money import quantize_money
+        return quantize_money(self.paid_amount - self.refunded_amount)
+
+    @property
+    def returned_amount(self):
+        from common.money import quantize_money
+        return quantize_money(
+            sum((item.refund_amount for item in self.returns.all()), Decimal("0"))
+        )
 
     @property
     def outstanding_amount(self):
@@ -92,15 +112,31 @@ class InvoiceReturn(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="returns")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoice_returns")
     reason = models.CharField(max_length=255, blank=True)
+    refund_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal("0"),
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ("-created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(refund_amount__gte=Decimal("0")),
+                name="invoice_return_refund_amount_non_negative",
+            )
+        ]
+
+    @property
+    def merchandise_amount(self):
+        from common.money import quantize_money
+        return quantize_money(sum((item.line_total for item in self.items.all()), Decimal("0")))
 
     @property
     def total_amount(self):
-        from common.money import quantize_money
-        return quantize_money(sum((item.line_total for item in self.items.all()), Decimal("0")))
+        return self.refund_amount
 
 
 class InvoiceReturnItem(models.Model):
