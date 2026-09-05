@@ -21,7 +21,7 @@ class LogoutView(NoStoreResponseMixin, APIView):
 
         if refresh_token and device_id is not None:
             revoke_auth_session(
-                user=request.user,
+                user_id=request.user.pk,
                 refresh_token=refresh_token,
                 device_id=device_id,
             )
@@ -35,7 +35,7 @@ class LogoutAllView(NoStoreResponseMixin, APIView):
     permission_classes = (IsAuthenticated, VerifiedAuthSessionPermission)
 
     def post(self, request, *args, **kwargs):
-        revoke_all_sessions(request.user)
+        revoke_all_sessions(user_id=request.user.pk)
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)

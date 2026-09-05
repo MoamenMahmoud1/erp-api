@@ -1,0 +1,363 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sales ERP — Theme Preview</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #111;
+    color: #222;
+  }
+  .page {
+    padding: 28px;
+    display: grid;
+    gap: 28px;
+  }
+  .theme {
+    border-radius: 22px;
+    overflow: hidden;
+    border: 1px solid rgba(128,128,128,.25);
+    box-shadow: 0 18px 50px rgba(0,0,0,.22);
+  }
+  .theme-title {
+    padding: 16px 22px;
+    font-weight: 800;
+    letter-spacing: .3px;
+    background: rgba(128,128,128,.08);
+  }
+  .app {
+    display: grid;
+    grid-template-columns: 190px 1fr;
+    min-height: 610px;
+    background: var(--bg);
+    color: var(--text);
+  }
+  aside {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 22px 14px;
+  }
+  .brand {
+    font-size: 18px;
+    font-weight: 850;
+    padding: 6px 10px 24px;
+  }
+  .brand span { color: var(--primary); }
+  nav { display: grid; gap: 5px; }
+  nav div {
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--text2);
+    font-size: 13px;
+    font-weight: 650;
+  }
+  nav .active {
+    background: var(--primary);
+    color: var(--on-primary);
+  }
+  main { padding: 24px; }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  h1 { margin: 0; font-size: 24px; }
+  .muted { color: var(--text2); font-size: 13px; }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    font-weight: 800;
+  }
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .metric-label { color: var(--text2); font-size: 12px; }
+  .metric {
+    margin-top: 7px;
+    font-size: 23px;
+    font-weight: 850;
+  }
+  .positive { color: var(--success); font-size: 12px; margin-top: 5px; }
+  .negative { color: var(--error); font-size: 12px; margin-top: 5px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.35fr .85fr;
+    gap: 16px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+  }
+  .chart {
+    height: 190px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+  .bars {
+    height: 100%;
+    display: flex;
+    align-items: end;
+    gap: 10px;
+    padding: 18px;
+  }
+  .bar {
+    flex: 1;
+    background: var(--primary);
+    border-radius: 6px 6px 2px 2px;
+    opacity: .9;
+  }
+  .bar:nth-child(1){height:38%}.bar:nth-child(2){height:54%}.bar:nth-child(3){height:46%}
+  .bar:nth-child(4){height:72%}.bar:nth-child(5){height:61%}.bar:nth-child(6){height:88%}
+  .bar:nth-child(7){height:76%}.bar:nth-child(8){height:94%}
+  .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .table th, .table td {
+    text-align: left;
+    padding: 11px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .table th { color: var(--text2); font-weight: 700; }
+  .badge {
+    display: inline-block;
+    padding: 5px 8px;
+    border-radius: 7px;
+    font-weight: 750;
+    font-size: 10px;
+  }
+  .paid { color: var(--success); background: color-mix(in srgb, var(--success) 16%, transparent); }
+  .pending { color: var(--warning); background: color-mix(in srgb, var(--warning) 16%, transparent); }
+  .buttons { display:flex; gap:8px; margin-top: 14px; flex-wrap: wrap; }
+  button {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-weight: 750;
+    cursor: pointer;
+    font: inherit;
+  }
+  .primary { background: var(--primary); color: var(--on-primary); }
+  .secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  input {
+    width: 100%;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+    outline: none;
+  }
+  input::placeholder { color: var(--muted); }
+  .form-row { display:grid; gap:7px; margin-bottom: 12px; }
+  label { font-size: 12px; font-weight: 700; color: var(--text2); }
+  .palette {
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+    margin-top: 14px;
+  }
+  .swatch {
+    width: 58px; height: 42px;
+    border-radius: 8px;
+    border: 1px solid rgba(128,128,128,.25);
+    position: relative;
+  }
+  .swatch span {
+    position:absolute;
+    bottom:3px; left:5px;
+    font-size:8px;
+    font-weight:800;
+    text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  }
+  @media(max-width: 900px){
+    .app{grid-template-columns: 1fr}
+    aside{display:none}
+    .metrics{grid-template-columns: repeat(2,1fr)}
+    .grid{grid-template-columns:1fr}
+  }
+  @media(max-width: 560px){
+    .page{padding:12px}
+    .metrics{grid-template-columns:1fr}
+    main{padding:16px}
+  }
+
+  /* LIGHT */
+  .light {
+    --bg:#F7F4F0; --surface:#FFFDFC; --surface2:#EEE9E3; --border:#D8D0C8;
+    --primary:#9A6040; --on-primary:#FFFFFF; --text:#29231F; --text2:#5F5751; --muted:#8B8179;
+    --success:#397052; --warning:#A96F2D; --error:#A94640;
+  }
+  /* MID */
+  .mid {
+    --bg:#292522; --surface:#332E2A; --surface2:#3C3530; --border:#514841;
+    --primary:#B9784F; --on-primary:#FFFFFF; --text:#FAF6F1; --text2:#D6CBC2; --muted:#A99C93;
+    --success:#679879; --warning:#C58D46; --error:#CD6962;
+  }
+  /* DARK */
+  .dark {
+    --bg:#151312; --surface:#1E1B19; --surface2:#27221F; --border:#3B332E;
+    --primary:#C27A50; --on-primary:#FFFFFF; --text:#FFF9F4; --text2:#D8CCC4; --muted:#9E9189;
+    --success:#669A78; --warning:#C99047; --error:#CA6861;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <section class="theme light">
+    <div class="theme-title">LIGHT — Warm Ivory + Bronze / Terracotta</div>
+    <div class="app">
+      <aside>
+        <div class="brand">SALES <span>ERP</span></div>
+        <nav>
+          <div class="active">Dashboard</div>
+          <div>Sales</div><div>Invoices</div><div>Products</div><div>Customers</div><div>Payments</div>
+        </nav>
+      </aside>
+      <main>
+        <header>
+          <div><h1>Dashboard</h1><div class="muted">Sales overview</div></div>
+          <div class="avatar">MM</div>
+        </header>
+        <div class="metrics">
+          <div class="card"><div class="metric-label">Revenue</div><div class="metric">$48,240</div><div class="positive">+12.8%</div></div>
+          <div class="card"><div class="metric-label">Orders</div><div class="metric">1,284</div><div class="positive">+8.4%</div></div>
+          <div class="card"><div class="metric-label">Customers</div><div class="metric">842</div><div class="positive">+5.1%</div></div>
+          <div class="card"><div class="metric-label">Pending</div><div class="metric">36</div><div class="negative">-2.2%</div></div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h2>Sales performance</h2>
+            <div class="chart"><div class="bars">
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </div></div>
+          </div>
+          <div class="card">
+            <h2>Recent invoices</h2>
+            <table class="table">
+              <tr><th>Invoice</th><th>Status</th></tr>
+              <tr><td>#INV-1042</td><td><span class="badge paid">Paid</span></td></tr>
+              <tr><td>#INV-1041</td><td><span class="badge pending">Pending</span></td></tr>
+              <tr><td>#INV-1040</td><td><span class="badge paid">Paid</span></td></tr>
+            </table>
+            <div class="buttons"><button class="primary">New invoice</button><button class="secondary">Export</button></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="form-row"><label>Search products</label><input placeholder="Search by name or SKU"></div>
+          <div class="buttons"><button class="primary">Search</button><button class="secondary">Clear</button></div>
+        </div>
+        <div class="palette">
+          <div class="swatch" style="background:#F7F4F0"><span>#F7F4F0</span></div>
+          <div class="swatch" style="background:#FFFDFC"><span>#FFFDFC</span></div>
+          <div class="swatch" style="background:#EEE9E3"><span>#EEE9E3</span></div>
+          <div class="swatch" style="background:#9A6040"><span>#9A6040</span></div>
+          <div class="swatch" style="background:#70422D"><span>#70422D</span></div>
+          <div class="swatch" style="background:#29231F"><span>#29231F</span></div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="theme mid">
+    <div class="theme-title">MID — Warm Charcoal + Walnut + Bronze</div>
+    <div class="app">
+      <aside>
+        <div class="brand">SALES <span>ERP</span></div>
+        <nav>
+          <div class="active">Dashboard</div>
+          <div>Sales</div><div>Invoices</div><div>Products</div><div>Customers</div><div>Payments</div>
+        </nav>
+      </aside>
+      <main>
+        <header>
+          <div><h1>Dashboard</h1><div class="muted">Sales overview</div></div>
+          <div class="avatar">MM</div>
+        </header>
+        <div class="metrics">
+          <div class="card"><div class="metric-label">Revenue</div><div class="metric">$48,240</div><div class="positive">+12.8%</div></div>
+          <div class="card"><div class="metric-label">Orders</div><div class="metric">1,284</div><div class="positive">+8.4%</div></div>
+          <div class="card"><div class="metric-label">Customers</div><div class="metric">842</div><div class="positive">+5.1%</div></div>
+          <div class="card"><div class="metric-label">Pending</div><div class="metric">36</div><div class="negative">-2.2%</div></div>
+        </div>
+        <div class="grid">
+          <div class="card"><h2>Sales performance</h2><div class="chart"><div class="bars">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div></div></div>
+          <div class="card"><h2>Recent invoices</h2><table class="table">
+            <tr><th>Invoice</th><th>Status</th></tr><tr><td>#INV-1042</td><td><span class="badge paid">Paid</span></td></tr>
+            <tr><td>#INV-1041</td><td><span class="badge pending">Pending</span></td></tr><tr><td>#INV-1040</td><td><span class="badge paid">Paid</span></td></tr>
+          </table><div class="buttons"><button class="primary">New invoice</button><button class="secondary">Export</button></div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><div class="form-row"><label>Search products</label><input placeholder="Search by name or SKU"></div>
+          <div class="buttons"><button class="primary">Search</button><button class="secondary">Clear</button></div></div>
+        <div class="palette">
+          <div class="swatch" style="background:#292522"><span>#292522</span></div><div class="swatch" style="background:#332E2A"><span>#332E2A</span></div>
+          <div class="swatch" style="background:#3C3530"><span>#3C3530</span></div><div class="swatch" style="background:#B9784F"><span>#B9784F</span></div>
+          <div class="swatch" style="background:#955B3A"><span>#955B3A</span></div><div class="swatch" style="background:#FAF6F1"><span>#FAF6F1</span></div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+  <section class="theme dark">
+    <div class="theme-title">DARK — Deep Charcoal + Rich Terracotta + Cream</div>
+    <div class="app">
+      <aside>
+        <div class="brand">SALES <span>ERP</span></div>
+        <nav>
+          <div class="active">Dashboard</div>
+          <div>Sales</div><div>Invoices</div><div>Products</div><div>Customers</div><div>Payments</div>
+        </nav>
+      </aside>
+      <main>
+        <header>
+          <div><h1>Dashboard</h1><div class="muted">Sales overview</div></div>
+          <div class="avatar">MM</div>
+        </header>
+        <div class="metrics">
+          <div class="card"><div class="metric-label">Revenue</div><div class="metric">$48,240</div><div class="positive">+12.8%</div></div>
+          <div class="card"><div class="metric-label">Orders</div><div class="metric">1,284</div><div class="positive">+8.4%</div></div>
+          <div class="card"><div class="metric-label">Customers</div><div class="metric">842</div><div class="positive">+5.1%</div></div>
+          <div class="card"><div class="metric-label">Pending</div><div class="metric">36</div><div class="negative">-2.2%</div></div>
+        </div>
+        <div class="grid">
+          <div class="card"><h2>Sales performance</h2><div class="chart"><div class="bars">
+            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+          </div></div></div>
+          <div class="card"><h2>Recent invoices</h2><table class="table">
+            <tr><th>Invoice</th><th>Status</th></tr><tr><td>#INV-1042</td><td><span class="badge paid">Paid</span></td></tr>
+            <tr><td>#INV-1041</td><td><span class="badge pending">Pending</span></td></tr><tr><td>#INV-1040</td><td><span class="badge paid">Paid</span></td></tr>
+          </table><div class="buttons"><button class="primary">New invoice</button><button class="secondary">Export</button></div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><div class="form-row"><label>Search products</label><input placeholder="Search by name or SKU"></div>
+          <div class="buttons"><button class="primary">Search</button><button class="secondary">Clear</button></div></div>
+        <div class="palette">
+          <div class="swatch" style="background:#151312"><span>#151312</span></div><div class="swatch" style="background:#1E1B19"><span>#1E1B19</span></div>
+          <div class="swatch" style="background:#27221F"><span>#27221F</span></div><div class="swatch" style="background:#C27A50"><span>#C27A50</span></div>
+          <div class="swatch" style="background:#975633"><span>#975633</span></div><div class="swatch" style="background:#FFF9F4"><span>#FFF9F4</span></div>
+        </div>
+      </main>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

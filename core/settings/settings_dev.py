@@ -5,17 +5,33 @@ ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS += [
     'django_extensions',
-    'silk',
+    #'silk',
 ]
 
-MIDDLEWARE.insert(1, 'silk.middleware.SilkyMiddleware')
-
+#MIDDLEWARE.insert(1, 'silk.middleware.SilkyMiddleware')
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / "db.sqlite3",
-    }
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+
+        "NAME": config("DB_NAME"),
+        "USER": config("DB_USER"),
+        "PASSWORD": config("DB_PASSWORD"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
+
+        "CONN_MAX_AGE": 0,
+        "CONN_HEALTH_CHECKS": True,
+
+        "OPTIONS": {
+            "pool": {
+                "min_size": 2,
+                "max_size": 20,
+                "max_lifetime": 3600,
+                "max_idle": 600,
+            },
+        },
+    },
 }
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'

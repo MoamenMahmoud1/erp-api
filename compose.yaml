@@ -1,15 +1,20 @@
 services:
+
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-erp_api}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-development-only}
       POSTGRES_DB: ${POSTGRES_DB:-erp_api}
+
     ports:
       - "127.0.0.1:5432:5432"
+
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -20,6 +25,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+
     ports:
       - "127.0.0.1:6379:6379"
 

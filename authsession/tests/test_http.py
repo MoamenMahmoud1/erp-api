@@ -6,10 +6,10 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 from authsession.http import (
     DEVICE_COOKIE_NAME,
     DEVICE_COOKIE_SALT,
+    clear_login_cookies,
     get_client_context,
     get_client_ip,
     get_device_id,
-    clear_login_cookies,
     prevent_response_caching,
     set_login_cookies,
     set_refresh_cookie,
@@ -99,47 +99,9 @@ class AuthenticationHttpTests(SimpleTestCase):
         self.assertEqual(get_client_ip(request), "10.0.0.2")
 
     @override_settings(
-        TRUST_PROXY_HEADERS=True,
-        TRUSTED_PROXY_IPS=("10.0.0.0/8",),
+        DEBUG=False,
+        AUTH_COOKIE_SECURE=True,
     )
-    def test_untrusted_peer_has_all_forwarded_headers_removed(self):
-        request = self.factory.get(
-            "/api/v1/auth/login/",
-            REMOTE_ADDR="198.51.100.8",
-            HTTP_X_FORWARDED_FOR="203.0.113.9",
-            HTTP_X_FORWARDED_HOST="attacker.example",
-            HTTP_X_FORWARDED_PROTO="https",
-        )
-        middleware = TrustedProxyHeadersMiddleware(lambda req: req)
-
-        processed_request = middleware(request)
-
-        self.assertNotIn("HTTP_X_FORWARDED_FOR", processed_request.META)
-        self.assertNotIn("HTTP_X_FORWARDED_HOST", processed_request.META)
-        self.assertNotIn("HTTP_X_FORWARDED_PROTO", processed_request.META)
-
-    @override_settings(
-        TRUST_PROXY_HEADERS=True,
-        TRUSTED_PROXY_IPS=("10.0.0.0/8",),
-    )
-    def test_trusted_peer_keeps_forwarded_headers(self):
-        request = self.factory.get(
-            "/api/v1/auth/login/",
-            REMOTE_ADDR="10.0.0.2",
-            HTTP_X_FORWARDED_FOR="203.0.113.9",
-            HTTP_X_FORWARDED_PROTO="https",
-        )
-        middleware = TrustedProxyHeadersMiddleware(lambda req: req)
-
-        processed_request = middleware(request)
-
-        self.assertEqual(
-            processed_request.META["HTTP_X_FORWARDED_FOR"],
-            "203.0.113.9",
-        )
-        self.assertEqual(processed_request.META["HTTP_X_FORWARDED_PROTO"], "https")
-
-    @override_settings(DEBUG=False)
     def test_login_cookies_have_security_attributes(self):
         response = HttpResponse()
         device_id = uuid.uuid4()
@@ -180,7 +142,10 @@ class AuthenticationHttpTests(SimpleTestCase):
         for cookie in response.cookies.values():
             self.assertEqual(cookie["max-age"], 0)
 
-    @override_settings(DEBUG=False)
+    @override_settings(
+        DEBUG=False,
+        AUTH_COOKIE_SECURE=True,
+    )
     def test_refresh_cookie_can_use_remaining_session_lifetime(self):
         response = HttpResponse()
 

@@ -68,7 +68,7 @@ def get_client_context(request, *, device_id=None):
 def _cookie_options():
     return {
         "httponly": True,
-        "secure": not settings.DEBUG,
+        "secure": settings.AUTH_COOKIE_SECURE,
         "samesite": "Lax",
         "path": AUTH_COOKIE_PATH,
     }

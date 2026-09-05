@@ -119,12 +119,13 @@ class EmailChangeRequestSerializer(serializers.Serializer):
 
     def validate_new_email(self, value):
         new_email = User.objects.normalize_email(value)
-        if new_email.casefold() == self.context["request"].user.email.casefold():
+        current_user = self.context["request"].auth_session.user
+        if new_email.casefold() == current_user.email.casefold():
             raise serializers.ValidationError("The new email must be different.")
         return new_email
 
     def save(self, **kwargs):
-        user = self.context["request"].user
+        user = self.context["request"].auth_session.user
         try:
             verification = issue_email_change(
                 user=user,

@@ -42,6 +42,10 @@ class Role(models.Model):
         if user.is_superuser:
             return SUPERUSER_ROLE_LEVEL
 
+        token_role_level = getattr(user, "role_level", None)
+        if token_role_level is not None:
+            return int(token_role_level)
+
         role = cls.highest_for_user(user)
         return role.level if role else 0
 

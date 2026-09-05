@@ -5,14 +5,17 @@ from accounts.models.role import GLOBAL_EMPLOYEE_VISIBILITY_LEVEL, Role
 
 
 class EmployeeQuerySet(models.QuerySet):
-    def visible_to(self, user):
+    def visible_to(self, user, *, role_level=None):
         if not user or not user.is_authenticated:
             return self.none()
 
         if user.is_superuser:
             return self
 
-        if Role.level_for_user(user) >= GLOBAL_EMPLOYEE_VISIBILITY_LEVEL:
+        if role_level is None:
+            role_level = Role.level_for_user(user)
+
+        if role_level >= GLOBAL_EMPLOYEE_VISIBILITY_LEVEL:
             return self
 
         visible_employee_ids = RawSQL(
