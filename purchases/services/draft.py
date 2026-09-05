@@ -14,13 +14,22 @@ def _validate_items(items):
         raise InvalidBusinessOperation("Inactive products cannot be added to a purchase.")
 
 
+def _scoped_purchase(purchase_id, actor, *, for_update=True):
+    queryset = Purchase.objects.visible_to(actor)
+    if for_update:
+        queryset = queryset.select_for_update()
+    try:
+        return queryset.get(pk=purchase_id)
+    except Purchase.DoesNotExist as exc:
+        raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
+
+
 @transaction.atomic
 def create_purchase(*, created_by, validated_data):
     data = validated_data.copy()
     items = data.pop("items")
     _validate_items(items)
-    supplier = data["supplier"]
-    if not supplier.is_active:
+    if not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
     purchase = Purchase.objects.create(created_by=created_by, **data)
     PurchaseItem.objects.bulk_create([PurchaseItem(purchase=purchase, **item) for item in items])
@@ -28,8 +37,8 @@ def create_purchase(*, created_by, validated_data):
 
 
 @transaction.atomic
-def update_purchase(*, purchase_id, validated_data):
-    purchase = Purchase.objects.select_for_update().get(pk=purchase_id)
+def update_purchase(*, purchase_id, validated_data, actor):
+    purchase = _scoped_purchase(purchase_id, actor)
     if purchase.status != Purchase.Status.DRAFT:
         raise InvalidBusinessOperation("Only draft purchases can be edited.")
     data = validated_data.copy()
@@ -47,8 +56,8 @@ def update_purchase(*, purchase_id, validated_data):
 
 
 @transaction.atomic
-def delete_purchase(*, purchase_id):
-    purchase = Purchase.objects.select_for_update().get(pk=purchase_id)
+def delete_purchase(*, purchase_id, actor):
+    purchase = _scoped_purchase(purchase_id, actor)
     if purchase.status != Purchase.Status.DRAFT:
         raise InvalidBusinessOperation("Only draft purchases can be deleted.")
     purchase.delete()
@@ -60,10 +69,10 @@ class CreatePurchase:
 
 
 class UpdatePurchase:
-    def __call__(self, *, purchase_id, validated_data):
-        return update_purchase(purchase_id=purchase_id, validated_data=validated_data)
+    def __call__(self, *, purchase_id, validated_data, actor):
+        return update_purchase(purchase_id=purchase_id, validated_data=validated_data, actor=actor)
 
 
 class DeletePurchase:
-    def __call__(self, *, purchase_id):
-        return delete_purchase(purchase_id=purchase_id)
+    def __call__(self, *, purchase_id, actor):
+        return delete_purchase(purchase_id=purchase_id, actor=actor)
