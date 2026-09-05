@@ -5,7 +5,6 @@ from django.utils import timezone
 
 from accounting.models import Account, JournalEntry
 from accounting.services.journal import (
-    JournalEntryError,
     create_journal_entry,
     get_default_company,
     post_journal_entry,
@@ -47,12 +46,9 @@ def _source_entry(company, source_type, source_id):
             source_id=source_id,
             status=JournalEntry.Status.POSTED,
         )
+        .prefetch_related("lines")
         .first()
     )
-
-
-def _source_lines(entry):
-    return list(entry.lines.all())
 
 
 def post_sales_invoice(*, invoice, actor_id, company=None):
@@ -142,6 +138,34 @@ def post_customer_collection(*, payment, actor_id, company=None):
         reference=f"Payment #{payment.pk}",
         source_type=source_type,
         source_id=payment.pk,
+        lines=lines,
+        company=company,
+    )
+    return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
+
+
+def reverse_source_entry(*, source_entry, actor_id, source_type, source_id, company=None):
+    company = company or get_default_company()
+    reverse_type = f"{source_type}.reversal"
+    existing = _source_entry(company, reverse_type, source_id)
+    if existing:
+        return existing
+
+    lines = [
+        {
+            "account_id": line.account_id,
+            "debit": line.credit,
+            "credit": line.debit,
+        }
+        for line in source_entry.lines.all()
+    ]
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Reversal of {source_entry.reference or source_entry.pk}",
+        reference=f"Reversal {source_entry.reference or source_entry.pk}",
+        source_type=reverse_type,
+        source_id=source_id,
         lines=lines,
         company=company,
     )
