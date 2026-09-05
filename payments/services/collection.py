@@ -79,7 +79,6 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
             cash_amount=cash_use,
             transfer_amount=transfer_use,
         )
-        invoice.payment_allocations.add(allocation)
         cash_remaining -= cash_use
         transfer_remaining -= transfer_use
 
