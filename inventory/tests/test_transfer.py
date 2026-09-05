@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from common.exceptions import InvalidBusinessOperation
+from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from inventory.models import StockBalance, StockMovement
 from inventory.services.transfer_stock import TransferStock
 
@@ -38,7 +38,7 @@ class TransferServiceTests(InventoryTestMixin, TestCase):
         self.assertEqual(movement.items.count(), 1)
 
     def test_transfer_rolls_back_when_stock_is_insufficient(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(InsufficientStock):
             self.transfer(101)
         self.assertEqual(
             StockBalance.objects.get(location=self.warehouse, product=self.product).quantity,
