@@ -13,10 +13,13 @@ class InvoiceNotFound(InvalidBusinessOperation):
     pass
 
 
-def load_invoice_for_update(invoice_id):
+def load_invoice_for_update(invoice_id, actor=None):
+    queryset = Invoice.objects
+    if actor is not None:
+        queryset = queryset.visible_to(actor)
     try:
         return (
-            Invoice.objects.select_for_update(of=("self",))
+            queryset.select_for_update(of=("self",))
             .select_related("customer", "coupon", "created_by")
             .prefetch_related("items__product")
             .get(pk=invoice_id)
@@ -46,11 +49,7 @@ def _record_sale_movement(invoice, source_location):
     )
     for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
         try:
-            StockBalanceService.decrease(
-                location=source_location,
-                product=item.product,
-                quantity=item.quantity,
-            )
+            StockBalanceService.decrease(location=source_location, product=item.product, quantity=item.quantity)
         except ValueError as exc:
             raise InsufficientStock(
                 f"Insufficient stock for {item.product.name} in {source_location.name}."
@@ -60,8 +59,8 @@ def _record_sale_movement(invoice, source_location):
 
 
 @transaction.atomic
-def confirm_invoice(invoice_id):
-    invoice = load_invoice_for_update(invoice_id)
+def confirm_invoice(invoice_id, actor=None):
+    invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidStateTransition("Only a draft invoice can be confirmed.")
     source = sales_source_location(invoice.created_by)
@@ -75,15 +74,14 @@ def confirm_invoice(invoice_id):
 
 
 @transaction.atomic
-def cancel_invoice(invoice_id):
-    invoice = load_invoice_for_update(invoice_id)
+def cancel_invoice(invoice_id, actor=None):
+    invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
         raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
     if invoice.paid_amount > 0:
         raise InvalidStateTransition("A paid or partially paid invoice must be refunded before it can be cancelled.")
 
-    was_confirmed = invoice.status == Invoice.Status.CONFIRMED
-    if was_confirmed:
+    if invoice.status == Invoice.Status.CONFIRMED:
         sale = (
             StockMovement.objects.filter(
                 reference=f"Invoice #{invoice.pk}",
@@ -106,15 +104,15 @@ def cancel_invoice(invoice_id):
 
     invoice.status = Invoice.Status.CANCELLED
     invoice.save(update_fields=("status", "updated_at"))
-    log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk, was_confirmed=was_confirmed)
+    log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
     return invoice
 
 
 class ConfirmInvoice:
-    def __call__(self, invoice_id):
-        return confirm_invoice(invoice_id)
+    def __call__(self, invoice_id, actor=None):
+        return confirm_invoice(invoice_id, actor)
 
 
 class CancelInvoice:
-    def __call__(self, invoice_id):
-        return cancel_invoice(invoice_id)
+    def __call__(self, invoice_id, actor=None):
+        return cancel_invoice(invoice_id, actor)
