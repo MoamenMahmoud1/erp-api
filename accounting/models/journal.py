@@ -9,9 +9,7 @@ class JournalEntry(models.Model):
         DRAFT = "draft", "Draft"
         POSTED = "posted", "Posted"
 
-    company = models.ForeignKey(
-        "organization.Company", on_delete=models.PROTECT, related_name="journal_entries"
-    )
+    company = models.ForeignKey("organization.Company", on_delete=models.PROTECT, related_name="journal_entries")
     number = models.PositiveBigIntegerField()
     entry_date = models.DateField()
     description = models.CharField(max_length=500, blank=True)
@@ -19,16 +17,8 @@ class JournalEntry(models.Model):
     source_type = models.CharField(max_length=80, blank=True)
     source_id = models.PositiveBigIntegerField(null=True, blank=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT, db_index=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_journal_entries"
-    )
-    posted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.PROTECT,
-        related_name="posted_journal_entries",
-    )
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_journal_entries")
+    posted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="posted_journal_entries")
     posted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -37,10 +27,12 @@ class JournalEntry(models.Model):
         ordering = ("-entry_date", "-number")
         constraints = [
             models.UniqueConstraint(fields=("company", "number"), name="journal_entry_company_number_unique"),
+            models.UniqueConstraint(fields=("company", "source_type", "source_id"), name="journal_entry_company_source_unique"),
         ]
         indexes = [
             models.Index(fields=("company", "entry_date"), name="journal_company_date_idx"),
             models.Index(fields=("company", "status"), name="journal_company_status_idx"),
+            models.Index(fields=("company", "source_type", "source_id"), name="journal_source_lookup_idx"),
         ]
         permissions = [
             ("post_journal_entry", "Can post journal entries"),
