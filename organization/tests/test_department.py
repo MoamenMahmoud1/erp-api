@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -43,25 +44,25 @@ class DepartmentModelTests(TestCase):
 
     def test_store_cannot_have_department(self):
         store = self.create_site(code="ST-01", site_type=Site.Type.STORE)
-        with self.assertRaises(Exception) as raised:
+        with self.assertRaises(ValidationError) as raised:
             self.create_department(code="ST-HR", site=store)
-        self.assertEqual(raised.exception.__class__.__name__, "ValidationError")
+        self.assertIn("site", raised.exception.message_dict)
 
     def test_department_normalizes_code(self):
         department = self.create_department(code=" hr ")
         self.assertEqual(department.code, "HR")
 
     def test_department_rejects_code_containing_only_whitespace(self):
-        with self.assertRaises(Exception) as raised:
+        with self.assertRaises(ValidationError) as raised:
             self.create_department(code="   ")
-        self.assertEqual(raised.exception.__class__.__name__, "ValidationError")
+        self.assertIn("code", raised.exception.message_dict)
 
     def test_department_code_is_unique_across_company(self):
         branch = self.create_site(code="BR-01", site_type=Site.Type.BRANCH)
         self.create_department(code="HR")
-        with self.assertRaises(Exception) as raised:
+
+        with self.assertRaises(ValidationError):
             self.create_department(code="hr", site=branch)
-        self.assertEqual(raised.exception.__class__.__name__, "ValidationError")
 
     def test_database_enforces_department_code_uniqueness(self):
         self.create_department(code="HR")
