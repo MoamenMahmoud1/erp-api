@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from common.exceptions import InvalidBusinessOperation
+from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
@@ -13,6 +13,7 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
         purchase = purchases.select_for_update().prefetch_related("items__return_items").get(pk=purchase_id)
     except Purchase.DoesNotExist as exc:
         raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
+
     if purchase.status != Purchase.Status.CONFIRMED:
         raise InvalidBusinessOperation("Only confirmed purchases can be returned.")
     if not items:
@@ -51,14 +52,27 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
         reference=f"Return Purchase #{purchase.pk}",
     )
     for line, quantity in cleaned:
-        StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
+        try:
+            StockBalanceService.decrease(
+                location=warehouse,
+                product=line.product,
+                quantity=quantity,
+            )
+        except ValueError as exc:
+            raise InsufficientStock(
+                f"Insufficient stock for {line.product.name} in {warehouse.name}."
+            ) from exc
         PurchaseReturnItem.objects.create(
             purchase_return=purchase_return,
             purchase_item=line,
             quantity=quantity,
             unit_price=line.unit_purchase_price,
         )
-        StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=line.product,
+            quantity=quantity,
+        )
     return purchase_return
 
 
