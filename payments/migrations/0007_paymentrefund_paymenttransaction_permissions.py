@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import migrations, models
 import django.db.models.deletion
 
@@ -17,12 +18,12 @@ class Migration(migrations.Migration):
             name="PaymentRefund",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("cash_amount", models.DecimalField(decimal_places=2, max_digits=12, validators=[])),
-                ("transfer_amount", models.DecimalField(decimal_places=2, max_digits=12, validators=[])),
+                ("cash_amount", models.DecimalField(decimal_places=2, max_digits=12, validators=[MinValueValidator(Decimal("0"))])),
+                ("transfer_amount", models.DecimalField(decimal_places=2, max_digits=12, validators=[MinValueValidator(Decimal("0"))])),
                 ("reason", models.CharField(blank=True, max_length=255)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("allocation", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="refunds", to="payments.paymentallocation")),
-                ("created_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="created_payment_refunds", settings.AUTH_USER_MODEL)),
+                ("created_by", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="created_payment_refunds", to=settings.AUTH_USER_MODEL)),
                 ("invoice", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="payment_refunds", to="invoices.invoice")),
                 ("transaction", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="refunds", to="payments.paymenttransaction")),
             ],
