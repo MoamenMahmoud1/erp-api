@@ -66,6 +66,13 @@ def confirm_invoice(invoice_id, actor=None):
     source = sales_source_location(invoice.created_by)
     if source is None:
         raise InvalidBusinessOperation("The invoice creator has no active sales location from which to fulfill this sale.")
+
+    items = list(invoice.items.select_related("product"))
+    for item in items:
+        if item.cost_price is None:
+            item.cost_price = item.product.purchase_price
+            item.save(update_fields=("cost_price",))
+
     _record_sale_movement(invoice, source)
     company = get_default_company()
     post_sales_invoice(invoice=invoice, actor_id=invoice.created_by_id, company=company)
