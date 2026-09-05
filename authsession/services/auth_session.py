@@ -67,7 +67,9 @@ def _session_matches(*, auth_session, refresh_jti, user_id, device_id):
     return (
         auth_session.revoked_at is None
         and auth_session.expires_at > timezone.now()
-        and auth_session.user_id == user_id
+        # Simple JWT 5.5.1 stringifies the user_id claim for stateless users.
+        # Normalize both sides before comparing with the integer DB FK.
+        and str(auth_session.user_id) == str(user_id)
         and auth_session.device_id == device_id
         and auth_session.current_refresh_jti == refresh_jti
     )
