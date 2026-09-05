@@ -41,6 +41,10 @@ class EmailChangeTests(TestCase):
             format="json",
             HTTP_X_CSRFTOKEN=csrf_response.data["csrf_token"],
         )
+        for name in ("refresh_token", "device_id"):
+            cookie = login_response.cookies.get(name)
+            self.assertIsNotNone(cookie, f"Login must set the {name} cookie")
+            self.client.cookies[name] = cookie.value
         self.client.credentials(
             HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
         )
