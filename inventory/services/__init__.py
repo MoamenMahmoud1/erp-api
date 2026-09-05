@@ -1,11 +1,11 @@
 from .stock_balance import StockBalanceService
 from .stock_queries import get_available_stock, get_stock, get_total_stock
-from .transfer_stock import TransferStockService
+from .transfer_stock import TransferStock
 
-__all__ = [
+__all__ = (
     "StockBalanceService",
-    "TransferStockService",
+    "TransferStock",
     "get_stock",
     "get_total_stock",
     "get_available_stock",
-]
+)
