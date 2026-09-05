@@ -35,7 +35,7 @@ class Migration(migrations.Migration):
             model_name="stockmovement",
             constraint=models.CheckConstraint(
                 condition=(
-                    Q(movement_type="TRANSFER", source_location__isnull=True)
+                    Q(movement_type__in=("TRANSFER",), source_location__isnull=True)
                     | ~Q(source_location=F("destination_location"))
                 ),
                 name="stock_transfer_locations_differ",
