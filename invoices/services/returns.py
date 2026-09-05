@@ -32,11 +32,12 @@ def _validate_return_items(invoice, items):
 
 
 def _is_full_return(invoice, cleaned):
-    returned_by_line = {
-        line.pk: sum(item.quantity for item in line.return_items.all()) + quantity
-        for line, quantity in cleaned
-    }
-    return all(returned_by_line.get(line.pk, 0) == line.quantity for line in invoice.items.all())
+    requested = {line.pk: quantity for line, quantity in cleaned}
+    for line in invoice.items.all():
+        previously_returned = sum(item.quantity for item in line.return_items.all())
+        if previously_returned + requested.get(line.pk, 0) < line.quantity:
+            return False
+    return True
 
 
 @transaction.atomic
