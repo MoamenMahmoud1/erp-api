@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import migrations, models
 import django.db.models.deletion
 
@@ -27,9 +28,9 @@ class Migration(migrations.Migration):
             name="InvoiceReturnItem",
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
-                ("quantity", models.PositiveIntegerField()),
+                ("quantity", models.PositiveIntegerField(validators=[MinValueValidator(1)])),
                 ("condition", models.CharField(choices=[("saleable", "Saleable")], default="saleable", max_length=20)),
-                ("unit_price", models.DecimalField(decimal_places=2, max_digits=12)),
+                ("unit_price", models.DecimalField(decimal_places=2, max_digits=12, validators=[MinValueValidator(Decimal("0"))])),
                 ("invoice_item", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="return_items", to="invoices.invoiceitem")),
                 ("invoice_return", models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name="items", to="invoices.invoicereturn")),
             ],
