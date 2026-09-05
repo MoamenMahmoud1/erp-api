@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
@@ -5,7 +6,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
     dependencies = [
         ("payments", "0008_payment_permissions"),
-        ("accounts", "0010_employee_department_employee_work_site"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
@@ -27,7 +28,7 @@ class Migration(migrations.Migration):
                 null=True,
                 on_delete=django.db.models.deletion.PROTECT,
                 related_name="payment_collections",
-                to="accounts.user",
+                to=settings.AUTH_USER_MODEL,
             ),
         ),
     ]
