@@ -37,6 +37,7 @@ def login_client(client: APIClient, *, user, password: str):
         cookie = response.cookies.get(name)
         if cookie is None:
             raise AssertionError(f"Login must set the {name} cookie")
+        client.cookies.pop(name, None)
         client.cookies[name] = cookie.value
 
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
