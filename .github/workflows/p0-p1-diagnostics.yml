@@ -1,0 +1,76 @@
+name: P0/P1 Diagnostics
+
+on:
+  push:
+    branches:
+      - fix/p0-p1-business-logic-final
+    paths-ignore:
+      - diagnostics/ci-output.txt
+
+permissions:
+  contents: write
+
+jobs:
+  diagnostics:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: erp_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d erp_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Run diagnostics
+        env:
+          DJANGO_SETTINGS_MODULE: core.settings.settings_test
+          DB_NAME: erp_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+        run: |
+          set +e
+          python manage.py check > /tmp/check.txt 2>&1
+          CHECK_RC=$?
+          python manage.py makemigrations --check --dry-run -v 3 > /tmp/migrations.txt 2>&1
+          MIGRATION_RC=$?
+          python manage.py test > /tmp/tests.txt 2>&1
+          TEST_RC=$?
+          {
+            echo "# manage.py check (rc=$CHECK_RC)"
+            cat /tmp/check.txt
+            echo
+            echo "# makemigrations --check --dry-run (rc=$MIGRATION_RC)"
+            cat /tmp/migrations.txt
+            echo
+            echo "# manage.py test (rc=$TEST_RC)"
+            cat /tmp/tests.txt
+          } > diagnostics/ci-output.txt
+          echo "CHECK_RC=$CHECK_RC" >> "$GITHUB_ENV"
+          echo "MIGRATION_RC=$MIGRATION_RC" >> "$GITHUB_ENV"
+          echo "TEST_RC=$TEST_RC" >> "$GITHUB_ENV"
+      - name: Persist diagnostic output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add diagnostics/ci-output.txt
+          git diff --cached --quiet || git commit -m "ci: store latest P0/P1 diagnostics"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+      - name: Fail on diagnostic failures
+        run: |
+          test "$CHECK_RC" = "0"
+          test "$MIGRATION_RC" = "0"
+          test "$TEST_RC" = "0"
