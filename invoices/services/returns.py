@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 
+from accounting.services import get_default_company, post_sales_return
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockMovement, StockMovementItem
@@ -48,11 +49,9 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
         raise InvalidBusinessOperation("Sales returns require a paid invoice and a refund.")
 
     cleaned, returned_subtotal = _validate_return_items(invoice, items)
-    refund_amount = (
-        Decimal("0")
-        if invoice.subtotal == 0
-        else quantize_money(returned_subtotal * invoice.total / invoice.subtotal)
-    )
+    refund_amount = Decimal("0") if invoice.subtotal == 0 else quantize_money(returned_subtotal * invoice.total / invoice.subtotal)
+    sales_return = InvoiceReturn.objects.create(invoice=invoice, created_by_id=created_by_id, reason=reason, refund_amount=refund_amount)
+
     refund_invoice(
         invoice_id=invoice.pk,
         amount=refund_amount,
@@ -61,23 +60,10 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
         actor=actor,
     )
 
-    sale = (
-        StockMovement.objects.filter(
-            reference=f"Invoice #{invoice.pk}",
-            movement_type=StockMovement.MovementType.SALE,
-        )
-        .select_related("source_location")
-        .first()
-    )
+    sale = StockMovement.objects.filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE).select_related("source_location").first()
     if sale is None or sale.source_location is None:
         raise InvalidBusinessOperation("Cannot return sale: original sale movement was not found.")
 
-    sales_return = InvoiceReturn.objects.create(
-        invoice=invoice,
-        created_by_id=created_by_id,
-        reason=reason,
-        refund_amount=refund_amount,
-    )
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.SALEABLE_RETURN,
         destination_location=sale.source_location,
@@ -86,13 +72,10 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
     )
     for line, quantity in cleaned:
         StockBalanceService.increase(location=sale.source_location, product=line.product, quantity=quantity)
-        InvoiceReturnItem.objects.create(
-            invoice_return=sales_return,
-            invoice_item=line,
-            quantity=quantity,
-            unit_price=line.unit_price,
-        )
+        InvoiceReturnItem.objects.create(invoice_return=sales_return, invoice_item=line, quantity=quantity, unit_price=line.unit_price)
         StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
+
+    post_sales_return(sales_return=sales_return, actor_id=created_by_id, company=get_default_company())
 
     if _is_full_return(invoice, cleaned):
         invoice.status = Invoice.Status.RETURNED
@@ -102,10 +85,4 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
 
 class CreateSalesReturn:
     def __call__(self, *, invoice_id, items, created_by_id, reason="", actor=None):
-        return create_sales_return(
-            invoice_id=invoice_id,
-            items=items,
-            created_by_id=created_by_id,
-            reason=reason,
-            actor=actor,
-        )
+        return create_sales_return(invoice_id=invoice_id, items=items, created_by_id=created_by_id, reason=reason, actor=actor)
