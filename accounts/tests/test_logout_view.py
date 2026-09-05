@@ -10,7 +10,7 @@ from rest_framework import status
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 from authsession.services import start_auth_session
-from core.testing.auth import login_client, new_api_client
+from core.testing.auth import authenticate_stateful_client, new_api_client
 
 
 class LogoutViewTests(TestCase):
@@ -41,18 +41,20 @@ class LogoutViewTests(TestCase):
         )
 
     def test_logout_revokes_refresh_session_and_clears_login_cookies(self):
-        login_response = login_client(self.client, user=self.user, password=self.password)
+        session = authenticate_stateful_client(
+            self.client,
+            user=self.user,
+        )
 
         response = self.client.post(self.logout_url, {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertIsNotNone(AuthSession.objects.get(user=self.user).revoked_at)
+        self.assertIsNotNone(AuthSession.objects.get(pk=session.session_id).revoked_at)
         self.assertEqual(response.cookies["refresh_token"]["max-age"], 0)
         self.assertEqual(response.cookies["refresh_token"]["path"], "/api/v1/auth/")
-        self.assertIn("access", login_response.data)
 
     def test_logout_all_revokes_every_device_session(self):
-        login_client(self.client, user=self.user, password=self.password)
+        authenticate_stateful_client(self.client, user=self.user)
         start_auth_session(
             user=self.user,
             client_context=ClientContext(
@@ -89,7 +91,7 @@ class LogoutViewTests(TestCase):
             ),
         )
 
-        login_client(self.client, user=self.user, password=self.password)
+        authenticate_stateful_client(self.client, user=self.user)
         self.verify_current_session()
 
         response = self.client.post(self.logout_all_url, {}, format="json")
