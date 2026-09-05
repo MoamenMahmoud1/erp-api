@@ -8,9 +8,9 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from authsession.models import AuthSession
+from core.testing.auth import login_client, new_api_client
 
 
 @override_settings(
@@ -31,23 +31,10 @@ class EmailChangeTests(TestCase):
 
     def setUp(self):
         cache.clear()
-        self.client = APIClient(enforce_csrf_checks=True)
+        self.client = new_api_client()
         self.change_url = reverse("accounts:email-change")
         self.confirm_url = reverse("accounts:email-change-confirm")
-        csrf_response = self.client.get(reverse("accounts:csrf-token"))
-        login_response = self.client.post(
-            reverse("accounts:login"),
-            {"identifier": self.user.email, "password": self.password},
-            format="json",
-            HTTP_X_CSRFTOKEN=csrf_response.data["csrf_token"],
-        )
-        for name in ("refresh_token", "device_id"):
-            cookie = login_response.cookies.get(name)
-            self.assertIsNotNone(cookie, f"Login must set the {name} cookie")
-            self.client.cookies[name] = cookie.value
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
-        )
+        login_client(self.client, user=self.user, password=self.password)
 
     def verify_current_session(self, password=None):
         AuthSession.objects.filter(
