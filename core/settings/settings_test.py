@@ -7,8 +7,9 @@ SECURE_SSL_REDIRECT = False
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 
-# The Django test client uses HTTP by default. Keep auth cookies usable in
-# integration tests without weakening the production cookie policy.
+# Django's test client uses HTTP. Keep test cookies usable without changing
+# the secure-cookie policy used by production.
+AUTH_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
