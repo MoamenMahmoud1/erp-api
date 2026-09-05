@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from accounting.services import get_default_company, post_payment_refund
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from invoices.models import Invoice
@@ -25,25 +26,20 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise RefundError("Only confirmed or paid invoices can be refunded.")
 
-    allocation = (
-        PaymentAllocation.objects.filter(transaction_id=transaction_id, invoice_id=invoice_id)
-        .select_for_update()
-        .prefetch_related("refunds")
-        .first()
-    )
+    allocation = PaymentAllocation.objects.filter(transaction_id=transaction_id, invoice_id=invoice_id).select_for_update().prefetch_related("refunds").first()
     if allocation is None:
         raise RefundError("No matching payment allocation exists.")
     if amount > allocation.refundable_amount:
         raise RefundAmountTooLarge("Refund amount exceeds refundable payment amount.")
 
-    cash_refund = min(amount, allocation.cash_amount)
-    PaymentRefund.objects.create(
+    refund = PaymentRefund.objects.create(
         transaction_id=transaction_id,
         invoice=invoice,
         allocation=allocation,
-        cash_amount=cash_refund,
-        transfer_amount=amount - cash_refund,
+        cash_amount=min(amount, allocation.cash_amount),
+        transfer_amount=amount - min(amount, allocation.cash_amount),
         reason=reason,
         created_by_id=created_by_id,
     )
+    post_payment_refund(refund=refund, actor_id=created_by_id, company=get_default_company())
     return invoice
