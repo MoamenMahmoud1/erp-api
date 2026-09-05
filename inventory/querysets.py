@@ -11,7 +11,11 @@ class StockLocationQuerySet(models.QuerySet):
         if user.is_superuser:
             return self
         employee_ids = Subquery(visible_employee_user_ids(user))
-        return self.filter(Q(location_type="MAIN_WAREHOUSE") | Q(employee_id__in=employee_ids))
+        return self.filter(
+            Q(location_type="MAIN_WAREHOUSE")
+            | Q(employee_id=user.pk)
+            | Q(employee_id__in=employee_ids)
+        )
 
     def active(self):
         return self.filter(is_active=True)
@@ -25,7 +29,10 @@ class StockMovementQuerySet(models.QuerySet):
             return self
         employee_ids = Subquery(visible_employee_user_ids(user))
         return self.filter(
-            Q(created_by_id__in=employee_ids)
+            Q(created_by_id=user.pk)
+            | Q(created_by_id__in=employee_ids)
+            | Q(source_location__employee_id=user.pk)
+            | Q(destination_location__employee_id=user.pk)
             | Q(source_location__employee_id__in=employee_ids)
             | Q(destination_location__employee_id__in=employee_ids)
             | Q(source_location__location_type="MAIN_WAREHOUSE")
