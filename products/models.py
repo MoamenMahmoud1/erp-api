@@ -24,7 +24,7 @@ class Product(models.Model):
         ordering = ("category", "name")
         indexes = [
             models.Index(fields=("name",), name="products_product_name_idx"),
-            models.Index(fields=("category", "name"), name="products_product_category_name_idx"),
+            models.Index(fields=("category", "name"), name="products_product_cat_name_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=Q(purchase_price__gte=Decimal("0")), name="product_purchase_price_non_negative"),
