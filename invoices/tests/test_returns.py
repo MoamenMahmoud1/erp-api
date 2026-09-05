@@ -16,7 +16,7 @@ class SalesReturnTests(InvoiceTestMixin, TestCase):
         invoice = Invoice.objects.create(
             customer=self.customer,
             created_by=self.user,
-            status=Invoice.Status.CONFIRMED,
+            status=Invoice.Status.DRAFT,
         )
         line = InvoiceItem.objects.create(
             invoice=invoice,
@@ -29,7 +29,7 @@ class SalesReturnTests(InvoiceTestMixin, TestCase):
             product=self.product,
             quantity=quantity,
         )
-        ConfirmInvoice()(invoice.pk)
+        ConfirmInvoice()(invoice.pk, actor=self.user)
         tx = PaymentTransaction.objects.create(
             customer=self.customer,
             collected_by=self.user,
