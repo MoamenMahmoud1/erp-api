@@ -63,6 +63,7 @@ PROJECT_APPS = [
     "inventory.apps.InventoryConfig",
     "purchases.apps.PurchasesConfig",
     "suppliers.apps.SuppliersConfig",
+    "accounting.apps.AccountingConfig",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
@@ -151,9 +152,6 @@ SIMPLE_JWT = {
         "JWT_SIGNING_KEY",
         default="dev-only-jwt-signing-key-change-me-0123456789abcdef",
     ),
-    # Session revocation is enforced by AuthSession state. Keeping this false
-    # preserves the stateless token contract and avoids embedding a
-    # password-derived claim in every access token.
     "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
@@ -182,43 +180,14 @@ DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="WARNING").upper()
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {
-        "standard": {
-            "format": "{asctime} {levelname} {name} [{request_id}]: {message}",
-            "style": "{",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "standard",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": LOG_LEVEL,
-    },
+    "formatters": {"standard": {"format": "{asctime} {levelname} {name} [{request_id}]: {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "standard"}},
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
     "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": DJANGO_LOG_LEVEL,
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": ["console"],
-            "level": "WARNING",
-            "propagate": False,
-        },
-        "accounts": {
-            "handlers": ["console"],
-            "level": LOG_LEVEL,
-            "propagate": False,
-        },
-        "erp.operations": {
-            "handlers": ["console"],
-            "level": LOG_LEVEL,
-            "propagate": False,
-        },
+        "django": {"handlers": ["console"], "level": DJANGO_LOG_LEVEL, "propagate": False},
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "accounts": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "erp.operations": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
 }
 
