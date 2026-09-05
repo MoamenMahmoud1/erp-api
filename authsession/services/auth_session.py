@@ -202,7 +202,16 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
                 .get(id=session_id)
             )
 
+            password_changed = (
+                auth_session.user.password_changed_at is not None
+                and auth_session.user.password_changed_at > auth_session.created_at
+            )
+
             if auth_session.revoked_at is not None or auth_session.expires_at <= now:
+                invalid_session = True
+            elif password_changed:
+                auth_session.revoked_at = now
+                auth_session.save(update_fields=("revoked_at",))
                 invalid_session = True
             elif not auth_session.user.is_active:
                 auth_session.revoked_at = now
