@@ -2,6 +2,7 @@
 
 from django.db import transaction
 
+from accounting.models import JournalEntry
 from accounting.services import get_default_company, post_sales_invoice, reverse_source_entry
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
@@ -104,12 +105,11 @@ def cancel_invoice(invoice_id, actor=None):
             StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
 
         original_entry = (
-            __import__("accounting.models", fromlist=["JournalEntry"]).JournalEntry.objects
-            .filter(
+            JournalEntry.objects.filter(
                 company=get_default_company(),
                 source_type="invoice.sale",
                 source_id=invoice.pk,
-                status=__import__("accounting.models", fromlist=["JournalEntry"]).JournalEntry.Status.POSTED,
+                status=JournalEntry.Status.POSTED,
             )
             .prefetch_related("lines")
             .first()
