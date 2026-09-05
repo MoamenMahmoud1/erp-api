@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from common.exceptions import InvalidBusinessOperation
+from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 
@@ -19,7 +19,7 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
     except StockLocation.DoesNotExist as exc:
         raise InvalidBusinessOperation("Source or destination location is not accessible.") from exc
 
-    product_ids = [item["product"].pk if hasattr(item["product"], "pk") else item["product"] for item in items]
+    product_ids = [item["product"].pk for item in items]
     if len(product_ids) != len(set(product_ids)):
         raise InvalidBusinessOperation("A product can appear only once in a transfer.")
 
@@ -33,9 +33,12 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
     for item in items:
         product = item["product"]
         quantity = item["quantity"]
-        if quantity <= 0:
-            raise InvalidBusinessOperation("Quantity must be greater than zero.")
-        StockBalanceService.decrease(location=source, product=product, quantity=quantity)
+        try:
+            StockBalanceService.decrease(location=source, product=product, quantity=quantity)
+        except ValueError as exc:
+            raise InsufficientStock(
+                f"Insufficient stock for {product.name} in {source.name}."
+            ) from exc
         StockBalanceService.increase(location=destination, product=product, quantity=quantity)
         StockMovementItem.objects.create(movement=movement, product=product, quantity=quantity)
     return movement
