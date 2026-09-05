@@ -1,34 +1,41 @@
-"""Atomic invoice creation service."""
-
 from django.db import transaction
 
+from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from invoices.models import Invoice, InvoiceItem
 
 
+def _validate_items(items):
+    if not items:
+        raise InvalidBusinessOperation("An invoice must contain at least one item.")
+    product_ids = [item["product"].pk for item in items]
+    if len(product_ids) != len(set(product_ids)):
+        raise InvalidBusinessOperation("A product cannot appear more than once.")
+    if any(not item["product"].is_active for item in items):
+        raise InvalidBusinessOperation("Inactive products cannot be added to an invoice.")
+
+
 def _create_invoice(*, created_by_id, validated_data):
-    """Create an invoice and all items within one synchronous transaction."""
     invoice_data = validated_data.copy()
     items = invoice_data.pop("items")
+    _validate_items(items)
 
     with transaction.atomic():
         invoice = Invoice.objects.create(created_by_id=created_by_id, **invoice_data)
-        for item in items:
-            product = item["product"]
-            InvoiceItem.objects.create(
-                invoice=invoice,
-                product=product,
-                quantity=item["quantity"],
-                unit_price=quantize_money(product.selling_price),
-            )
+        InvoiceItem.objects.bulk_create(
+            [
+                InvoiceItem(
+                    invoice=invoice,
+                    product=item["product"],
+                    quantity=item["quantity"],
+                    unit_price=quantize_money(item["product"].selling_price),
+                )
+                for item in items
+            ]
+        )
     return invoice
 
 
 class CreateInvoice:
-    """Create an invoice with server-authoritative product-price snapshots."""
-
     def __call__(self, *, created_by_id, validated_data):
-        return _create_invoice(
-            created_by_id=created_by_id,
-            validated_data=validated_data,
-        )
+        return _create_invoice(created_by_id=created_by_id, validated_data=validated_data)
