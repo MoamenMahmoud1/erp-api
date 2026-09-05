@@ -11,10 +11,7 @@ class StockLocation(models.Model):
         SALES_VEHICLE = "SALES_VEHICLE", "Sales Vehicle"
 
     name = models.CharField(max_length=150)
-    location_type = models.CharField(
-        max_length=30,
-        choices=LocationType.choices,
-    )
+    location_type = models.CharField(max_length=30, choices=LocationType.choices)
     employee = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -30,10 +27,7 @@ class StockLocation(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=("location_type",),
-                condition=Q(
-                    location_type="MAIN_WAREHOUSE",
-                    is_active=True,
-                ),
+                condition=Q(location_type="MAIN_WAREHOUSE", is_active=True),
                 name="inventory_one_active_main_warehouse",
             ),
         ]
@@ -45,15 +39,13 @@ class StockLocation(models.Model):
 class StockMovement(models.Model):
     class MovementType(models.TextChoices):
         PURCHASE = "PURCHASE", "Purchase"
+        PURCHASE_RETURN = "PURCHASE_RETURN", "Purchase Return"
         TRANSFER = "TRANSFER", "Transfer"
         SALE = "SALE", "Sale"
         SALEABLE_RETURN = "SALEABLE_RETURN", "Saleable Return"
         DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
 
-    movement_type = models.CharField(
-        max_length=30,
-        choices=MovementType.choices,
-    )
+    movement_type = models.CharField(max_length=30, choices=MovementType.choices)
     source_location = models.ForeignKey(
         StockLocation,
         on_delete=models.PROTECT,
@@ -74,10 +66,7 @@ class StockMovement(models.Model):
         related_name="created_stock_movements",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    reference = models.CharField(
-        max_length=100,
-        blank=True,
-    )
+    reference = models.CharField(max_length=100, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -87,24 +76,13 @@ class StockMovement(models.Model):
 
 
 class StockMovementItem(models.Model):
-    movement = models.ForeignKey(
-        StockMovement,
-        on_delete=models.CASCADE,
-        related_name="items",
-    )
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.PROTECT,
-        related_name="stock_movement_items",
-    )
+    movement = models.ForeignKey(StockMovement, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_movement_items")
     quantity = models.PositiveIntegerField()
 
     class Meta:
         constraints = [
-            models.CheckConstraint(
-                condition=Q(quantity__gte=1),
-                name="stock_movement_item_quantity_positive",
-            ),
+            models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_movement_item_quantity_positive"),
         ]
         ordering = ("id",)
 
@@ -113,25 +91,14 @@ class StockMovementItem(models.Model):
 
 
 class StockBalance(models.Model):
-    location = models.ForeignKey(
-        StockLocation,
-        on_delete=models.CASCADE,
-        related_name="stock_balances",
-    )
-    product = models.ForeignKey(
-        "products.Product",
-        on_delete=models.PROTECT,
-        related_name="stock_balances",
-    )
+    location = models.ForeignKey(StockLocation, on_delete=models.CASCADE, related_name="stock_balances")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_balances")
     quantity = models.PositiveIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(
-                fields=("location", "product"),
-                name="stock_balance_unique_location_product",
-            ),
+            models.UniqueConstraint(fields=("location", "product"), name="stock_balance_unique_location_product"),
         ]
 
     def __str__(self):
