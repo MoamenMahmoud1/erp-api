@@ -15,6 +15,7 @@ class Migration(migrations.Migration):
             model_name="cartonpricing",
             name="product",
             field=models.ForeignKey(
+                blank=True,
                 null=True,
                 on_delete=django.db.models.deletion.PROTECT,
                 related_name="carton_pricings",
