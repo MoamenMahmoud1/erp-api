@@ -7,7 +7,14 @@ from .automation import (
     post_sales_invoice,
     post_sales_return,
 )
-from .journal import JournalEntryError, create_journal_entry, general_ledger, get_default_company, post_journal_entry, trial_balance
+from .journal import (
+    JournalEntryError,
+    create_journal_entry,
+    general_ledger,
+    get_default_company,
+    post_journal_entry,
+    trial_balance,
+)
 
 __all__ = (
     "JournalEntryError",
