@@ -1,5 +1,3 @@
-from decimal import Decimal
-
 from django.db import transaction
 
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
@@ -22,9 +20,7 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
     if amount <= 0:
         raise InvalidMoney("Refund amount must be greater than zero.")
 
-    invoice_qs = Invoice.objects
-    if actor is not None:
-        invoice_qs = invoice_qs.visible_to(actor)
+    invoice_qs = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     invoice = invoice_qs.select_for_update().get(pk=invoice_id)
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise RefundError("Only confirmed or paid invoices can be refunded.")
@@ -50,7 +46,4 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
         reason=reason,
         created_by_id=created_by_id,
     )
-    if invoice.status == Invoice.Status.PAID and invoice.paid_amount < invoice.total:
-        invoice.status = Invoice.Status.CONFIRMED
-        invoice.save(update_fields=("status", "updated_at"))
     return invoice
