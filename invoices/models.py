@@ -55,21 +55,21 @@ class Invoice(models.Model):
 
     @property
     def sold_quantity(self):
-        return sum(item.quantity for item in self.items.all())
+        quantity = Decimal("0")
+        for item in self.items.all():
+            returned = sum(value.quantity for value in item.return_items.all())
+            quantity += item.quantity - returned
+        return int(quantity)
 
     @property
     def paid_amount(self):
         from common.money import quantize_money
-        return quantize_money(
-            sum((item.total_amount for item in self.payment_allocations.all()), Decimal("0"))
-        )
+        return quantize_money(sum((item.total_amount for item in self.payment_allocations.all()), Decimal("0")))
 
     @property
     def refunded_amount(self):
         from common.money import quantize_money
-        return quantize_money(
-            sum((item.total_amount for item in self.payment_refunds.all()), Decimal("0"))
-        )
+        return quantize_money(sum((item.total_amount for item in self.payment_refunds.all()), Decimal("0")))
 
     @property
     def net_paid_amount(self):
@@ -79,9 +79,7 @@ class Invoice(models.Model):
     @property
     def returned_amount(self):
         from common.money import quantize_money
-        return quantize_money(
-            sum((item.refund_amount for item in self.returns.all()), Decimal("0"))
-        )
+        return quantize_money(sum((item.refund_amount for item in self.returns.all()), Decimal("0")))
 
     @property
     def outstanding_amount(self):
@@ -112,21 +110,13 @@ class InvoiceReturn(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="returns")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoice_returns")
     reason = models.CharField(max_length=255, blank=True)
-    refund_amount = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=Decimal("0"),
-        validators=[MinValueValidator(Decimal("0"))],
-    )
+    refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))])
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ("-created_at",)
         constraints = [
-            models.CheckConstraint(
-                condition=Q(refund_amount__gte=Decimal("0")),
-                name="invoice_return_refund_amount_non_negative",
-            )
+            models.CheckConstraint(condition=Q(refund_amount__gte=Decimal("0")), name="invoice_return_refund_amount_non_negative"),
         ]
 
     @property
