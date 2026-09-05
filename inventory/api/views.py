@@ -2,6 +2,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
 from rest_framework.response import Response
 
+from common.exceptions import InvalidBusinessOperation
 from common.pagination import StandardPagination
 from inventory.api.filters import StockBalanceFilter, StockMovementFilter
 from inventory.api.serializers import (
@@ -21,7 +22,7 @@ class LocationListView(generics.ListAPIView):
     pagination_class = StandardPagination
 
     def get_queryset(self):
-        return StockLocation.objects.visible_to(self.request.user).filter(is_active=True)
+        return StockLocation.objects.visible_to(self.request.user).active()
 
 
 class StockBalanceListView(generics.ListAPIView):
@@ -32,9 +33,11 @@ class StockBalanceListView(generics.ListAPIView):
     filterset_class = StockBalanceFilter
 
     def get_queryset(self):
-        return StockBalance.objects.select_related("product", "location").filter(
-            location__in=StockLocation.objects.visible_to(self.request.user)
-        ).order_by("location__name", "product__name")
+        return (
+            StockBalance.objects.select_related("product", "location")
+            .filter(location__in=StockLocation.objects.visible_to(self.request.user))
+            .order_by("location__name", "product__name")
+        )
 
 
 class MovementListView(generics.ListAPIView):
@@ -45,9 +48,11 @@ class MovementListView(generics.ListAPIView):
     filterset_class = StockMovementFilter
 
     def get_queryset(self):
-        return StockMovement.objects.visible_to(self.request.user).prefetch_related(
-            "items__product"
-        ).select_related("source_location", "destination_location", "created_by")
+        return (
+            StockMovement.objects.visible_to(self.request.user)
+            .prefetch_related("items__product")
+            .select_related("source_location", "destination_location", "created_by")
+        )
 
 
 class TransferView(generics.GenericAPIView):
@@ -66,6 +71,15 @@ class TransferView(generics.GenericAPIView):
                 created_by=request.user,
                 reference=data.get("reference", ""),
             )
-        except ValueError as exc:
-            return Response({"detail": str(exc), "code": "transfer_invalid"}, status=status.HTTP_409_CONFLICT)
+        except InvalidBusinessOperation as exc:
+            return Response(
+                {"detail": str(exc), "code": "transfer_invalid"},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        movement = (
+            StockMovement.objects.prefetch_related("items__product")
+            .select_related("source_location", "destination_location", "created_by")
+            .get(pk=movement.pk)
+        )
         return Response(StockMovementSerializer(movement).data, status=status.HTTP_201_CREATED)
