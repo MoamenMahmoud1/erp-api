@@ -35,10 +35,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id):
 
     with transaction.atomic():
         invoices = list(
-            Invoice.objects.filter(
-                customer=customer,
-                status=Invoice.Status.CONFIRMED,
-            )
+            Invoice.objects.filter(customer=customer, status=Invoice.Status.CONFIRMED)
             .select_for_update(of=("self",))
             .prefetch_related("items")
             .order_by("created_at", "id")
@@ -61,9 +58,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id):
                 total_outstanding += due
 
         if not outstanding:
-            raise NoConfirmableInvoicesError(
-                "The customer has no outstanding confirmed invoices."
-            )
+            raise NoConfirmableInvoicesError("The customer has no outstanding confirmed invoices.")
         if total_received > total_outstanding:
             raise OverpaymentError("The received amount exceeds the outstanding balance.")
 
@@ -90,7 +85,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id):
             cash_remaining -= cash_use
             transfer_remaining -= transfer_use
 
-            if quantize_money(cash_use + transfer_use) + (due - quantize_money(cash_use + transfer_use)) == invoice.outstanding_amount:
+            if invoice.paid_amount >= invoice.total:
                 invoice.status = Invoice.Status.PAID
                 invoice.save(update_fields=("status", "updated_at"))
 
