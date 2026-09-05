@@ -1,9 +1,7 @@
-from decimal import Decimal
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from invoices.models import Invoice, InvoiceItem
+from invoices.models import Invoice
 from .helpers import InvoiceTestMixin
 
 
