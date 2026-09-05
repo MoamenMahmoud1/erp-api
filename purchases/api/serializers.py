@@ -1,6 +1,13 @@
 from rest_framework import serializers
 
-from purchases.models import Purchase, PurchaseItem, PurchaseReturn, PurchaseReturnItem
+from purchases.models import (
+    Purchase,
+    PurchaseItem,
+    PurchaseReturn,
+    PurchaseReturnItem,
+    SupplierPayment,
+    SupplierPaymentAllocation,
+)
 
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
@@ -56,3 +63,25 @@ class PurchaseReturnSerializer(serializers.ModelSerializer):
         model = PurchaseReturn
         fields = ("id", "purchase", "created_by", "reason", "total_amount", "created_at")
         read_only_fields = fields
+
+
+class SupplierPaymentAllocationSerializer(serializers.ModelSerializer):
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = SupplierPaymentAllocation
+        fields = ("id", "purchase", "cash_amount", "transfer_amount", "total_amount", "created_at")
+        read_only_fields = fields
+
+
+class SupplierPaymentSerializer(serializers.ModelSerializer):
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    allocations = SupplierPaymentAllocationSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SupplierPayment
+        fields = (
+            "id", "supplier", "paid_by", "cash_amount", "transfer_amount",
+            "reference", "total_amount", "created_at", "allocations",
+        )
+        read_only_fields = ("id", "paid_by", "total_amount", "created_at", "allocations")
