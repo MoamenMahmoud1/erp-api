@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
 
 from customers.models import Customer
 from inventory.models import StockLocation
@@ -28,7 +27,3 @@ class InvoiceTestMixin:
             location_type=StockLocation.LocationType.SALES_VEHICLE,
             employee=self.user,
         )
-
-
-class InvoiceModelTestCase(InvoiceTestMixin, TestCase):
-    pass
