@@ -1,9 +1,16 @@
+import json
+
 from django.db import transaction
 
 from payments.api.serializers import PaymentTransactionSerializer
 from payments.models import IdempotencyKey
 from payments.services.collection import collect
 from payments.services.idempotency import load_or_create_key
+
+
+def _json_safe(value):
+    """Normalize serialized response data before storing it in JSONField."""
+    return json.loads(json.dumps(value, default=str))
 
 
 @transaction.atomic
@@ -26,7 +33,7 @@ def process_idempotent(*, key, user_id, path, data, customer, cash_amount, trans
         response_body = {"detail": "Zero-value collection is a no-op.", "code": "noop"}
     else:
         status_code = 201
-        response_body = PaymentTransactionSerializer(payment).data
+        response_body = _json_safe(PaymentTransactionSerializer(payment).data)
 
     IdempotencyKey.objects.filter(pk=record.pk).update(
         response_status=status_code,
