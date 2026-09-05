@@ -4,11 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounting.models import Account, JournalEntry
-from accounting.services.journal import (
-    create_journal_entry,
-    get_default_company,
-    post_journal_entry,
-)
+from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
 
 
 DEFAULT_ACCOUNTS = {
@@ -60,7 +56,11 @@ def post_sales_invoice(*, invoice, actor_id, company=None):
     accounts = ensure_default_accounts(company)
     receivable = invoice.total
     cogs = sum(
-        (item.product.purchase_price * item.quantity for item in invoice.items.all()),
+        (
+            (item.cost_price if item.cost_price is not None else item.product.purchase_price)
+            * item.quantity
+            for item in invoice.items.all()
+        ),
         Decimal("0"),
     )
     lines = [
@@ -152,11 +152,7 @@ def reverse_source_entry(*, source_entry, actor_id, source_type, source_id, comp
         return existing
 
     lines = [
-        {
-            "account_id": line.account_id,
-            "debit": line.credit,
-            "credit": line.debit,
-        }
+        {"account_id": line.account_id, "debit": line.credit, "credit": line.debit}
         for line in source_entry.lines.all()
     ]
     entry = create_journal_entry(
