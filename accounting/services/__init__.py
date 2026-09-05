@@ -6,6 +6,7 @@ from .automation import (
     post_purchase_return,
     post_sales_invoice,
     post_sales_return,
+    post_supplier_payment,
 )
 from .journal import (
     JournalEntryError,
@@ -29,5 +30,6 @@ __all__ = (
     "post_journal_entry",
     "post_sales_invoice",
     "post_sales_return",
+    "post_supplier_payment",
     "trial_balance",
 )
