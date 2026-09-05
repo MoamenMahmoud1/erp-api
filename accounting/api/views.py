@@ -1,9 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
 
 from accounting.api.serializers import (
     AccountSerializer,
@@ -37,9 +37,10 @@ class AccountViewSet(viewsets.ModelViewSet):
         serializer.save(company=get_default_company())
 
 
-class JournalEntryViewSet(viewsets.ReadOnlyModelViewSet):
+class JournalEntryViewSet(viewsets.ModelViewSet):
     serializer_class = JournalEntrySerializer
     permission_classes = (IsAuthenticated,)
+    http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_fields = ("status", "entry_date", "reference", "source_type")
     search_fields = ("description", "reference")
