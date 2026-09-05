@@ -8,17 +8,7 @@ from common.exceptions import CouponInvalid, InsufficientStock, InvalidBusinessO
 from invoices.api.serializers import InvoiceReturnInputSerializer, InvoiceReturnSerializer, InvoiceSerializer, InvoiceSummarySerializer
 from invoices.models import Invoice, InvoiceItem
 from invoices.permissions import InvoicePermission
-from invoices.services import (
-    ApplyCoupon,
-    CancelInvoice,
-    ConfirmInvoice,
-    CreateInvoice,
-    CreateSalesReturn,
-    DeleteInvoice,
-    InvoiceNotFound,
-    RemoveCoupon,
-    UpdateInvoice,
-)
+from invoices.services import ApplyCoupon, CancelInvoice, ConfirmInvoice, CreateInvoice, CreateSalesReturn, DeleteInvoice, InvoiceNotFound, RemoveCoupon, UpdateInvoice
 
 
 def _run_invoice(operation):
@@ -32,6 +22,8 @@ def _run_invoice(operation):
         return None, Response({"detail": str(exc), "code": "insufficient_stock"}, status=409)
     except InvoiceNotFound as exc:
         return None, Response({"detail": str(exc), "code": "not_found"}, status=404)
+    except Invoice.DoesNotExist:
+        return None, Response({"detail": "Invoice not found.", "code": "not_found"}, status=404)
     except InvalidBusinessOperation as exc:
         return None, Response({"detail": str(exc), "code": "invalid_operation"}, status=409)
 
@@ -48,20 +40,20 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         )
 
     def get_serializer_class(self):
-        if self.action in {"list", "retrieve"}:
-            return InvoiceSummarySerializer
-        return InvoiceSerializer
+        return InvoiceSummarySerializer if self.action in {"list", "retrieve"} else InvoiceSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        invoice = CreateInvoice()(created_by_id=request.user.pk, validated_data=serializer.validated_data)
+        invoice, error = _run_invoice(lambda: CreateInvoice()(created_by_id=request.user.pk, validated_data=serializer.validated_data))
+        if error:
+            return error
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        invoice, error = _run_invoice(
-            lambda: UpdateInvoice()(invoice_id=kwargs["pk"], validated_data=request.data)
-        )
+        serializer = self.get_serializer(data=request.data, partial=request.method == "PATCH")
+        serializer.is_valid(raise_exception=True)
+        invoice, error = _run_invoice(lambda: UpdateInvoice()(invoice_id=kwargs["pk"], validated_data=serializer.validated_data, actor=request.user))
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
@@ -70,21 +62,21 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return self.update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
-        _, error = _run_invoice(lambda: DeleteInvoice()(invoice_id=kwargs["pk"]))
+        _, error = _run_invoice(lambda: DeleteInvoice()(invoice_id=kwargs["pk"], actor=request.user))
         if error:
             return error
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], throttle_classes=[SensitiveActionThrottle])
     def confirm(self, request, pk=None):
-        invoice, error = _run_invoice(lambda: ConfirmInvoice()(invoice_id=pk))
+        invoice, error = _run_invoice(lambda: ConfirmInvoice()(invoice_id=pk, actor=request.user))
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=True, methods=["post"], throttle_classes=[SensitiveActionThrottle])
     def cancel(self, request, pk=None):
-        invoice, error = _run_invoice(lambda: CancelInvoice()(invoice_id=pk))
+        invoice, error = _run_invoice(lambda: CancelInvoice()(invoice_id=pk, actor=request.user))
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
@@ -94,14 +86,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         code = (request.data or {}).get("code")
         if not code:
             return Response({"detail": "A coupon code is required.", "code": "coupon_required"}, status=400)
-        invoice, error = _run_invoice(lambda: ApplyCoupon()(invoice_id=pk, code=code))
+        invoice, error = _run_invoice(lambda: ApplyCoupon()(invoice_id=pk, code=code, actor=request.user))
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
 
     @action(detail=True, methods=["post"], url_path="remove-coupon", throttle_classes=[SensitiveActionThrottle])
     def remove_coupon(self, request, pk=None):
-        invoice, error = _run_invoice(lambda: RemoveCoupon()(invoice_id=pk))
+        invoice, error = _run_invoice(lambda: RemoveCoupon()(invoice_id=pk, actor=request.user))
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
@@ -112,13 +104,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         result, error = _run_invoice(
-            lambda: CreateSalesReturn()(
-                invoice_id=pk,
-                items=data["items"],
-                created_by_id=request.user.pk,
-                reason=data.get("reason", ""),
-            )
+            lambda: CreateSalesReturn()(invoice_id=pk, items=data["items"], created_by_id=request.user.pk, reason=data.get("reason", ""), actor=request.user)
         )
         if error:
             return error
-        return Response(InvoiceReturnSerializer(result).data, status=201)
+        return Response(InvoiceReturnSerializer(result).data, status=status.HTTP_201_CREATED)
