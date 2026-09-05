@@ -9,8 +9,11 @@ from .refund import refund_payment
 
 
 @transaction.atomic
-def refund_invoice(*, invoice_id, amount, created_by_id, reason=""):
-    invoice = Invoice.objects.select_for_update().get(pk=invoice_id)
+def refund_invoice(*, invoice_id, amount, created_by_id, reason="", actor=None):
+    invoice_qs = Invoice.objects
+    if actor is not None:
+        invoice_qs = invoice_qs.visible_to(actor)
+    invoice = invoice_qs.select_for_update().get(pk=invoice_id)
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise InvalidBusinessOperation("Only confirmed or paid invoices can be refunded.")
 
@@ -37,6 +40,7 @@ def refund_invoice(*, invoice_id, amount, created_by_id, reason=""):
             amount=chunk,
             created_by_id=created_by_id,
             reason=reason,
+            actor=actor,
         )
         remaining -= chunk
         if remaining <= 0:
