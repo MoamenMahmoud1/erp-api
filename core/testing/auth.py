@@ -12,6 +12,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from authsession.http import ClientContext, set_login_cookies
+from authsession.models import AuthSession
 from authsession.services import start_auth_session
 
 
@@ -60,10 +61,11 @@ def authenticate_stateful_client(
     user_agent="Test browser",
     ip_address="127.0.0.1",
 ):
-    """Attach a valid access JWT and the matching stateful auth cookies.
+    """Attach a valid access JWT and matching stateful auth cookies.
 
     This exercises the protected endpoint/session contract directly while
     leaving login endpoint coverage to ``login_client`` and its dedicated tests.
+    The returned value is the persisted ``AuthSession`` model.
     """
     device_id = device_id or uuid.uuid4()
     client_context = ClientContext(
@@ -72,17 +74,17 @@ def authenticate_stateful_client(
         user_agent=user_agent,
         ip_address=ip_address,
     )
-    session = start_auth_session(user=user, client_context=client_context)
+    session_result = start_auth_session(user=user, client_context=client_context)
 
     cookie_response = HttpResponse()
     set_login_cookies(
         cookie_response,
-        refresh_token=session.refresh_token,
-        device_id=session.device_id,
+        refresh_token=session_result.refresh_token,
+        device_id=session_result.device_id,
     )
     client.cookies.update(cookie_response.cookies)
-    client.credentials(HTTP_AUTHORIZATION=f"Bearer {session.access_token}")
-    return session
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {session_result.access_token}")
+    return AuthSession.objects.get(pk=session_result.session_id)
 
 
 def new_api_client() -> APIClient:
