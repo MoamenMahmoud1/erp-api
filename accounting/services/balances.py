@@ -153,12 +153,12 @@ def customer_aging(*, as_of=None, customer_id=None):
 
     return [
         {
-            "customer_id": customer_id,
-            "customer_name": names[customer_id],
+            "customer_id": cid,
+            "customer_name": names[cid],
             **buckets,
             "total": sum(buckets.values(), ZERO),
         }
-        for customer_id, buckets in by_customer.items()
+        for cid, buckets in sorted(by_customer.items())
     ]
 
 
@@ -198,10 +198,10 @@ def supplier_aging(*, as_of=None, supplier_id=None):
 
     return [
         {
-            "supplier_id": supplier_id,
-            "supplier_name": names[supplier_id],
+            "supplier_id": sid,
+            "supplier_name": names[sid],
             **buckets,
             "total": sum(buckets.values(), ZERO),
         }
-        for supplier_id, buckets in by_supplier.items()
+        for sid, buckets in sorted(by_supplier.items())
     ]
