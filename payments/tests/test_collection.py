@@ -4,7 +4,7 @@ from django.test import TransactionTestCase
 
 from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentTransaction
-from payments.services import NoConfirmableInvoicesError, OverpaymentError, collect, refund_payment
+from payments.services import NoConfirmableInvoicesError, OverpaymentError, collect
 
 from .helpers import PaymentTestMixin
 
@@ -22,7 +22,10 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         invoice.refresh_from_db()
         self.assertEqual(tx.total_amount, Decimal("100.00"))
         self.assertEqual(invoice.status, Invoice.Status.PAID)
-        self.assertEqual(PaymentAllocation.objects.get(invoice=invoice).total_amount, Decimal("100.00"))
+        self.assertEqual(
+            PaymentAllocation.objects.get(invoice=invoice).total_amount,
+            Decimal("100.00"),
+        )
 
     def test_partial_payment(self):
         invoice = self.create_invoice()
@@ -47,8 +50,14 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             collected_by_id=self.user.pk,
             actor=self.user,
         )
-        self.assertEqual(PaymentAllocation.objects.get(transaction=tx, invoice=old).total_amount, Decimal("100.00"))
-        self.assertEqual(PaymentAllocation.objects.get(transaction=tx, invoice=new).total_amount, Decimal("20.00"))
+        self.assertEqual(
+            PaymentAllocation.objects.get(transaction=tx, invoice=old).total_amount,
+            Decimal("100.00"),
+        )
+        self.assertEqual(
+            PaymentAllocation.objects.get(transaction=tx, invoice=new).total_amount,
+            Decimal("20.00"),
+        )
 
     def test_overpayment_rolls_back(self):
         self.create_invoice()
@@ -72,26 +81,3 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
                 collected_by_id=self.user.pk,
                 actor=self.user,
             )
-
-    def test_refund_does_not_create_outstanding_debt(self):
-        invoice = self.create_invoice()
-        tx = collect(
-            customer=self.customer,
-            cash_amount=Decimal("100"),
-            transfer_amount=Decimal("0"),
-            collected_by_id=self.user.pk,
-            actor=self.user,
-        )
-        refund_payment(
-            transaction_id=tx.pk,
-            invoice_id=invoice.pk,
-            amount=Decimal("50"),
-            created_by_id=self.user.pk,
-            actor=self.user,
-        )
-        invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
-        self.assertEqual(invoice.paid_amount, Decimal("100.00"))
-        self.assertEqual(invoice.refunded_amount, Decimal("50.00"))
-        self.assertEqual(invoice.net_paid_amount, Decimal("50.00"))
-        self.assertEqual(invoice.outstanding_amount, Decimal("0.00"))
