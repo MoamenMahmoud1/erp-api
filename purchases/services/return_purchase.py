@@ -1,7 +1,8 @@
 from django.db import transaction
 
+from accounting.services import get_default_company, post_purchase_return
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
-from inventory.models import StockLocation, StockMovement, StockMovementItem
+from inventory.models import StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
@@ -32,19 +33,11 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
             raise InvalidBusinessOperation("Return quantity exceeds the remaining purchased quantity.")
         cleaned.append((line, quantity))
 
-    warehouse = (
-        StockLocation.objects.select_for_update()
-        .filter(location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True)
-        .first()
-    )
+    warehouse = StockLocation.objects.select_for_update().filter(location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True).first()
     if warehouse is None:
         raise InvalidBusinessOperation("Active main warehouse does not exist.")
 
-    purchase_return = PurchaseReturn.objects.create(
-        purchase=purchase,
-        created_by_id=created_by_id,
-        reason=reason,
-    )
+    purchase_return = PurchaseReturn.objects.create(purchase=purchase, created_by_id=created_by_id, reason=reason)
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.PURCHASE_RETURN,
         source_location=warehouse,
@@ -53,35 +46,21 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
     )
     for line, quantity in cleaned:
         try:
-            StockBalanceService.decrease(
-                location=warehouse,
-                product=line.product,
-                quantity=quantity,
-            )
+            StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
         except ValueError as exc:
-            raise InsufficientStock(
-                f"Insufficient stock for {line.product.name} in {warehouse.name}."
-            ) from exc
+            raise InsufficientStock(f"Insufficient stock for {line.product.name} in {warehouse.name}.") from exc
         PurchaseReturnItem.objects.create(
             purchase_return=purchase_return,
             purchase_item=line,
             quantity=quantity,
             unit_price=line.unit_purchase_price,
         )
-        StockMovementItem.objects.create(
-            movement=movement,
-            product=line.product,
-            quantity=quantity,
-        )
+        StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
+
+    post_purchase_return(purchase_return=purchase_return, actor_id=created_by_id, company=get_default_company())
     return purchase_return
 
 
 class ReturnPurchase:
     def __call__(self, *, purchase_id, items, created_by_id, reason="", actor=None):
-        return return_purchase(
-            purchase_id=purchase_id,
-            items=items,
-            created_by_id=created_by_id,
-            reason=reason,
-            actor=actor,
-        )
+        return return_purchase(purchase_id=purchase_id, items=items, created_by_id=created_by_id, reason=reason, actor=actor)
