@@ -1,4 +1,4 @@
-"""Locked invoice lifecycle transitions."""
+"""Atomic invoice lifecycle transitions."""
 
 from django.db import transaction
 
@@ -10,11 +10,10 @@ from invoices.models import Invoice
 
 
 class InvoiceNotFound(InvalidBusinessOperation):
-    """Raised when a requested invoice does not exist."""
+    pass
 
 
 def load_invoice_for_update(invoice_id):
-    """Load a lifecycle target; callers must hold ``transaction.atomic()``."""
     try:
         return (
             Invoice.objects.select_for_update(of=("self",))
@@ -27,7 +26,6 @@ def load_invoice_for_update(invoice_id):
 
 
 def sales_source_location(user):
-    """Return the active SALES_VEHICLE location bound to ``user``."""
     return (
         StockLocation.objects.filter(
             employee=user,
@@ -46,12 +44,7 @@ def _record_sale_movement(invoice, source_location):
         created_by=invoice.created_by,
         reference=f"Invoice #{invoice.pk}",
     )
-
-    items = sorted(
-        invoice.items.select_related("product").all(),
-        key=lambda value: value.product_id,
-    )
-    for item in items:
+    for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
         try:
             StockBalanceService.decrease(
                 location=source_location,
@@ -62,111 +55,66 @@ def _record_sale_movement(invoice, source_location):
             raise InsufficientStock(
                 f"Insufficient stock for {item.product.name} in {source_location.name}."
             ) from exc
-
-        StockMovementItem.objects.create(
-            movement=movement,
-            product=item.product,
-            quantity=item.quantity,
-        )
+        StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
     return movement
 
 
-def _confirm_invoice(invoice_id):
-    with transaction.atomic():
-        invoice = load_invoice_for_update(invoice_id)
-        if invoice.status != Invoice.Status.DRAFT:
-            raise InvalidStateTransition("Only a draft invoice can be confirmed.")
+@transaction.atomic
+def confirm_invoice(invoice_id):
+    invoice = load_invoice_for_update(invoice_id)
+    if invoice.status != Invoice.Status.DRAFT:
+        raise InvalidStateTransition("Only a draft invoice can be confirmed.")
+    source = sales_source_location(invoice.created_by)
+    if source is None:
+        raise InvalidBusinessOperation("The invoice creator has no active sales location from which to fulfill this sale.")
+    _record_sale_movement(invoice, source)
+    invoice.status = Invoice.Status.CONFIRMED
+    invoice.save(update_fields=("status", "updated_at"))
+    log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk, items=invoice.items.count())
+    return invoice
 
-        source_location = sales_source_location(invoice.created_by)
-        if source_location is None:
-            raise InvalidBusinessOperation(
-                "The invoice creator has no active sales location from which to fulfill this sale."
+
+@transaction.atomic
+def cancel_invoice(invoice_id):
+    invoice = load_invoice_for_update(invoice_id)
+    if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
+        raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
+    if invoice.paid_amount > 0:
+        raise InvalidStateTransition("A paid or partially paid invoice must be refunded before it can be cancelled.")
+
+    was_confirmed = invoice.status == Invoice.Status.CONFIRMED
+    if was_confirmed:
+        sale = (
+            StockMovement.objects.filter(
+                reference=f"Invoice #{invoice.pk}",
+                movement_type=StockMovement.MovementType.SALE,
             )
-
-        _record_sale_movement(invoice, source_location)
-        invoice.status = Invoice.Status.CONFIRMED
-        invoice.save(update_fields=("status", "updated_at"))
-        log_operation(
-            "invoice.confirm",
-            user=invoice.created_by_id,
-            invoice=invoice.pk,
-            items=invoice.items.count(),
+            .select_related("source_location")
+            .first()
         )
-        return invoice
-
-
-def _find_original_sale_location(invoice):
-    sale = (
-        StockMovement.objects.filter(
-            reference=f"Invoice #{invoice.pk}",
-            movement_type=StockMovement.MovementType.SALE,
+        if sale is None or sale.source_location is None:
+            raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
+        movement = StockMovement.objects.create(
+            movement_type=StockMovement.MovementType.SALEABLE_RETURN,
+            destination_location=sale.source_location,
+            created_by=invoice.created_by,
+            reference=f"Cancel Invoice #{invoice.pk}",
         )
-        .select_related("source_location")
-        .first()
-    )
-    if sale is None or sale.source_location is None:
-        raise InvalidBusinessOperation(
-            "Cannot reverse sale: no original SALE movement found for this invoice."
-        )
-    return sale.source_location
+        for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
+            StockBalanceService.increase(location=sale.source_location, product=item.product, quantity=item.quantity)
+            StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
 
-
-def _reverse_sale_movement(invoice):
-    source_location = _find_original_sale_location(invoice)
-    movement = StockMovement.objects.create(
-        movement_type=StockMovement.MovementType.SALEABLE_RETURN,
-        destination_location=source_location,
-        created_by=invoice.created_by,
-        reference=f"Cancel Invoice #{invoice.pk}",
-    )
-
-    items = sorted(
-        invoice.items.select_related("product").all(),
-        key=lambda value: value.product_id,
-    )
-    for item in items:
-        StockBalanceService.increase(
-            location=source_location,
-            product=item.product,
-            quantity=item.quantity,
-        )
-        StockMovementItem.objects.create(
-            movement=movement,
-            product=item.product,
-            quantity=item.quantity,
-        )
-
-
-def _cancel_invoice(invoice_id):
-    with transaction.atomic():
-        invoice = load_invoice_for_update(invoice_id)
-        if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
-            raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
-
-        was_confirmed = invoice.status == Invoice.Status.CONFIRMED
-        if was_confirmed:
-            _reverse_sale_movement(invoice)
-
-        invoice.status = Invoice.Status.CANCELLED
-        invoice.save(update_fields=("status", "updated_at"))
-        log_operation(
-            "invoice.cancel",
-            user=invoice.created_by_id,
-            invoice=invoice.pk,
-            was_confirmed=was_confirmed,
-        )
-        return invoice
+    invoice.status = Invoice.Status.CANCELLED
+    invoice.save(update_fields=("status", "updated_at"))
+    log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk, was_confirmed=was_confirmed)
+    return invoice
 
 
 class ConfirmInvoice:
-    """Transition DRAFT to CONFIRMED atomically, including the sale inventory move."""
-
     def __call__(self, invoice_id):
-        return _confirm_invoice(invoice_id)
+        return confirm_invoice(invoice_id)
 
 
 class CancelInvoice:
-    """Transition DRAFT or CONFIRMED to CANCELLED atomically."""
-
     def __call__(self, invoice_id):
-        return _cancel_invoice(invoice_id)
+        return cancel_invoice(invoice_id)
