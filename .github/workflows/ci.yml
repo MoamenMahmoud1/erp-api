@@ -33,7 +33,7 @@ jobs:
     env:
       DJANGO_SETTINGS_MODULE: core.settings.settings_test
       SECRET_KEY: ci-test-secret
-      JWT_SIGNING_KEY: ci-test-jwt-secret
+      JWT_SIGNING_KEY: ci-test-jwt-secret-0123456789abcdef0123456789abcdef
       ALLOWED_HOSTS: testserver,localhost,127.0.0.1
       CORS_ALLOWED_ORIGINS: http://localhost:3000
       CSRF_TRUSTED_ORIGINS: http://localhost:3000
