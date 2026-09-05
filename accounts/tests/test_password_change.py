@@ -8,7 +8,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from authsession.models import AuthSession
-from core.testing.auth import login_client, new_api_client
+from core.testing.auth import authenticate_stateful_client, new_api_client
 
 
 class PasswordChangeTests(TestCase):
@@ -26,14 +26,13 @@ class PasswordChangeTests(TestCase):
     def setUp(self):
         cache.clear()
         self.client = new_api_client()
-        login_client(self.client, user=self.user, password=self.password)
-        self.session = AuthSession.objects.get(
+        self.session = authenticate_stateful_client(
+            self.client,
             user=self.user,
-            revoked_at__isnull=True,
         )
 
     def verify_current_session(self):
-        AuthSession.objects.filter(pk=self.session.pk).update(
+        AuthSession.objects.filter(pk=self.session.session_id).update(
             created_at=timezone.now() - timedelta(days=8)
         )
         return self.client.post(
