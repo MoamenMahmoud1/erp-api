@@ -92,12 +92,20 @@ class InvoiceItem(models.Model):
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="invoice_items")
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
+    cost_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("invoice", "product"), name="invoices_unique_invoice_product"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="invoice_item_quantity_positive"),
             models.CheckConstraint(condition=Q(unit_price__gte=Decimal("0")), name="invoice_item_unit_price_non_negative"),
+            models.CheckConstraint(condition=Q(cost_price__gte=Decimal("0")) | Q(cost_price__isnull=True), name="invoice_item_cost_price_non_negative"),
         ]
 
     @property
@@ -143,7 +151,7 @@ class InvoiceReturnItem(models.Model):
         constraints = [
             models.UniqueConstraint(fields=("invoice_return", "invoice_item"), name="invoice_return_item_unique_line"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="invoice_return_item_quantity_positive"),
-            models.CheckConstraint(condition=Q(unit_price__gte=Decimal("0")), name="invoice_return_item_price_non_negative"),
+            models.CheckConstraint(condition=Q(unit_price__gte=0), name="invoice_return_item_price_non_negative"),
         ]
 
     @property
