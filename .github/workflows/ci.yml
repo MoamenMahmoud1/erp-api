@@ -77,7 +77,6 @@ jobs:
       - name: Check migrations
         run: python manage.py makemigrations --check --dry-run
 
-      # Ruff remains informational until the repository's current lint debt is removed.
       - name: Ruff (non-blocking)
         continue-on-error: true
         run: ruff check .
@@ -100,6 +99,8 @@ jobs:
             apps: invoices payments inventory
           - suite: purchasing
             apps: purchases
+          - suite: accounting
+            apps: accounting
 
     services:
       postgres:
