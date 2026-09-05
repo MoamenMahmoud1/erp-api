@@ -8,8 +8,8 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from authsession.models import AuthSession
 from authsession.http import ClientContext
+from authsession.models import AuthSession
 from authsession.services import start_auth_session
 
 
@@ -35,15 +35,22 @@ class LogoutViewTests(TestCase):
         return self.client.get(self.csrf_url).data["csrf_token"]
 
     def login(self):
-        return self.client.post(
+        response = self.client.post(
             self.login_url,
             {
                 "identifier": self.user.email,
                 "password": self.password,
             },
             format="json",
-            HTTP_X_CSRFTOKEN=self.csrf_token(),
+            HTTP_X_CSRSTOKEN=self.csrf_token(),
         )
+        # APIClient does not maintain Django's browser cookie jar between
+        # responses, so explicitly carry the stateful auth cookies forward.
+        for name in ("refresh_token", "device_id"):
+            cookie = response.cookies.get(name)
+            self.assertIsNotNone(cookie, f"Login must set the {name} cookie")
+            self.client.cookies[name] = cookie.value
+        return response
 
     def verify_current_session(self):
         AuthSession.objects.filter(
