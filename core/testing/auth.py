@@ -1,12 +1,18 @@
 """Authentication helpers for API tests.
 
-These helpers model the real browser flow: login returns an access token and
-stateful refresh/device cookies, and protected stateful endpoints require all
-three pieces of state.
+Keep login endpoint coverage separate from protected-endpoint tests. Protected
+API tests should construct the same stateful session primitives the production
+login flow creates, without making every business test depend on login views.
 """
 
+import uuid
+
+from django.http import HttpResponse
 from django.urls import reverse
 from rest_framework.test import APIClient
+
+from authsession.http import ClientContext, set_login_cookies
+from authsession.services import start_auth_session
 
 
 STATEFUL_AUTH_COOKIES = ("refresh_token", "device_id")
@@ -21,7 +27,10 @@ def _assert_success(response, *, action: str):
 
 
 def login_client(client: APIClient, *, user, password: str):
-    """Log in through the real API and retain the returned browser cookies."""
+    """Log in through the real API and retain the returned browser cookies.
+
+    Use this helper only when the login endpoint itself is part of the test.
+    """
     csrf_response = client.get(reverse("accounts:csrf-token"))
     _assert_success(csrf_response, action="CSRF bootstrap")
 
@@ -37,12 +46,43 @@ def login_client(client: APIClient, *, user, password: str):
         if name not in response.cookies:
             raise AssertionError(f"Login must set the {name} cookie")
 
-    # Preserve the complete Set-Cookie morsels. In particular, the device_id
-    # value is signed and the test client should retain it exactly as emitted
-    # by Django rather than rebuilding it from the raw value.
     client.cookies.update(response.cookies)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
     return response
+
+
+def authenticate_stateful_client(
+    client: APIClient,
+    *,
+    user,
+    device_id=None,
+    device_name="Test device",
+    user_agent="Test browser",
+    ip_address="127.0.0.1",
+):
+    """Attach a valid access JWT and the matching stateful auth cookies.
+
+    This exercises the protected endpoint/session contract directly while
+    leaving login endpoint coverage to ``login_client`` and its dedicated tests.
+    """
+    device_id = device_id or uuid.uuid4()
+    client_context = ClientContext(
+        device_id=device_id,
+        device_name=device_name,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
+    session = start_auth_session(user=user, client_context=client_context)
+
+    cookie_response = HttpResponse()
+    set_login_cookies(
+        cookie_response,
+        refresh_token=session.refresh_token,
+        device_id=session.device_id,
+    )
+    client.cookies.update(cookie_response.cookies)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {session.access_token}")
+    return session
 
 
 def new_api_client() -> APIClient:
