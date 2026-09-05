@@ -106,6 +106,15 @@ def cancel_invoice(invoice_id, actor=None):
     return invoice
 
 
+# Backward-compatible internal aliases retained for existing tests/callers.
+def _record_sale_movement_sync(invoice, source_location):
+    return _record_sale_movement(invoice, source_location)
+
+
+def _cancel_invoice_sync(invoice_id, actor=None):
+    return cancel_invoice(invoice_id, actor)
+
+
 class ConfirmInvoice:
     def __call__(self, invoice_id, actor=None):
         return confirm_invoice(invoice_id, actor)
