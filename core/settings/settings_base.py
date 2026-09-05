@@ -151,7 +151,10 @@ SIMPLE_JWT = {
         "JWT_SIGNING_KEY",
         default="dev-only-jwt-signing-key-change-me-0123456789abcdef",
     ),
-    "CHECK_REVOKE_TOKEN": True,
+    # Session revocation is enforced by AuthSession state. Keeping this false
+    # preserves the stateless token contract and avoids embedding a
+    # password-derived claim in every access token.
+    "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
 
