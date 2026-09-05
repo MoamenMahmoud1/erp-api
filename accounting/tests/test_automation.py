@@ -1,17 +1,17 @@
 from decimal import Decimal
 
 from django.test import TestCase
-from django.utils import timezone
 
 from accounting.models import Account, JournalEntry
 from accounting.services import ensure_default_accounts, post_customer_collection, post_purchase, post_sales_invoice
 from accounts.models import CustomUserModel
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
+from organization.models import Company
 from payments.models import PaymentTransaction
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
-from organization.models import Company
+from suppliers.models import Supplier
 
 
 class AccountingAutomationTests(TestCase):
@@ -19,6 +19,7 @@ class AccountingAutomationTests(TestCase):
         self.company = Company.objects.create(name="Automation Company")
         self.user = CustomUserModel.objects.create_user(email="automation@test.local", password="strong-password-123")
         self.customer = Customer.objects.create(name="Customer")
+        self.supplier = Supplier.objects.create(name="Supplier")
         self.product = Product.objects.create(
             name="Widget",
             purchase_price=Decimal("40.00"),
@@ -59,7 +60,7 @@ class AccountingAutomationTests(TestCase):
         )
 
     def test_purchase_posting_creates_inventory_and_ap(self):
-        purchase = Purchase.objects.create(supplier_id=1, created_by=self.user)
+        purchase = Purchase.objects.create(supplier=self.supplier, created_by=self.user)
         PurchaseItem.objects.create(
             purchase=purchase,
             product=self.product,
