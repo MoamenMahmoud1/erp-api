@@ -7,9 +7,10 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from accounts.models import Employee, Role
+from authsession.http import ClientContext
+from authsession.services import start_auth_session
 
 User = get_user_model()
 
@@ -117,8 +118,16 @@ class EmployeeVisibilityTests(APITestCase):
         self.assertEqual(visible_ids, {self.manager.id, self.child.id, self.grandchild.id})
 
     def test_simple_jwt_bearer_token_authenticates_api_request(self):
-        access_token = RefreshToken.for_user(self.manager_user).access_token
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+        session = start_auth_session(
+            user=self.manager_user,
+            client_context=ClientContext(
+                device_id=__import__("uuid").uuid4(),
+                device_name="test",
+                user_agent="test-agent",
+                ip_address="127.0.0.1",
+            ),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {session.access_token}")
 
         response = self.client.get(reverse("accounts:employee-list"))
 
