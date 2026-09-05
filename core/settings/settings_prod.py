@@ -52,6 +52,7 @@ STORAGES = {
 }
 
 # Secure Cookies
+AUTH_COOKIE_SECURE = True
 SESSION_COOKIE_SAMESITE = "lax"
 CSRF_COOKIE_SAMESITE = "lax"
 
