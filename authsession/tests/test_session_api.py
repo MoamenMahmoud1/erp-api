@@ -9,7 +9,7 @@ from rest_framework import status
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 from authsession.services import start_auth_session
-from core.testing.auth import login_client, new_api_client
+from core.testing.auth import authenticate_stateful_client, new_api_client
 
 
 class AuthSessionApiTests(TestCase):
@@ -30,7 +30,7 @@ class AuthSessionApiTests(TestCase):
 
     def setUp(self):
         self.client = new_api_client()
-        login_client(self.client, user=self.user, password=self.password)
+        authenticate_stateful_client(self.client, user=self.user)
 
     def test_user_can_list_active_devices_and_identify_current_device(self):
         start_auth_session(
