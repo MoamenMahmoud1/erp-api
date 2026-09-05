@@ -49,7 +49,7 @@ class LogoutViewTests(TestCase):
         response = self.client.post(self.logout_url, {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertIsNotNone(AuthSession.objects.get(pk=session.session_id).revoked_at)
+        self.assertIsNotNone(AuthSession.objects.get(pk=session.pk).revoked_at)
         self.assertEqual(response.cookies["refresh_token"]["max-age"], 0)
         self.assertEqual(response.cookies["refresh_token"]["path"], "/api/v1/auth/")
 
