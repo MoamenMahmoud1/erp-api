@@ -73,7 +73,7 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
                 actor=self.user,
             )
 
-    def test_refunded_payment_reopens_outstanding_balance(self):
+    def test_refund_does_not_create_outstanding_debt(self):
         invoice = self.create_invoice()
         tx = collect(
             customer=self.customer,
@@ -90,5 +90,8 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
-        self.assertEqual(invoice.outstanding_amount, Decimal("50.00"))
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.paid_amount, Decimal("100.00"))
+        self.assertEqual(invoice.refunded_amount, Decimal("50.00"))
+        self.assertEqual(invoice.net_paid_amount, Decimal("50.00"))
+        self.assertEqual(invoice.outstanding_amount, Decimal("0.00"))
