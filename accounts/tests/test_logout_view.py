@@ -42,7 +42,7 @@ class LogoutViewTests(TestCase):
                 "password": self.password,
             },
             format="json",
-            HTTP_X_CSRSTOKEN=self.csrf_token(),
+            HTTP_X_CSRFTOKEN=self.csrf_token(),
         )
         # APIClient does not maintain Django's browser cookie jar between
         # responses, so explicitly carry the stateful auth cookies forward.
