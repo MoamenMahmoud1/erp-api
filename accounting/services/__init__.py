@@ -8,6 +8,7 @@ from .automation import (
     post_sales_return,
     post_supplier_payment,
 )
+from .balances import customer_aging, customer_balances, supplier_aging, supplier_balances
 from .journal import (
     JournalEntryError,
     create_journal_entry,
@@ -23,6 +24,9 @@ __all__ = (
     "balance_sheet",
     "cash_flow",
     "create_journal_entry",
+    "customer_aging",
+    "customer_balances",
+    "customer_aging",
     "ensure_default_accounts",
     "general_ledger",
     "get_default_company",
@@ -35,5 +39,7 @@ __all__ = (
     "post_sales_return",
     "post_supplier_payment",
     "profit_and_loss",
+    "supplier_aging",
+    "supplier_balances",
     "trial_balance",
 )
