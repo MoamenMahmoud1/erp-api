@@ -21,7 +21,7 @@ def _assert_success(response, *, action: str):
 
 
 def login_client(client: APIClient, *, user, password: str):
-    """Log in through the real API and attach the stateful auth cookies."""
+    """Log in through the real API and retain the returned browser cookies."""
     csrf_response = client.get(reverse("accounts:csrf-token"))
     _assert_success(csrf_response, action="CSRF bootstrap")
 
@@ -34,12 +34,13 @@ def login_client(client: APIClient, *, user, password: str):
     _assert_success(response, action="login")
 
     for name in STATEFUL_AUTH_COOKIES:
-        cookie = response.cookies.get(name)
-        if cookie is None:
+        if name not in response.cookies:
             raise AssertionError(f"Login must set the {name} cookie")
-        client.cookies.pop(name, None)
-        client.cookies[name] = cookie.value
 
+    # Preserve the complete Set-Cookie morsels. In particular, the device_id
+    # value is signed and the test client should retain it exactly as emitted
+    # by Django rather than rebuilding it from the raw value.
+    client.cookies.update(response.cookies)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
     return response
 
