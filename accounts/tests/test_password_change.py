@@ -32,7 +32,7 @@ class PasswordChangeTests(TestCase):
         )
 
     def verify_current_session(self):
-        AuthSession.objects.filter(pk=self.session.session_id).update(
+        AuthSession.objects.filter(pk=self.session.pk).update(
             created_at=timezone.now() - timedelta(days=8)
         )
         return self.client.post(
