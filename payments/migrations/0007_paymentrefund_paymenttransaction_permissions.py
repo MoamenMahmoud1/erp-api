@@ -9,7 +9,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
     dependencies = [
         ("accounts", "0010_employee_department_employee_work_site"),
-        ("invoices", "0005_invoicereturn_invoicereturnitem"),
+        ("invoices", "0007_invoice_return_accounting_state"),
         ("payments", "0006_paymenttransaction_collected_by_and_more"),
     ]
 
