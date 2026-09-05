@@ -1,14 +1,37 @@
 from django.db.models import Prefetch
-from rest_framework import status, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from authentication.throttling import SensitiveActionThrottle
-from common.exceptions import CouponInvalid, InsufficientStock, InvalidBusinessOperation, InvalidDiscount, InvalidStateTransition
-from invoices.api.serializers import InvoiceReturnInputSerializer, InvoiceReturnSerializer, InvoiceSerializer, InvoiceSummarySerializer
+from common.exceptions import (
+    CouponInvalid,
+    InsufficientStock,
+    InvalidBusinessOperation,
+    InvalidDiscount,
+    InvalidStateTransition,
+)
+from invoices.api.filters import InvoiceFilter
+from invoices.api.serializers import (
+    InvoiceReturnInputSerializer,
+    InvoiceReturnSerializer,
+    InvoiceSerializer,
+    InvoiceSummarySerializer,
+)
 from invoices.models import Invoice, InvoiceItem
 from invoices.permissions import InvoicePermission
-from invoices.services import ApplyCoupon, CancelInvoice, ConfirmInvoice, CreateInvoice, CreateSalesReturn, DeleteInvoice, InvoiceNotFound, RemoveCoupon, UpdateInvoice
+from invoices.services import (
+    ApplyCoupon,
+    CancelInvoice,
+    ConfirmInvoice,
+    CreateInvoice,
+    CreateSalesReturn,
+    DeleteInvoice,
+    InvoiceNotFound,
+    RemoveCoupon,
+    UpdateInvoice,
+)
 
 
 def _run_invoice(operation):
@@ -20,16 +43,19 @@ def _run_invoice(operation):
         return None, Response({"detail": str(exc), "code": "coupon_invalid"}, status=400)
     except InsufficientStock as exc:
         return None, Response({"detail": str(exc), "code": "insufficient_stock"}, status=409)
-    except InvoiceNotFound as exc:
-        return None, Response({"detail": str(exc), "code": "not_found"}, status=404)
-    except Invoice.DoesNotExist:
-        return None, Response({"detail": "Invoice not found.", "code": "not_found"}, status=404)
+    except (InvoiceNotFound, Invoice.DoesNotExist) as exc:
+        return None, Response({"detail": str(exc) or "Invoice not found.", "code": "not_found"}, status=404)
     except InvalidBusinessOperation as exc:
         return None, Response({"detail": str(exc), "code": "invalid_operation"}, status=409)
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = (InvoicePermission,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_class = InvoiceFilter
+    search_fields = ("customer__name",)
+    ordering_fields = ("created_at", "updated_at", "status")
+    ordering = ("-created_at", "-id")
     http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")
 
     def get_queryset(self):
@@ -45,7 +71,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        invoice, error = _run_invoice(lambda: CreateInvoice()(created_by_id=request.user.pk, validated_data=serializer.validated_data))
+        invoice, error = _run_invoice(
+            lambda: CreateInvoice()(created_by_id=request.user.pk, validated_data=serializer.validated_data)
+        )
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data, status=status.HTTP_201_CREATED)
@@ -53,7 +81,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, partial=request.method == "PATCH")
         serializer.is_valid(raise_exception=True)
-        invoice, error = _run_invoice(lambda: UpdateInvoice()(invoice_id=kwargs["pk"], validated_data=serializer.validated_data, actor=request.user))
+        invoice, error = _run_invoice(
+            lambda: UpdateInvoice()(
+                invoice_id=kwargs["pk"],
+                validated_data=serializer.validated_data,
+                actor=request.user,
+            )
+        )
         if error:
             return error
         return Response(InvoiceSerializer(invoice).data)
@@ -104,7 +138,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         result, error = _run_invoice(
-            lambda: CreateSalesReturn()(invoice_id=pk, items=data["items"], created_by_id=request.user.pk, reason=data.get("reason", ""), actor=request.user)
+            lambda: CreateSalesReturn()(
+                invoice_id=pk,
+                items=data["items"],
+                created_by_id=request.user.pk,
+                reason=data.get("reason", ""),
+                actor=request.user,
+            )
         )
         if error:
             return error
