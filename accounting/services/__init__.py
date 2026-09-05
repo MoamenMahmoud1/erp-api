@@ -26,7 +26,6 @@ __all__ = (
     "create_journal_entry",
     "customer_aging",
     "customer_balances",
-    "customer_aging",
     "ensure_default_accounts",
     "general_ledger",
     "get_default_company",
