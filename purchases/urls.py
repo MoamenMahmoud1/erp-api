@@ -8,6 +8,7 @@ from purchases.api.views import (
     PurchaseListCreateView,
     PurchaseReturnView,
     PurchaseUpdateView,
+    SupplierPaymentView,
 )
 
 urlpatterns = [
@@ -18,4 +19,5 @@ urlpatterns = [
     path("<int:pk>/cancel/", PurchaseCancelView.as_view(), name="purchase-cancel"),
     path("<int:pk>/delete/", PurchaseDeleteView.as_view(), name="purchase-delete"),
     path("<int:pk>/returns/", PurchaseReturnView.as_view(), name="purchase-return"),
+    path("supplier-payments/", SupplierPaymentView.as_view(), name="supplier-payment"),
 ]
