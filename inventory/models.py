@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import Q
 
 from products.models import Product
+from inventory.querysets import StockLocationQuerySet, StockMovementQuerySet
 
 
 class StockLocation(models.Model):
@@ -21,6 +22,7 @@ class StockLocation(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    objects = StockLocationQuerySet.as_manager()
 
     class Meta:
         ordering = ("name",)
@@ -46,27 +48,12 @@ class StockMovement(models.Model):
         DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
 
     movement_type = models.CharField(max_length=30, choices=MovementType.choices)
-    source_location = models.ForeignKey(
-        StockLocation,
-        on_delete=models.PROTECT,
-        related_name="outgoing_movements",
-        null=True,
-        blank=True,
-    )
-    destination_location = models.ForeignKey(
-        StockLocation,
-        on_delete=models.PROTECT,
-        related_name="incoming_movements",
-        null=True,
-        blank=True,
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name="created_stock_movements",
-    )
+    source_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="outgoing_movements", null=True, blank=True)
+    destination_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="incoming_movements", null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_stock_movements")
     created_at = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=100, blank=True)
+    objects = StockMovementQuerySet.as_manager()
 
     class Meta:
         ordering = ("-created_at",)
@@ -81,9 +68,7 @@ class StockMovementItem(models.Model):
     quantity = models.PositiveIntegerField()
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_movement_item_quantity_positive"),
-        ]
+        constraints = [models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_movement_item_quantity_positive")]
         ordering = ("id",)
 
     def __str__(self):
@@ -97,9 +82,7 @@ class StockBalance(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=("location", "product"), name="stock_balance_unique_location_product"),
-        ]
+        constraints = [models.UniqueConstraint(fields=("location", "product"), name="stock_balance_unique_location_product")]
 
     def __str__(self):
         return f"{self.location_id} - {self.product_id}: {self.quantity}"
