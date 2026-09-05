@@ -14,10 +14,13 @@ class ProductSerializer(serializers.ModelSerializer):
             "id", "name", "category", "purchase_price", "selling_price", "is_active",
             "total_stock", "stock_quantity", "sold_quantity", "created_at", "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at", "total_stock", "stock_quantity", "sold_quantity")
+        read_only_fields = (
+            "id", "created_at", "updated_at", "total_stock", "stock_quantity", "sold_quantity",
+        )
 
 
 class CartonPricingSerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.active())
     product_name = serializers.CharField(source="product.name", read_only=True)
 
     class Meta:
