@@ -1,10 +1,13 @@
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import IntegrityError
 from django.test import TransactionTestCase
+from django.utils import timezone
 
 from payments.models import IdempotencyKey, PaymentAllocation, PaymentRefund, PaymentTransaction
 from payments.services import process_idempotent
+from payments.services.idempotency import prune_idempotency_keys
 
 from .helpers import PaymentTestMixin
 
@@ -46,7 +49,11 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
             key="same-key",
             user_id=self.user.pk,
             path="/api/v1/payments/collections/",
-            data={"customer": self.customer.pk, "cash_amount": "20.00", "transfer_amount": "0.00"},
+            data={
+                "customer": self.customer.pk,
+                "cash_amount": "20.00",
+                "transfer_amount": "0.00",
+            },
             customer=self.customer,
             cash_amount=Decimal("20"),
             transfer_amount=Decimal("0"),
@@ -56,7 +63,11 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
             key="same-key",
             user_id=self.user.pk,
             path="/api/v1/payments/collections/",
-            data={"customer": self.customer.pk, "cash_amount": "30.00", "transfer_amount": "0.00"},
+            data={
+                "customer": self.customer.pk,
+                "cash_amount": "30.00",
+                "transfer_amount": "0.00",
+            },
             customer=self.customer,
             cash_amount=Decimal("30"),
             transfer_amount=Decimal("0"),
@@ -123,3 +134,30 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
             response_body={"ok": True},
         )
         self.assertEqual(complete.response_status, 201)
+
+    def test_prune_idempotency_keys_removes_expired_records_only(self):
+        old = IdempotencyKey.objects.create(
+            key="old",
+            user=self.user,
+            path="/payments/collections/",
+            request_signature="c" * 64,
+            response_status=201,
+            response_body={"ok": True},
+        )
+        fresh = IdempotencyKey.objects.create(
+            key="fresh",
+            user=self.user,
+            path="/payments/collections/",
+            request_signature="d" * 64,
+            response_status=201,
+            response_body={"ok": True},
+        )
+        IdempotencyKey.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=91)
+        )
+
+        deleted = prune_idempotency_keys()
+
+        self.assertEqual(deleted, 1)
+        self.assertFalse(IdempotencyKey.objects.filter(pk=old.pk).exists())
+        self.assertTrue(IdempotencyKey.objects.filter(pk=fresh.pk).exists())
