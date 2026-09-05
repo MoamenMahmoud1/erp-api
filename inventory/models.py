@@ -2,8 +2,8 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Q
 
-from products.models import Product
 from inventory.querysets import StockLocationQuerySet, StockMovementQuerySet
+from products.models import Product
 
 
 class StockLocation(models.Model):
@@ -48,15 +48,34 @@ class StockMovement(models.Model):
         DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
 
     movement_type = models.CharField(max_length=30, choices=MovementType.choices)
-    source_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="outgoing_movements", null=True, blank=True)
-    destination_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="incoming_movements", null=True, blank=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_stock_movements")
+    source_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="outgoing_movements",
+        null=True,
+        blank=True,
+    )
+    destination_location = models.ForeignKey(
+        StockLocation,
+        on_delete=models.PROTECT,
+        related_name="incoming_movements",
+        null=True,
+        blank=True,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_stock_movements",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=100, blank=True)
     objects = StockMovementQuerySet.as_manager()
 
     class Meta:
         ordering = ("-created_at",)
+        permissions = [
+            ("transfer_stock", "Can transfer stock"),
+        ]
 
     def __str__(self):
         return f"{self.get_movement_type_display()} #{self.pk}"
