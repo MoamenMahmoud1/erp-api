@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from accounting.services import get_default_company, post_purchase
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
@@ -55,6 +56,11 @@ class ConfirmPurchaseService:
                 quantity=item.quantity,
             )
 
+        post_purchase(
+            purchase=purchase,
+            actor_id=actor.pk,
+            company=get_default_company(),
+        )
         purchase.status = Purchase.Status.CONFIRMED
         purchase.save(update_fields=("status", "updated_at"))
         return purchase
