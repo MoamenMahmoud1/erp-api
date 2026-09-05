@@ -1,17 +1,21 @@
 from django.db import transaction
 
+from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
 from purchases.models import Purchase
 
 
 class CancelPurchaseService:
     @staticmethod
     @transaction.atomic
-    def execute(*, purchase_id):
-        purchase = Purchase.objects.select_for_update().get(pk=purchase_id)
+    def execute(*, purchase_id, actor):
+        try:
+            purchase = Purchase.objects.visible_to(actor).select_for_update().get(pk=purchase_id)
+        except Purchase.DoesNotExist as exc:
+            raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
 
         if purchase.status != Purchase.Status.DRAFT:
-            raise ValueError("Only draft purchases can be cancelled.")
+            raise InvalidStateTransition("Only draft purchases can be cancelled.")
 
         purchase.status = Purchase.Status.CANCELLED
-        purchase.save(update_fields=["status", "updated_at"])
+        purchase.save(update_fields=("status", "updated_at"))
         return purchase
