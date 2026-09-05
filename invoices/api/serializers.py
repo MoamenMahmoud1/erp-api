@@ -19,19 +19,22 @@ class InvoiceSerializer(serializers.ModelSerializer):
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     sold_quantity = serializers.IntegerField(read_only=True)
     paid_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    net_paid_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    returned_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     outstanding_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Invoice
         fields = (
             "id", "customer", "created_by", "coupon", "coupon_discount", "status",
-            "subtotal", "total", "paid_amount", "outstanding_amount", "sold_quantity",
-            "items", "created_at", "updated_at",
+            "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount",
+            "returned_amount", "outstanding_amount", "sold_quantity", "items", "created_at", "updated_at",
         )
         read_only_fields = (
-            "id", "created_by", "coupon", "coupon_discount", "status", "subtotal",
-            "total", "paid_amount", "outstanding_amount", "sold_quantity", "created_at",
-            "updated_at",
+            "id", "created_by", "coupon", "coupon_discount", "status", "subtotal", "total",
+            "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount",
+            "outstanding_amount", "sold_quantity", "created_at", "updated_at",
         )
 
 
@@ -41,14 +44,17 @@ class InvoiceSummarySerializer(serializers.ModelSerializer):
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     sold_quantity = serializers.IntegerField(read_only=True)
     paid_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    net_paid_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    returned_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     outstanding_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Invoice
         fields = (
             "id", "customer", "customer_name", "status", "subtotal", "coupon_discount",
-            "total", "paid_amount", "outstanding_amount", "sold_quantity", "created_at",
-            "updated_at",
+            "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount",
+            "outstanding_amount", "sold_quantity", "created_at", "updated_at",
         )
 
 
@@ -64,9 +70,13 @@ class InvoiceReturnInputSerializer(serializers.Serializer):
 
 
 class InvoiceReturnSerializer(serializers.ModelSerializer):
+    merchandise_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = InvoiceReturn
-        fields = ("id", "invoice", "created_by", "reason", "total_amount", "created_at")
+        fields = (
+            "id", "invoice", "created_by", "reason", "merchandise_amount", "refund_amount",
+            "total_amount", "created_at",
+        )
         read_only_fields = fields
