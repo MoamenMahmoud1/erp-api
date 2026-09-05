@@ -27,7 +27,7 @@ def _validate_lines(lines, company):
     total_debit = Decimal("0")
     total_credit = Decimal("0")
     account_ids = {line["account_id"] for line in lines}
-    accounts = {account.pk: account for account in Account.objects.filter(pk__in=account_ids, company=company)}
+    accounts = {line_account.pk: line_account for line_account in Account.objects.filter(pk__in=account_ids, company=company)}
     if len(accounts) != len(account_ids):
         raise JournalEntryError("Every journal line account must belong to the company.")
 
@@ -49,17 +49,31 @@ def _validate_lines(lines, company):
 
 
 @transaction.atomic
-def create_journal_entry(*, created_by_id, entry_date, description="", reference="", lines, company=None):
+def create_journal_entry(
+    *,
+    created_by_id,
+    entry_date,
+    description="",
+    reference="",
+    source_type="",
+    source_id=None,
+    lines,
+    company=None,
+):
     company = company or get_default_company()
     company = Company.objects.select_for_update().get(pk=company.pk)
     _validate_lines(lines, company)
-    next_number = (JournalEntry.objects.filter(company=company).aggregate(max_number=Max("number"))["max_number"] or 0) + 1
+    next_number = (
+        JournalEntry.objects.filter(company=company).aggregate(max_number=Max("number"))["max_number"] or 0
+    ) + 1
     entry = JournalEntry.objects.create(
         company=company,
         number=next_number,
         entry_date=entry_date,
         description=description,
         reference=reference,
+        source_type=source_type,
+        source_id=source_id,
         created_by_id=created_by_id,
         status=JournalEntry.Status.DRAFT,
     )
