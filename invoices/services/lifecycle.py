@@ -14,14 +14,12 @@ class InvoiceNotFound(InvalidBusinessOperation):
 
 
 def load_invoice_for_update(invoice_id, actor=None):
-    queryset = Invoice.objects
-    if actor is not None:
-        queryset = queryset.visible_to(actor)
+    queryset = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     try:
         return (
             queryset.select_for_update(of=("self",))
             .select_related("customer", "coupon", "created_by")
-            .prefetch_related("items__product")
+            .prefetch_related("items__product", "payment_allocations", "payment_refunds")
             .get(pk=invoice_id)
         )
     except Invoice.DoesNotExist as exc:
@@ -69,7 +67,7 @@ def confirm_invoice(invoice_id, actor=None):
     _record_sale_movement(invoice, source)
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "updated_at"))
-    log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk, items=invoice.items.count())
+    log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
     return invoice
 
 
@@ -78,8 +76,8 @@ def cancel_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
         raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
-    if invoice.paid_amount > 0:
-        raise InvalidStateTransition("A paid or partially paid invoice must be refunded before it can be cancelled.")
+    if invoice.net_paid_amount > 0:
+        raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
 
     if invoice.status == Invoice.Status.CONFIRMED:
         sale = (
