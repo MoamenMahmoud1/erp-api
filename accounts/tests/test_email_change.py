@@ -10,7 +10,7 @@ from django.utils import timezone
 from rest_framework import status
 
 from authsession.models import AuthSession
-from core.testing.auth import login_client, new_api_client
+from core.testing.auth import authenticate_stateful_client, new_api_client
 
 
 @override_settings(
@@ -34,7 +34,7 @@ class EmailChangeTests(TestCase):
         self.client = new_api_client()
         self.change_url = reverse("accounts:email-change")
         self.confirm_url = reverse("accounts:email-change-confirm")
-        login_client(self.client, user=self.user, password=self.password)
+        authenticate_stateful_client(self.client, user=self.user)
 
     def verify_current_session(self, password=None):
         AuthSession.objects.filter(
