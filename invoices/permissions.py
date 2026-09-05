@@ -1,43 +1,30 @@
-"""Business permissions for invoice operations.
-
-Staff/superuser remains a broad fallback (backwards compatible with the earlier
-coarse model), but fine-grained non-staff roles can now be granted the specific
-``invoices.confirm_invoice`` / ``invoices.cancel_invoice`` /
-``invoices.apply_invoice_coupon`` permissions and act through the API without
-being staff.
-"""
-
 from rest_framework.permissions import BasePermission
 
 
 class InvoicePermission(BasePermission):
-    """Read for any authenticated user; writes require a business permission.
-
-    Mapping of view actions to the Django permission codename they require.
-    """
-
     ACTION_PERMISSIONS = {
         "create": "invoices.add_invoice",
         "acreate": "invoices.add_invoice",
+        "update": "invoices.change_invoice",
+        "aupdate": "invoices.change_invoice",
+        "partial_update": "invoices.change_invoice",
+        "partial_aupdate": "invoices.change_invoice",
+        "destroy": "invoices.delete_invoice",
+        "adestroy": "invoices.delete_invoice",
         "confirm": "invoices.confirm_invoice",
         "cancel": "invoices.cancel_invoice",
         "apply_coupon": "invoices.apply_invoice_coupon",
+        "remove_coupon": "invoices.apply_invoice_coupon",
+        "returns": "invoices.return_invoice",
     }
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        user = request.user
+        if not user or not user.is_authenticated:
             return False
-
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return True
-
-        # Broad admin fallback retained for backwards compatibility. Business
-        # permissions below are the primary, granular authorization mechanism.
-        if request.user.is_staff or request.user.is_superuser:
+        if user.is_staff or user.is_superuser:
             return True
-
         codename = self.ACTION_PERMISSIONS.get(getattr(view, "action", None))
-        if not codename:
-            return False
-
-        return request.user.has_perm(codename)
+        return bool(codename and user.has_perm(codename))

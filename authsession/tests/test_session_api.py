@@ -5,11 +5,11 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 from authsession.services import start_auth_session
+from core.testing.auth import authenticate_stateful_client, new_api_client
 
 
 class AuthSessionApiTests(TestCase):
@@ -29,24 +29,8 @@ class AuthSessionApiTests(TestCase):
         )
 
     def setUp(self):
-        self.client = APIClient(enforce_csrf_checks=True)
-        csrf_response = self.client.get(reverse("accounts:csrf-token"))
-        self.csrf_token = csrf_response.data["csrf_token"]
-        self.device_id = uuid.uuid4()
-        self.login_response = self.client.post(
-            reverse("accounts:login"),
-            {"identifier": self.user.email, "password": self.password},
-            format="json",
-            HTTP_X_CSRFTOKEN=self.csrf_token,
-            HTTP_X_DEVICE_ID=str(self.device_id),
-        )
-        # Login sets the httponly refresh_token and signed device_id cookies
-        # on the test client (path=/api/v1/auth/), which the authsession
-        # permission reads for its stateful session verification.
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {self.login_response.data['access']}"
-        )
-        self.refresh_token = self.login_response.cookies.get("refresh_token")
+        self.client = new_api_client()
+        authenticate_stateful_client(self.client, user=self.user)
 
     def test_user_can_list_active_devices_and_identify_current_device(self):
         start_auth_session(
@@ -63,10 +47,7 @@ class AuthSessionApiTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 2)
-        self.assertEqual(
-            sum(item["is_current"] for item in response.data["results"]),
-            1,
-        )
+        self.assertEqual(sum(item["is_current"] for item in response.data["results"]), 1)
         self.assertIn("no-store", response["Cache-Control"])
 
     def test_user_can_revoke_another_device(self):
@@ -85,9 +66,7 @@ class AuthSessionApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertIsNotNone(
-            AuthSession.objects.get(pk=second.session_id).revoked_at
-        )
+        self.assertIsNotNone(AuthSession.objects.get(pk=second.session_id).revoked_at)
 
     def test_revoked_current_session_cannot_manage_devices(self):
         AuthSession.objects.filter(
@@ -96,7 +75,6 @@ class AuthSessionApiTests(TestCase):
         ).update(revoked_at=timezone.now())
 
         response = self.client.get(reverse("accounts:session-list"))
-
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_user_cannot_access_another_users_session(self):
@@ -113,5 +91,4 @@ class AuthSessionApiTests(TestCase):
         response = self.client.get(
             reverse("accounts:session-detail", args=(other.session_id,))
         )
-
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

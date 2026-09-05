@@ -6,7 +6,10 @@ from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 from authsession.http import ClientContext
 from authsession.models import AuthSession
-from authsession.services.auth_session import start_auth_session
+from authsession.services.auth_session import (
+    get_current_auth_session,
+    start_auth_session,
+)
 
 
 class AuthSessionServiceTests(TestCase):
@@ -48,6 +51,18 @@ class AuthSessionServiceTests(TestCase):
         self.assertEqual(auth_session.device_name, "Ahmed Laptop")
         self.assertEqual(auth_session.user_agent, "Test Browser/1.0")
         self.assertEqual(auth_session.ip_address, "192.0.2.10")
+
+    def test_current_session_accepts_stringified_stateless_user_id(self):
+        result = self.start_session()
+
+        auth_session = get_current_auth_session(
+            user_id=str(self.user.pk),
+            access_token=AccessToken(result.access_token),
+            refresh_token=result.refresh_token,
+            device_id=result.device_id,
+        )
+
+        self.assertEqual(auth_session.pk, result.session_id)
 
     def test_new_session_on_same_device_revokes_previous_session(self):
         context = self.make_context()

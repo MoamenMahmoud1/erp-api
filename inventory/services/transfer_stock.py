@@ -1,55 +1,83 @@
 from django.db import transaction
 
+from common.exceptions import InsufficientStock, InvalidBusinessOperation
+from common.observability import log_operation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 
 
-class TransferStockService:
-    @staticmethod
-    @transaction.atomic
-    def execute(
-        *,
-        source: StockLocation,
-        destination: StockLocation,
-        items,
-        created_by,
-        reference="",
-    ):
-        if source.pk == destination.pk:
-            raise ValueError("Source and destination must be different.")
+@transaction.atomic
+def transfer_stock(*, source_id, destination_id, items, created_by, reference=""):
+    if source_id == destination_id:
+        raise InvalidBusinessOperation("Source and destination must be different.")
+    if not items:
+        raise InvalidBusinessOperation("Transfer must contain at least one item.")
 
-        items = list(items)
-        if not items:
-            raise ValueError("Transfer must contain at least one item.")
+    visible_locations = StockLocation.objects.visible_to(created_by).filter(is_active=True)
+    location_map = {
+        location.pk: location
+        for location in visible_locations
+        .select_for_update()
+        .filter(pk__in=(source_id, destination_id))
+        .order_by("pk")
+    }
+    source = location_map.get(source_id)
+    destination = location_map.get(destination_id)
+    if source is None or destination is None:
+        raise InvalidBusinessOperation("Source or destination location is not accessible.")
 
-        movement = StockMovement.objects.create(
-            movement_type=StockMovement.MovementType.TRANSFER,
-            source_location=source,
-            destination_location=destination,
-            created_by=created_by,
-            reference=reference,
-        )
+    product_ids = [item["product"].pk for item in items]
+    if len(product_ids) != len(set(product_ids)):
+        raise InvalidBusinessOperation("A product can appear only once in a transfer.")
 
-        for item in items:
-            product = item["product"]
-            quantity = item["quantity"]
-            if quantity <= 0:
-                raise ValueError("Quantity must be greater than zero.")
-
+    movement = StockMovement.objects.create(
+        movement_type=StockMovement.MovementType.TRANSFER,
+        source_location=source,
+        destination_location=destination,
+        created_by=created_by,
+        reference=reference,
+    )
+    for item in sorted(items, key=lambda value: value["product"].pk):
+        product = item["product"]
+        quantity = item["quantity"]
+        try:
             StockBalanceService.decrease(
                 location=source,
                 product=product,
                 quantity=quantity,
             )
-            StockBalanceService.increase(
-                location=destination,
-                product=product,
-                quantity=quantity,
-            )
-            StockMovementItem.objects.create(
-                movement=movement,
-                product=product,
-                quantity=quantity,
-            )
+        except ValueError as exc:
+            raise InsufficientStock(
+                f"Insufficient stock for {product.name} in {source.name}."
+            ) from exc
+        StockBalanceService.increase(
+            location=destination,
+            product=product,
+            quantity=quantity,
+        )
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=product,
+            quantity=quantity,
+        )
 
-        return movement
+    log_operation(
+        "inventory.transfer",
+        user=created_by.pk,
+        source=source.pk,
+        destination=destination.pk,
+        item_count=len(items),
+        movement=movement.pk,
+    )
+    return movement
+
+
+class TransferStock:
+    def __call__(self, *, source_id, destination_id, items, created_by, reference=""):
+        return transfer_stock(
+            source_id=source_id,
+            destination_id=destination_id,
+            items=items,
+            created_by=created_by,
+            reference=reference,
+        )

@@ -1,4 +1,4 @@
-"""Coupon validation and atomic application to draft invoices."""
+"""Coupon validation and application for draft invoices."""
 
 from django.db import transaction
 from django.utils import timezone
@@ -20,35 +20,26 @@ def _validate_coupon(coupon, invoice):
         raise CouponInvalid("Coupon is not yet valid.")
     if coupon.valid_until and now > coupon.valid_until:
         raise CouponInvalid("Coupon has expired.")
-    if coupon.minimum_invoice_amount:
-        subtotal = _calculator.subtotal(invoice)
-        if subtotal < coupon.minimum_invoice_amount:
-            raise CouponInvalid("The invoice does not meet the coupon's minimum amount.")
+    if coupon.minimum_invoice_amount and _calculator.subtotal(invoice) < coupon.minimum_invoice_amount:
+        raise CouponInvalid("The invoice does not meet the coupon's minimum amount.")
 
 
-def _apply_coupon(invoice_id, code):
-    """Keep invoice locking, validation, calculation, and update atomic."""
-    with transaction.atomic():
-        invoice = load_invoice_for_update(invoice_id)
-        if invoice.status != invoice.Status.DRAFT:
-            raise InvalidStateTransition("A coupon can only be applied to a draft invoice.")
-        try:
-            coupon = Coupon.objects.get(code=code)
-        except Coupon.DoesNotExist as exc:
-            raise CouponInvalid("Coupon not found.") from exc
-
-        _validate_coupon(coupon, invoice)
-        invoice.coupon = coupon
-        invoice.coupon_discount = _calculator.coupon_discount_value(
-            coupon,
-            _calculator.subtotal(invoice),
-        )
-        invoice.save(update_fields=("coupon", "coupon_discount", "updated_at"))
-        return invoice
+@transaction.atomic
+def apply_coupon(*, invoice_id, code, actor=None):
+    invoice = load_invoice_for_update(invoice_id, actor)
+    if invoice.status != invoice.Status.DRAFT:
+        raise InvalidStateTransition("A coupon can only be applied to a draft invoice.")
+    try:
+        coupon = Coupon.objects.get(code=code)
+    except Coupon.DoesNotExist as exc:
+        raise CouponInvalid("Coupon not found.") from exc
+    _validate_coupon(coupon, invoice)
+    invoice.coupon = coupon
+    invoice.coupon_discount = _calculator.coupon_discount_value(coupon, _calculator.subtotal(invoice))
+    invoice.save(update_fields=("coupon", "coupon_discount", "updated_at"))
+    return invoice
 
 
 class ApplyCoupon:
-    """Apply a coupon to a draft invoice atomically."""
-
-    def __call__(self, *, invoice_id, code):
-        return _apply_coupon(invoice_id, code)
+    def __call__(self, *, invoice_id, code, actor=None):
+        return apply_coupon(invoice_id=invoice_id, code=code, actor=actor)

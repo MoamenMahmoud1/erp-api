@@ -119,7 +119,7 @@ def confirm_email_change(token):
             user.email = new_email
             user.is_verified = True
             user.save(update_fields=("email", "is_verified", "updated_at"))
-            revoke_all_sessions(user)
+            revoke_all_sessions(user_id=user.pk)
     except User.DoesNotExist as error:
         raise InvalidEmailVerification from error
     except IntegrityError as error:

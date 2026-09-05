@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 
+from inventory.querysets import StockLocationQuerySet, StockMovementQuerySet
 from products.models import Product
 
 
@@ -11,10 +12,7 @@ class StockLocation(models.Model):
         SALES_VEHICLE = "SALES_VEHICLE", "Sales Vehicle"
 
     name = models.CharField(max_length=150)
-    location_type = models.CharField(
-        max_length=30,
-        choices=LocationType.choices,
-    )
+    location_type = models.CharField(max_length=30, choices=LocationType.choices)
     employee = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -24,16 +22,14 @@ class StockLocation(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    objects = StockLocationQuerySet.as_manager()
 
     class Meta:
         ordering = ("name",)
         constraints = [
             models.UniqueConstraint(
                 fields=("location_type",),
-                condition=Q(
-                    location_type="MAIN_WAREHOUSE",
-                    is_active=True,
-                ),
+                condition=Q(location_type="MAIN_WAREHOUSE", is_active=True),
                 name="inventory_one_active_main_warehouse",
             ),
         ]
@@ -45,15 +41,13 @@ class StockLocation(models.Model):
 class StockMovement(models.Model):
     class MovementType(models.TextChoices):
         PURCHASE = "PURCHASE", "Purchase"
+        PURCHASE_RETURN = "PURCHASE_RETURN", "Purchase Return"
         TRANSFER = "TRANSFER", "Transfer"
         SALE = "SALE", "Sale"
         SALEABLE_RETURN = "SALEABLE_RETURN", "Saleable Return"
         DAMAGED_RETURN = "DAMAGED_RETURN", "Damaged Return"
 
-    movement_type = models.CharField(
-        max_length=30,
-        choices=MovementType.choices,
-    )
+    movement_type = models.CharField(max_length=30, choices=MovementType.choices)
     source_location = models.ForeignKey(
         StockLocation,
         on_delete=models.PROTECT,
@@ -74,29 +68,51 @@ class StockMovement(models.Model):
         related_name="created_stock_movements",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    reference = models.CharField(
-        max_length=100,
-        blank=True,
-    )
+    reference = models.CharField(max_length=100, blank=True)
+    objects = StockMovementQuerySet.as_manager()
 
     class Meta:
         ordering = ("-created_at",)
+        permissions = [
+            ("transfer_stock", "Can transfer stock"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        movement_type="TRANSFER",
+                        source_location__isnull=False,
+                        destination_location__isnull=False,
+                    )
+                    | Q(
+                        movement_type__in=("PURCHASE_RETURN", "SALE"),
+                        source_location__isnull=False,
+                        destination_location__isnull=True,
+                    )
+                    | Q(
+                        movement_type__in=("PURCHASE", "SALEABLE_RETURN", "DAMAGED_RETURN"),
+                        source_location__isnull=True,
+                        destination_location__isnull=False,
+                    )
+                ),
+                name="stock_movement_direction_matches_type",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(movement_type__in=("TRANSFER",), source_location__isnull=True)
+                    | ~Q(source_location=F("destination_location"))
+                ),
+                name="stock_transfer_locations_differ",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_movement_type_display()} #{self.pk}"
 
 
 class StockMovementItem(models.Model):
-    movement = models.ForeignKey(
-        StockMovement,
-        on_delete=models.CASCADE,
-        related_name="items",
-    )
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.PROTECT,
-        related_name="stock_movement_items",
-    )
+    movement = models.ForeignKey(StockMovement, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_movement_items")
     quantity = models.PositiveIntegerField()
 
     class Meta:
@@ -106,6 +122,9 @@ class StockMovementItem(models.Model):
                 name="stock_movement_item_quantity_positive",
             ),
         ]
+        indexes = [
+            models.Index(fields=("product", "movement"), name="stock_move_item_product_idx"),
+        ]
         ordering = ("id",)
 
     def __str__(self):
@@ -113,16 +132,8 @@ class StockMovementItem(models.Model):
 
 
 class StockBalance(models.Model):
-    location = models.ForeignKey(
-        StockLocation,
-        on_delete=models.CASCADE,
-        related_name="stock_balances",
-    )
-    product = models.ForeignKey(
-        "products.Product",
-        on_delete=models.PROTECT,
-        related_name="stock_balances",
-    )
+    location = models.ForeignKey(StockLocation, on_delete=models.CASCADE, related_name="stock_balances")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_balances")
     quantity = models.PositiveIntegerField(default=0)
     updated_at = models.DateTimeField(auto_now=True)
 

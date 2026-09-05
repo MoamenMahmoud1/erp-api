@@ -1,6 +1,4 @@
-"""Synchronous payment/collection API."""
-
-from django.db.models import Prefetch
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
 from rest_framework.response import Response
 
@@ -8,106 +6,77 @@ from authentication.throttling import SensitiveActionThrottle
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.pagination import StandardPagination
 from common.observability import log_operation
-from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer
-from payments.models import PaymentAllocation, PaymentTransaction
-from payments.permissions import CollectionPermission, TransactionReadPermission
-from payments.services import (
-    NoConfirmableInvoicesError,
-    OverpaymentError,
-    ProcessCollectionIdempotent,
-)
+from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer, RefundInputSerializer
+from payments.models import PaymentTransaction
+from payments.permissions import CollectionPermission, RefundPermission, TransactionReadPermission
+from payments.services import NoConfirmableInvoicesError, OverpaymentError, process_idempotent, refund_payment
 
 
 class CollectionView(generics.GenericAPIView):
-    """POST /api/v1/payments/collections/ — receive and allocate a payment."""
-
+    serializer_class = CollectionSerializer
     permission_classes = (CollectionPermission,)
     throttle_classes = (SensitiveActionThrottle,)
-    serializer_class = CollectionSerializer
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        idempotency_key = request.headers.get("Idempotency-Key")
-        if not idempotency_key:
-            return Response(
-                {
-                    "detail": "Idempotency-Key header is required for payment collections.",
-                    "code": "idempotency_key_required",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        customer = serializer.validated_data["customer"]
-        cash_amount = serializer.validated_data["cash_amount"]
-        transfer_amount = serializer.validated_data["transfer_amount"]
-        user_id = request.user.pk
-        request_data = {
-            "customer": customer.pk,
-            "cash_amount": str(cash_amount),
-            "transfer_amount": str(transfer_amount),
-        }
-
+        key = request.headers.get("Idempotency-Key")
+        if not key:
+            return Response({"detail": "Idempotency-Key header is required for payment collections.", "code": "idempotency_key_required"}, status=400)
+        data = serializer.validated_data
+        customer = data["customer"]
         try:
-            result = ProcessCollectionIdempotent()(
-                key=idempotency_key,
-                user_id=user_id,
+            result = process_idempotent(
+                key=key,
+                user_id=request.user.pk,
                 path=request.path,
-                data=request_data,
+                data={"customer": customer.pk, "cash_amount": str(data["cash_amount"]), "transfer_amount": str(data["transfer_amount"])},
                 customer=customer,
-                cash_amount=cash_amount,
-                transfer_amount=transfer_amount,
+                cash_amount=data["cash_amount"],
+                transfer_amount=data["transfer_amount"],
+                actor=request.user,
             )
         except OverpaymentError as exc:
-            log_operation("payment.collection", user=user_id,
-                          customer=customer.pk, result="overpayment_rejected")
-            return Response(
-                {"detail": str(exc), "code": "overpayment"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": str(exc), "code": "overpayment"}, status=400)
         except NoConfirmableInvoicesError as exc:
-            log_operation("payment.collection", user=user_id,
-                          customer=customer.pk, result="no_invoices_rejected")
-            return Response(
-                {"detail": str(exc), "code": "nothing_to_collect"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": str(exc), "code": "nothing_to_collect"}, status=400)
         except (InvalidMoney, InvalidBusinessOperation) as exc:
-            log_operation("payment.collection", user=user_id,
-                          customer=customer.pk, result="invalid_rejected")
-            return Response(
-                {"detail": str(exc), "code": "invalid_payment"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
+            return Response({"detail": str(exc), "code": "invalid_payment"}, status=400)
         if result == "mismatch":
-            return Response(
-                {
-                    "detail": "Idempotency key used with a different request body.",
-                    "code": "idempotency_conflict",
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-
+            return Response({"detail": "Idempotency key used with a different request body.", "code": "idempotency_conflict"}, status=409)
         return Response(result.response_body, status=result.response_status)
 
 
-class TransactionListView(generics.ListAPIView):
-    """GET /api/v1/payments/transactions/ — read-only view of collections."""
+class RefundView(generics.GenericAPIView):
+    serializer_class = RefundInputSerializer
+    permission_classes = (RefundPermission,)
+    throttle_classes = (SensitiveActionThrottle,)
 
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            invoice = refund_payment(
+                transaction_id=data["transaction"],
+                invoice_id=data["invoice"],
+                amount=data["amount"],
+                created_by_id=request.user.pk,
+                reason=data.get("reason", ""),
+                actor=request.user,
+            )
+        except (InvalidBusinessOperation, InvalidMoney) as exc:
+            return Response({"detail": str(exc), "code": "refund_invalid"}, status=400)
+        log_operation("payment.refund", user=request.user.pk, invoice=invoice.pk)
+        return Response({"invoice": invoice.pk, "paid_amount": invoice.paid_amount, "outstanding_amount": invoice.outstanding_amount})
+
+
+class TransactionListView(generics.ListAPIView):
     serializer_class = PaymentTransactionSerializer
     pagination_class = StandardPagination
     permission_classes = (TransactionReadPermission,)
+    filter_backends = (DjangoFilterBackend,)
+    filterset_fields = ("customer", "collected_by")
 
     def get_queryset(self):
-        return (
-            PaymentTransaction.objects.select_related("customer")
-            .prefetch_related(
-                Prefetch(
-                    "allocations",
-                    queryset=PaymentAllocation.objects.select_related("invoice"),
-                )
-            )
-            .order_by("-created_at")
-        )
+        return PaymentTransaction.objects.visible_to(self.request.user).with_payment_data().order_by("-created_at")

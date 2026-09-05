@@ -1,5 +1,6 @@
+import uuid
+
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.test import TestCase
@@ -7,51 +8,13 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.models import Employee, Role
+from accounts.models import Employee
+from authsession.http import ClientContext
+from authsession.services import start_auth_session
+from core.testing.roles import create_role
 
 User = get_user_model()
-
-
-def create_role(*, code, level, permissions=()):
-    group = Group.objects.create(name=f"Test {code.title()}")
-    role = Role.objects.create(group=group, code=code, level=level)
-
-    if permissions:
-        group.permissions.set(
-            Permission.objects.filter(
-                content_type__app_label="accounts",
-                content_type__model="employee",
-                codename__in=permissions,
-            )
-        )
-
-    return role
-
-
-class RoleHierarchyTests(TestCase):
-    def setUp(self):
-        self.admin_role = create_role(code="admin", level=80)
-        self.employee_role = create_role(code="employee", level=10)
-        self.admin = User.objects.create_user(username="admin", email="admin@test.com")
-        self.employee = User.objects.create_user(username="employee", email="employee@test.com")
-        self.admin.groups.set([self.admin_role.group])
-        self.employee.groups.set([self.employee_role.group])
-
-    def test_higher_role_can_manage_lower_role(self):
-        self.assertTrue(Role.can_manage_user(self.admin, self.employee))
-
-    def test_lower_role_can_not_manage_higher_role(self):
-        self.assertFalse(Role.can_manage_user(self.employee, self.admin))
-
-    def test_new_user_does_not_receive_an_implicit_role(self):
-        user = User.objects.create_user(username="new-user", email="new-user@test.com")
-
-        self.assertFalse(user.groups.exists())
-
-    def test_unauthenticated_actor_can_not_manage_users(self):
-        self.assertFalse(Role.can_manage_user(None, self.employee))
 
 
 class EmployeeVisibilityTests(APITestCase):
@@ -82,21 +45,22 @@ class EmployeeVisibilityTests(APITestCase):
 
         self.manager = Employee.objects.create(user=self.manager_user)
         self.child = Employee.objects.create(user=self.child_user, manager=self.manager)
-        self.grandchild = Employee.objects.create(user=self.grandchild_user, manager=self.child)
+        self.grandchild = Employee.objects.create(
+            user=self.grandchild_user,
+            manager=self.child,
+        )
         self.other = Employee.objects.create(user=self.other_user)
 
     def test_manager_sees_self_and_recursive_reports(self):
-        visible_ids = set(Employee.objects.visible_to(self.manager_user).values_list("id", flat=True))
-
+        visible_ids = set(
+            Employee.objects.visible_to(self.manager_user).values_list("id", flat=True)
+        )
         self.assertEqual(visible_ids, {self.manager.id, self.child.id, self.grandchild.id})
 
     def test_recursive_visibility_uses_two_queries_regardless_of_depth(self):
         with CaptureQueriesContext(connection) as captured_queries:
             visible_ids = set(
-                Employee.objects.visible_to(self.manager_user).values_list(
-                    "id",
-                    flat=True,
-                )
+                Employee.objects.visible_to(self.manager_user).values_list("id", flat=True)
             )
 
         application_queries = [
@@ -109,7 +73,6 @@ class EmployeeVisibilityTests(APITestCase):
 
     def test_manager_can_not_see_unrelated_employee_through_api(self):
         self.client.force_authenticate(self.manager_user)
-
         response = self.client.get(reverse("accounts:employee-list"))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -117,25 +80,29 @@ class EmployeeVisibilityTests(APITestCase):
         self.assertEqual(visible_ids, {self.manager.id, self.child.id, self.grandchild.id})
 
     def test_simple_jwt_bearer_token_authenticates_api_request(self):
-        access_token = RefreshToken.for_user(self.manager_user).access_token
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+        session = start_auth_session(
+            user=self.manager_user,
+            client_context=ClientContext(
+                device_id=uuid.uuid4(),
+                device_name="test",
+                user_agent="test-agent",
+                ip_address="127.0.0.1",
+            ),
+        )
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {session.access_token}")
 
         response = self.client.get(reverse("accounts:employee-list"))
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_employee_without_add_permission_can_not_create_employee(self):
         self.client.force_authenticate(self.child_user)
-
         response = self.client.post(
             reverse("accounts:employee-list"),
             {"user": self.other_user.pk},
         )
-
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_management_cycle_is_rejected(self):
         self.manager.manager = self.grandchild
-
         with self.assertRaises(ValidationError):
             self.manager.save()
