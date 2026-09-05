@@ -8,17 +8,7 @@ from common.money import quantize_money
 
 
 class PaymentTransaction(models.Model):
-    """A single collection received from a customer.
-
-    A transaction is a (cash, transfer) pair that is then allocated across one
-    or more of the customer's invoices via ``PaymentAllocation`` rows. The
-    backend owns the allocation — the client only reports how much cash and
-    transfer was received.
-
-    ``collected_by`` records the authenticated employee/user who performed
-    the collection.  It is a durable audit field — never derived from a
-    dynamic attribute.
-    """
+    """A single collection received from a customer."""
 
     customer = models.ForeignKey(
         "customers.Customer",
@@ -29,7 +19,6 @@ class PaymentTransaction(models.Model):
         "accounts.CustomUserModel",
         on_delete=models.PROTECT,
         related_name="payment_collections",
-        help_text="Authenticated user who performed the collection.",
         null=True,
         blank=True,
     )
@@ -64,26 +53,30 @@ class PaymentTransaction(models.Model):
             ),
         ]
         permissions = [
-            (
-                "process_collection",
-                "Can process a payment collection",
-            ),
+            ("process_collection", "Can process a payment collection"),
+            ("refund_payment", "Can refund a payment"),
         ]
 
     @property
     def total_amount(self) -> Decimal:
         return quantize_money(self.cash_amount + self.transfer_amount)
 
+    @property
+    def refunded_amount(self) -> Decimal:
+        return quantize_money(
+            sum((refund.total_amount for refund in self.refunds.all()), Decimal("0"))
+        )
+
+    @property
+    def refundable_amount(self) -> Decimal:
+        return quantize_money(self.total_amount - self.refunded_amount)
+
     def __str__(self):
         return f"Tx {self.pk} ({self.customer_id})"
 
 
 class PaymentAllocation(models.Model):
-    """Money from one transaction allocated to one invoice.
-
-    ``cash_amount + transfer_amount`` is the portion of the transaction that
-    reduces the target invoice's outstanding balance.
-    """
+    """Money from one transaction allocated to one invoice."""
 
     transaction = models.ForeignKey(
         PaymentTransaction,
@@ -128,21 +121,76 @@ class PaymentAllocation(models.Model):
     def total_amount(self) -> Decimal:
         return quantize_money(self.cash_amount + self.transfer_amount)
 
+    @property
+    def refunded_amount(self) -> Decimal:
+        return quantize_money(
+            sum((refund.total_amount for refund in self.refunds.all()), Decimal("0"))
+        )
+
+    @property
+    def refundable_amount(self) -> Decimal:
+        return quantize_money(self.total_amount - self.refunded_amount)
+
     def __str__(self):
         return f"Alloc {self.pk} -> invoice {self.invoice_id}"
 
 
+class PaymentRefund(models.Model):
+    """Immutable reversal of money previously allocated to an invoice."""
+
+    transaction = models.ForeignKey(
+        PaymentTransaction,
+        on_delete=models.PROTECT,
+        related_name="refunds",
+    )
+    invoice = models.ForeignKey(
+        "invoices.Invoice",
+        on_delete=models.PROTECT,
+        related_name="payment_refunds",
+    )
+    allocation = models.ForeignKey(
+        PaymentAllocation,
+        on_delete=models.PROTECT,
+        related_name="refunds",
+    )
+    cash_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    transfer_amount = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
+    reason = models.CharField(max_length=255, blank=True)
+    created_by = models.ForeignKey(
+        "accounts.CustomUserModel",
+        on_delete=models.PROTECT,
+        related_name="created_payment_refunds",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(cash_amount__gte=Decimal("0")),
+                name="payment_refund_cash_non_negative",
+            ),
+            models.CheckConstraint(
+                condition=Q(transfer_amount__gte=Decimal("0")),
+                name="payment_refund_transfer_non_negative",
+            ),
+        ]
+
+    @property
+    def total_amount(self) -> Decimal:
+        return quantize_money(self.cash_amount + self.transfer_amount)
+
+
 class IdempotencyKey(models.Model):
-    """DB-backed idempotency for financial write operations.
-
-    A client provides ``Idempotency-Key`` for a collection request.  If the
-    same key (scoped to the user and the target endpoint path) is seen again,
-    the previously persisted response is returned instead of re-executing the
-    service.  This guards against duplicate collections caused by network
-    retries.
-
-    Keys are durable in PostgreSQL — they are never solely Redis-backed.
-    """
+    """DB-backed idempotency for financial write operations."""
 
     key = models.CharField(max_length=128, db_index=True)
     user = models.ForeignKey(
@@ -150,11 +198,8 @@ class IdempotencyKey(models.Model):
         on_delete=models.PROTECT,
         related_name="idempotency_keys",
     )
-    path = models.CharField(max_length=500, help_text="Normalized request path.")
-    request_signature = models.CharField(
-        max_length=64,
-        help_text="SHA-256 of the canonical request body.",
-    )
+    path = models.CharField(max_length=500)
+    request_signature = models.CharField(max_length=64)
     response_status = models.PositiveSmallIntegerField()
     response_body = models.JSONField()
     created_at = models.DateTimeField(auto_now_add=True)
