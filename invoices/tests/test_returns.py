@@ -6,7 +6,7 @@ from common.exceptions import InvalidBusinessOperation
 from inventory.models import StockBalance, StockMovement
 from invoices.models import Invoice, InvoiceItem
 from invoices.services import ConfirmInvoice, CreateSalesReturn
-from payments.models import PaymentAllocation, PaymentTransaction
+from payments.services.collection import collect
 
 from .helpers import InvoiceTestMixin
 
@@ -30,17 +30,12 @@ class SalesReturnTests(InvoiceTestMixin, TestCase):
             quantity=quantity,
         )
         ConfirmInvoice()(invoice.pk, actor=self.user)
-        tx = PaymentTransaction.objects.create(
+        collect(
             customer=self.customer,
-            collected_by=self.user,
             cash_amount=Decimal("100.00") * quantity,
             transfer_amount=Decimal("0"),
-        )
-        PaymentAllocation.objects.create(
-            transaction=tx,
-            invoice=invoice,
-            cash_amount=Decimal("100.00") * quantity,
-            transfer_amount=Decimal("0"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
         )
         invoice.refresh_from_db()
         return invoice, line
