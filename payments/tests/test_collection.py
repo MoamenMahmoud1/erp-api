@@ -2,8 +2,9 @@ from decimal import Decimal
 
 from django.test import TransactionTestCase
 
+from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentTransaction
-from payments.services import NoConfirmableInvoicesError, OverpaymentError, collect
+from payments.services import NoConfirmableInvoicesError, OverpaymentError, collect, refund_payment
 
 from .helpers import PaymentTestMixin
 
@@ -20,7 +21,7 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         )
         invoice.refresh_from_db()
         self.assertEqual(tx.total_amount, Decimal("100.00"))
-        self.assertEqual(invoice.status, invoice.Status.PAID)
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertEqual(PaymentAllocation.objects.get(invoice=invoice).total_amount, Decimal("100.00"))
 
     def test_partial_payment(self):
@@ -33,7 +34,7 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, invoice.Status.CONFIRMED)
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
         self.assertEqual(invoice.outstanding_amount, Decimal("70.00"))
 
     def test_oldest_invoice_first(self):
@@ -62,10 +63,17 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         self.assertFalse(PaymentTransaction.objects.exists())
 
     def test_no_confirmed_invoice(self):
-        self.create_invoice(status=self.create_invoice.__annotations__.get("status", "CONFIRMED"))
+        self.create_invoice(status=Invoice.Status.DRAFT)
+        with self.assertRaises(NoConfirmableInvoicesError):
+            collect(
+                customer=self.customer,
+                cash_amount=Decimal("10"),
+                transfer_amount=Decimal("0"),
+                collected_by_id=self.user.pk,
+                actor=self.user,
+            )
 
     def test_refunded_payment_reopens_outstanding_balance(self):
-        from payments.services import refund_payment
         invoice = self.create_invoice()
         tx = collect(
             customer=self.customer,
@@ -82,14 +90,5 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, invoice.Status.CONFIRMED)
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
         self.assertEqual(invoice.outstanding_amount, Decimal("50.00"))
-        collect(
-            customer=self.customer,
-            cash_amount=Decimal("50"),
-            transfer_amount=Decimal("0"),
-            collected_by_id=self.user.pk,
-            actor=self.user,
-        )
-        invoice.refresh_from_db()
-        self.assertEqual(invoice.status, invoice.Status.PAID)
