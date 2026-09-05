@@ -2,6 +2,7 @@
 
 from django.db import transaction
 
+from accounting.services import get_default_company, post_sales_invoice, reverse_source_entry
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
@@ -65,6 +66,8 @@ def confirm_invoice(invoice_id, actor=None):
     if source is None:
         raise InvalidBusinessOperation("The invoice creator has no active sales location from which to fulfill this sale.")
     _record_sale_movement(invoice, source)
+    company = get_default_company()
+    post_sales_invoice(invoice=invoice, actor_id=invoice.created_by_id, company=company)
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
@@ -99,6 +102,27 @@ def cancel_invoice(invoice_id, actor=None):
         for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
             StockBalanceService.increase(location=sale.source_location, product=item.product, quantity=item.quantity)
             StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
+
+        original_entry = (
+            __import__("accounting.models", fromlist=["JournalEntry"]).JournalEntry.objects
+            .filter(
+                company=get_default_company(),
+                source_type="invoice.sale",
+                source_id=invoice.pk,
+                status=__import__("accounting.models", fromlist=["JournalEntry"]).JournalEntry.Status.POSTED,
+            )
+            .prefetch_related("lines")
+            .first()
+        )
+        if original_entry is None:
+            raise InvalidBusinessOperation("Cannot reverse sale: accounting entry is missing.")
+        reverse_source_entry(
+            source_entry=original_entry,
+            actor_id=invoice.created_by_id,
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            company=get_default_company(),
+        )
 
     invoice.status = Invoice.Status.CANCELLED
     invoice.save(update_fields=("status", "updated_at"))
