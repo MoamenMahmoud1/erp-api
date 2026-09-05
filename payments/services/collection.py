@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 
+from accounting.services import get_default_company, post_customer_collection
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from common.observability import log_operation
@@ -90,6 +91,11 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         if cash_remaining == 0 and transfer_remaining == 0:
             break
 
+    post_customer_collection(
+        payment=payment,
+        actor_id=collected_by_id,
+        company=get_default_company(),
+    )
     log_operation(
         "payment.collection",
         user=collected_by_id,
