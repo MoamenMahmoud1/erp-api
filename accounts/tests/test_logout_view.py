@@ -6,11 +6,11 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 from authsession.services import start_auth_session
+from core.testing.auth import login_client, new_api_client
 
 
 class LogoutViewTests(TestCase):
@@ -25,32 +25,9 @@ class LogoutViewTests(TestCase):
         )
 
     def setUp(self):
-        self.client = APIClient(enforce_csrf_checks=True)
-        self.csrf_url = reverse("accounts:csrf-token")
-        self.login_url = reverse("accounts:login")
+        self.client = new_api_client()
         self.logout_url = reverse("accounts:logout")
         self.logout_all_url = reverse("accounts:logout-all")
-
-    def csrf_token(self):
-        return self.client.get(self.csrf_url).data["csrf_token"]
-
-    def login(self):
-        response = self.client.post(
-            self.login_url,
-            {
-                "identifier": self.user.email,
-                "password": self.password,
-            },
-            format="json",
-            HTTP_X_CSRFTOKEN=self.csrf_token(),
-        )
-        # APIClient does not maintain Django's browser cookie jar between
-        # responses, so explicitly carry the stateful auth cookies forward.
-        for name in ("refresh_token", "device_id"):
-            cookie = response.cookies.get(name)
-            self.assertIsNotNone(cookie, f"Login must set the {name} cookie")
-            self.client.cookies[name] = cookie.value
-        return response
 
     def verify_current_session(self):
         AuthSession.objects.filter(
@@ -64,30 +41,18 @@ class LogoutViewTests(TestCase):
         )
 
     def test_logout_revokes_refresh_session_and_clears_login_cookies(self):
-        login_response = self.login()
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
-        )
+        login_response = login_client(self.client, user=self.user, password=self.password)
 
-        response = self.client.post(
-            self.logout_url,
-            {},
-            format="json",
-        )
+        response = self.client.post(self.logout_url, {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNotNone(AuthSession.objects.get(user=self.user).revoked_at)
-        self.assertEqual(
-            response.cookies["refresh_token"]["max-age"],
-            0,
-        )
-        self.assertEqual(
-            response.cookies["refresh_token"]["path"],
-            "/api/v1/auth/",
-        )
+        self.assertEqual(response.cookies["refresh_token"]["max-age"], 0)
+        self.assertEqual(response.cookies["refresh_token"]["path"], "/api/v1/auth/")
+        self.assertIn("access", login_response.data)
 
     def test_logout_all_revokes_every_device_session(self):
-        login_response = self.login()
+        login_client(self.client, user=self.user, password=self.password)
         start_auth_session(
             user=self.user,
             client_context=ClientContext(
@@ -97,16 +62,9 @@ class LogoutViewTests(TestCase):
                 ip_address="198.51.100.9",
             ),
         )
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
-        )
         self.verify_current_session()
 
-        response = self.client.post(
-            self.logout_all_url,
-            {},
-            format="json",
-        )
+        response = self.client.post(self.logout_all_url, {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(
@@ -131,17 +89,10 @@ class LogoutViewTests(TestCase):
             ),
         )
 
-        login_response = self.login()
-        self.client.credentials(
-            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
-        )
+        login_client(self.client, user=self.user, password=self.password)
         self.verify_current_session()
 
-        response = self.client.post(
-            self.logout_all_url,
-            {},
-            format="json",
-        )
+        response = self.client.post(self.logout_all_url, {}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertIsNone(
