@@ -1,3 +1,55 @@
+"""
+Accounts Receivable / Accounts Payable Service
+================================================
+
+Purpose
+-------
+Provide operational customer and supplier balances plus aging analysis.
+
+Unlike `statements.py`, this module currently works from business-domain
+records (invoices, purchases, payments, returns) rather than deriving the
+answer directly from the general ledger.
+
+Architecture
+------------
+
+    Customer side
+
+    Invoice ----+
+               |
+    Collection-+----> Customer Balance ----> AR Aging
+               |
+    Refund ----+
+               |
+    Return ----+
+
+    Supplier side
+
+    Purchase --------+
+                    |
+    Supplier Payment-+--> Supplier Balance -> AP Aging
+                    |
+    Purchase Return-+
+
+Balance formulas
+----------------
+
+    Customer balance
+        Invoice total
+        - Returns
+        - Allocated collections
+        + Payment refunds
+
+    Supplier balance
+        Purchase total
+        - Purchase returns
+        - Supplier payment allocations
+
+Aging buckets
+-------------
+    0-30 days | 31-60 days | 61-90 days | 90+ days
+"""
+
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
@@ -11,9 +63,20 @@ ZERO = Decimal("0.00")
 
 
 def customer_balances(*, as_of=None, customer_id=None):
-    """Return AR balances from invoice transactions through the requested date.
+    """
+    Calculate outstanding receivables for customers as of a date.
 
-    Balance = invoice total - sales returns - allocated collections + payment refunds.
+    The calculation follows the operational invoice lifecycle:
+
+        Invoices - Returns - Payments + Refunds = Balance
+
+    Args:
+        as_of: optional inclusive date.  Only activity on or before this date
+            is included.
+        customer_id: optional customer filter.
+
+    Returns:
+        list[dict]: one summary row per customer.
     """
     invoice_filter = Q()
     if as_of:
@@ -55,9 +118,20 @@ def customer_balances(*, as_of=None, customer_id=None):
 
 
 def supplier_balances(*, as_of=None, supplier_id=None):
-    """Return AP balances from confirmed purchases through the requested date.
+    """
+    Calculate outstanding payables for suppliers as of a date.
 
-    Balance = purchase total - purchase returns - supplier payment allocations.
+    The calculation follows the operational purchase lifecycle:
+
+        Purchases - Returns - Supplier Payments = Balance
+
+    Args:
+        as_of: optional inclusive date.  Only activity on or before this date
+            is included.
+        supplier_id: optional supplier filter.
+
+    Returns:
+        list[dict]: one summary row per supplier.
     """
     purchase_filter = Q(status=Purchase.Status.CONFIRMED)
     if as_of:
@@ -110,6 +184,15 @@ def supplier_balances(*, as_of=None, supplier_id=None):
 
 
 def _age_bucket(days):
+    """
+    Map an overdue age in days to the standard aging bucket.
+
+    Buckets:
+        0_30, 31_60, 61_90, 90_plus
+
+    Returns:
+        str: the bucket key.
+    """
     if days <= 30:
         return "0_30"
     if days <= 60:
@@ -120,10 +203,21 @@ def _age_bucket(days):
 
 
 def _empty_aging():
+    """Return an initialized aging-bucket mapping with zero balances."""
     return {"0_30": ZERO, "31_60": ZERO, "61_90": ZERO, "90_plus": ZERO}
 
 
 def customer_aging(*, as_of=None, customer_id=None):
+    """
+    Distribute each customer's outstanding receivable into aging buckets.
+
+    The age is measured from the invoice creation date to ``as_of``.  Fully
+    settled invoices are skipped; only outstanding balances contribute to a
+    bucket.
+
+    Returns:
+        list[dict]: customer totals split into 0-30, 31-60, 61-90, and 90+ days.
+    """
     as_of = as_of or date.today()
     invoice_filter = Q(
         created_at__date__lte=as_of,
@@ -163,6 +257,16 @@ def customer_aging(*, as_of=None, customer_id=None):
 
 
 def supplier_aging(*, as_of=None, supplier_id=None):
+    """
+    Distribute each supplier's outstanding payable into aging buckets.
+
+    The age is measured from the purchase creation date to ``as_of``.  Fully
+    settled purchases are skipped; only outstanding balances contribute to a
+    bucket.
+
+    Returns:
+        list[dict]: supplier totals split into 0-30, 31-60, 61-90, and 90+ days.
+    """
     as_of = as_of or date.today()
     purchase_filter = Q(status=Purchase.Status.CONFIRMED, created_at__date__lte=as_of)
     if supplier_id is not None:
