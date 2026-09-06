@@ -1,3 +1,42 @@
+"""
+ERP Analytics Service
+=====================
+
+Purpose
+-------
+Provide fast operational KPIs and grouped analytics for dashboards.
+
+Current scope
+-------------
+The service is intentionally based on Django ORM/database aggregation for
+small, request-time reports.  Heavy analysis (large historical datasets,
+forecasting, segmentation, anomaly detection, and similar workloads) should
+later run through Celery workers and can use Pandas/NumPy without blocking API
+requests.
+
+Architecture
+------------
+
+    ERP tables
+       |
+       +---- Invoices ------+
+       |                    |
+       +---- Purchases -----+----> Django ORM / DB aggregation
+       |                    |
+       +---- Inventory -----+             |
+       |                                  v
+       +---- Employees -----+        Dashboard KPIs
+
+Future heavy path:
+
+    API -> Analytics Job -> Celery -> Pandas/NumPy -> Stored Result -> API
+
+Design note
+-----------
+Analytics reads operational data.  Accounting statements remain responsible
+for financial reporting derived from posted journal entries.
+"""
+
 from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
@@ -13,6 +52,21 @@ SALES_STATUSES = (Invoice.Status.CONFIRMED, Invoice.Status.PAID)
 
 
 def _range_filter(queryset, field, date_from=None, date_to=None):
+    """
+    Apply optional inclusive date boundaries to a queryset field.
+
+    This helper keeps the date-range behavior consistent across analytics
+    functions and avoids repeating the same filtering logic.
+
+    Args:
+        queryset: Django queryset to filter.
+        field: datetime field path used for the report.
+        date_from: optional inclusive lower date.
+        date_to: optional inclusive upper date.
+
+    Returns:
+        QuerySet: the filtered queryset.
+    """
     if date_from:
         queryset = queryset.filter(**{f"{field}__date__gte": date_from})
     if date_to:
@@ -21,6 +75,20 @@ def _range_filter(queryset, field, date_from=None, date_to=None):
 
 
 def sales_dashboard(*, date_from=None, date_to=None):
+    """
+    Return high-level sales KPIs for an optional date range.
+
+    Metrics:
+        - gross_sales: line sales less invoice-level coupon discounts.
+        - units_sold: total quantity on qualifying sales invoices.
+        - invoice_count: distinct qualifying invoices.
+
+    The current implementation treats CONFIRMED and PAID invoices as active
+    sales records for dashboard purposes.
+
+    Returns:
+        dict: date range plus sales KPIs.
+    """
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -45,6 +113,17 @@ def sales_dashboard(*, date_from=None, date_to=None):
 
 
 def purchase_dashboard(*, date_from=None, date_to=None):
+    """
+    Return high-level purchase KPIs for an optional date range.
+
+    Metrics:
+        - purchase_value: purchase line value.
+        - units_purchased: total purchased quantity.
+        - purchase_count: distinct confirmed purchases.
+
+    Returns:
+        dict: date range plus purchase KPIs.
+    """
     items = PurchaseItem.objects.filter(purchase__status=Purchase.Status.CONFIRMED)
     items = _range_filter(items, "purchase__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -66,6 +145,22 @@ def purchase_dashboard(*, date_from=None, date_to=None):
 
 
 def inventory_dashboard(*, low_stock_threshold=10):
+    """
+    Return current inventory KPIs and products at or below a stock threshold.
+
+    Inventory value is calculated from current quantity multiplied by the
+    product purchase price.  This is an operational valuation for the
+    dashboard; formal financial inventory valuation remains an accounting
+    concern.
+
+    Args:
+        low_stock_threshold: inclusive quantity threshold for the low-stock
+            list.
+
+    Returns:
+        dict: total units, inventory value, active product count, and low-stock
+        details.
+    """
     stock_rows = (
         Product.objects.filter(is_active=True)
         .values("id", "name", "purchase_price")
@@ -93,6 +188,19 @@ def inventory_dashboard(*, low_stock_threshold=10):
 
 
 def top_products(*, date_from=None, date_to=None, limit=10):
+    """
+    Return the highest-selling products for an optional date range.
+
+    Results are ordered primarily by sold quantity and then by revenue.  The
+    report is intentionally a ranking query, not a profitability statement.
+
+    Args:
+        date_from/date_to: optional inclusive date range.
+        limit: maximum number of products to return.
+
+    Returns:
+        list[dict]: grouped product quantity and revenue rows.
+    """
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -108,6 +216,16 @@ def top_products(*, date_from=None, date_to=None, limit=10):
 
 
 def sales_by_employee(*, date_from=None, date_to=None):
+    """
+    Group sales quantity and revenue by the employee who created each invoice.
+
+    Args:
+        date_from/date_to: optional inclusive date range.
+
+    Returns:
+        list[dict]: employee identifiers, email addresses, sold quantity, and
+        revenue ordered by revenue descending.
+    """
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
