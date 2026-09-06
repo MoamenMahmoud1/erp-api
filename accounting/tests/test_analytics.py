@@ -1,5 +1,5 @@
-from decimal import Decimal
 from datetime import timedelta
+from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
@@ -15,7 +15,6 @@ from accounts.models import CustomUserModel
 from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
 from invoices.models import Invoice, InvoiceItem
-from organization.models import Company
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from suppliers.models import Supplier
@@ -23,7 +22,6 @@ from suppliers.models import Supplier
 
 class AnalyticsTests(TestCase):
     def setUp(self):
-        self.company = Company.objects.create(name="Analytics Company")
         self.user = CustomUserModel.objects.create_user(
             email="analytics@test.local",
             password="strong-password-123",
@@ -137,7 +135,7 @@ class AnalyticsTests(TestCase):
         self._invoice(self.user, product=self.product_a, quantity=2, price="100")
         self._invoice(self.user_two, product=self.product_b, quantity=5, price="50")
         result = sales_by_employee()
-        self.assertEqual(result[0]["invoice__created_by_id"], self.user.pk)
-        self.assertEqual(result[0]["revenue"], Decimal("200"))
-        self.assertEqual(result[1]["invoice__created_by_id"], self.user_two.pk)
-        self.assertEqual(result[1]["revenue"], Decimal("250"))
+        self.assertEqual(result[0]["invoice__created_by_id"], self.user_two.pk)
+        self.assertEqual(result[0]["revenue"], Decimal("250"))
+        self.assertEqual(result[1]["invoice__created_by_id"], self.user.pk)
+        self.assertEqual(result[1]["revenue"], Decimal("200"))
