@@ -1,4 +1,38 @@
-from .analytics import inventory_dashboard, purchase_dashboard, sales_by_employee, sales_dashboard, top_products
+"""
+Accounting Services Package
+===========================
+
+Service boundaries
+------------------
+
+    Business operations
+            |
+            v
+      automation.py
+            |
+            v
+        journal.py
+            |
+            v
+       Posted Ledger
+          /     \
+         v       v
+ statements.py  balances.py
+         \       /
+          \     /
+           v   v
+       Financial / AR-AP reports
+
+analytics.py is a separate operational analytics layer.  It currently uses
+Django ORM/database aggregation for request-time KPIs and is intended to gain
+a Celery + Pandas/NumPy path later for heavy analytics workloads.
+
+Boundary rule
+-------------
+Business-domain services may call accounting automation, while the low-level
+journal engine should remain independent from domain applications.
+"""
+
 from .automation import (
     ensure_default_accounts,
     post_customer_collection,
@@ -30,7 +64,6 @@ __all__ = (
     "ensure_default_accounts",
     "general_ledger",
     "get_default_company",
-    "inventory_dashboard",
     "post_customer_collection",
     "post_payment_refund",
     "post_purchase",
@@ -40,11 +73,7 @@ __all__ = (
     "post_sales_return",
     "post_supplier_payment",
     "profit_and_loss",
-    "purchase_dashboard",
-    "sales_by_employee",
-    "sales_dashboard",
     "supplier_aging",
     "supplier_balances",
-    "top_products",
     "trial_balance",
 )
