@@ -1,3 +1,43 @@
+"""
+Financial Statements Service
+============================
+
+Purpose
+-------
+Build financial statements from POSTED accounting journal lines.
+
+This module is a read layer over the accounting ledger.  It does not create
+or modify journal entries.
+
+Architecture
+------------
+
+    POSTED JournalEntry
+            |
+            v
+       JournalLine
+            |
+      +-----+-----+----------------+
+      |           |                |
+      v           v                v
+     P&L     Balance Sheet     Cash Flow
+      |           |                |
+      v           v                v
+   Revenue/    Assets/         Cash/Bank
+   Expenses    Liabilities     movements
+               Equity
+
+Core rule
+---------
+Financial statements must be derived from POSTED entries only.  Draft
+accounting activity is intentionally excluded from these reports.
+
+Profit presentation
+-------------------
+Revenue and expenses are read from their account balances.  Net income is
+derived from those balances; it is not stored as a separate sale transaction.
+"""
+
 from collections import defaultdict
 from decimal import Decimal
 
@@ -11,6 +51,17 @@ ZERO = Decimal("0")
 
 
 def _posted_lines(*, company, date_from=None, date_to=None):
+    """
+    Return posted journal lines for a company and optional date range.
+
+    Why it exists:
+        Every financial statement needs the same base dataset.  Centralizing
+        the filter prevents different statements from accidentally including
+        different journal states or companies.
+
+    Returns:
+        QuerySet[JournalLine]: posted lines belonging to the company.
+    """
     queryset = JournalLine.objects.filter(
         entry__company=company,
         entry__status=JournalEntry.Status.POSTED,
@@ -24,6 +75,22 @@ def _posted_lines(*, company, date_from=None, date_to=None):
 
 
 def profit_and_loss(*, date_from=None, date_to=None, company=None):
+    """
+    Build a Profit and Loss statement for the requested period.
+
+    Calculation:
+
+        Revenue
+          - Expenses
+          = Net Income
+
+    Revenue accounts use credit minus debit; expense accounts use debit minus
+    credit.  COGS is an expense account and therefore contributes to the
+    expense total.
+
+    Returns:
+        dict containing account-level revenue and expense rows plus totals.
+    """
     company = company or get_default_company()
     rows = (
         _posted_lines(company=company, date_from=date_from, date_to=date_to)
@@ -59,6 +126,26 @@ def profit_and_loss(*, date_from=None, date_to=None, company=None):
 
 
 def balance_sheet(*, as_of, company=None):
+    """
+    Build a balance sheet as of a specific date.
+
+    Included account types:
+        - Assets
+        - Liabilities
+        - Equity
+
+    Revenue and expense accounts are treated as temporary accounts.  Their
+    cumulative net income is presented as retained earnings until explicit
+    closing entries are introduced.
+
+    Accounting equation:
+
+        Assets = Liabilities + Equity
+
+    Returns:
+        dict containing account groups, totals, retained earnings, and a
+        boolean ``balanced`` check.
+    """
     company = company or get_default_company()
     rows = (
         _posted_lines(company=company, date_to=as_of)
@@ -113,6 +200,18 @@ def balance_sheet(*, as_of, company=None):
 
 
 def cash_flow(*, date_from=None, date_to=None, company=None):
+    """
+    Build the current cash-flow report from posted Cash and Bank movements.
+
+    The current implementation identifies the default cash accounts (1010
+    Cash and 1020 Bank) and classifies movements using accounting source types.
+    Known payment/return sources are grouped under Operating; other movements
+    are grouped under Other.
+
+    Returns:
+        dict containing opening cash, inflows, outflows, net change, and ending
+        cash.
+    """
     company = company or get_default_company()
     cash_accounts = list(
         Account.objects.filter(
