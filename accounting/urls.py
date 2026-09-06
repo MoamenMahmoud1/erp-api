@@ -1,6 +1,13 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
+from accounting.api.analytics import (
+    inventory_dashboard_view,
+    purchase_dashboard_view,
+    sales_by_employee_view,
+    sales_dashboard_view,
+    top_products_view,
+)
 from accounting.api.balances import (
     customer_aging_view,
     customer_balances_view,
@@ -25,4 +32,9 @@ urlpatterns = [
     path("reports/supplier-balances/", supplier_balances_view, name="supplier-balances"),
     path("reports/customer-aging/", customer_aging_view, name="customer-aging"),
     path("reports/supplier-aging/", supplier_aging_view, name="supplier-aging"),
+    path("analytics/sales/", sales_dashboard_view, name="analytics-sales"),
+    path("analytics/purchases/", purchase_dashboard_view, name="analytics-purchases"),
+    path("analytics/inventory/", inventory_dashboard_view, name="analytics-inventory"),
+    path("analytics/top-products/", top_products_view, name="analytics-top-products"),
+    path("analytics/sales-by-employee/", sales_by_employee_view, name="analytics-sales-by-employee"),
 ]
