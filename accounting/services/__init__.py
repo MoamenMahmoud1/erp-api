@@ -1,3 +1,4 @@
+from .analytics import inventory_dashboard, purchase_dashboard, sales_by_employee, sales_dashboard, top_products
 from .automation import (
     ensure_default_accounts,
     post_customer_collection,
@@ -29,6 +30,7 @@ __all__ = (
     "ensure_default_accounts",
     "general_ledger",
     "get_default_company",
+    "inventory_dashboard",
     "post_customer_collection",
     "post_payment_refund",
     "post_purchase",
@@ -38,7 +40,11 @@ __all__ = (
     "post_sales_return",
     "post_supplier_payment",
     "profit_and_loss",
+    "purchase_dashboard",
+    "sales_by_employee",
+    "sales_dashboard",
     "supplier_aging",
     "supplier_balances",
+    "top_products",
     "trial_balance",
 )
