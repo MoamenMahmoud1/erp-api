@@ -1,3 +1,4 @@
+import type { FormEvent, ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import {
   ActionIcon,
@@ -10,7 +11,6 @@ import {
   Pagination,
   Paper,
   ScrollArea,
-  SimpleGrid,
   Stack,
   Table,
   Text,
@@ -32,7 +32,7 @@ export type CrudField = {
 export type CrudColumn = {
   key: string;
   label: string;
-  render?: (value: unknown, row: Record<string, unknown>) => React.ReactNode;
+  render?: (value: unknown, row: Record<string, unknown>) => ReactNode;
 };
 
 type Props = {
@@ -43,7 +43,8 @@ type Props = {
   list: (query: string) => Promise<Paginated>;
   create: (body: Json) => Promise<unknown>;
   update: (id: number, body: Json) => Promise<unknown>;
-  remove: (id: number) => Promise<unknown>;
+  remove?: (id: number) => Promise<unknown>;
+  canDelete?: boolean;
   searchPlaceholder?: string;
 };
 
@@ -54,7 +55,7 @@ function display(value: unknown) {
   return String(value);
 }
 
-export function CrudPage({ title, subtitle, fields, columns, list, create, update, remove, searchPlaceholder = 'Search' }: Props) {
+export function CrudPage({ title, subtitle, fields, columns, list, create, update, remove, canDelete = true, searchPlaceholder = 'Search' }: Props) {
   const [data, setData] = useState<Paginated>({ count: 0, next: null, previous: null, results: [] });
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -77,7 +78,7 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
     }
   }
 
-  useEffect(() => { void load(page); }, [page]); // search is applied by the explicit search action below
+  useEffect(() => { void load(page); }, [page]);
 
   function openCreate() {
     setEditing(null);
@@ -95,7 +96,7 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
     setModalOpen(true);
   }
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     try {
       if (editing) await update(Number(editing.id), form as Json);
@@ -109,6 +110,7 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
   }
 
   async function onDelete(id: number) {
+    if (!remove || !canDelete) return;
     if (!window.confirm(`Delete #${id}?`)) return;
     try {
       await remove(id);
@@ -144,7 +146,7 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
                   <Table.Td>
                     <Group justify="flex-end" gap={5}>
                       <ActionIcon variant="subtle" onClick={() => openEdit(row)}><IconEdit size={17} /></ActionIcon>
-                      <ActionIcon variant="subtle" color="red" onClick={() => void onDelete(Number(row.id))}><IconTrash size={17} /></ActionIcon>
+                      {canDelete && remove && <ActionIcon variant="subtle" color="red" onClick={() => void onDelete(Number(row.id))}><IconTrash size={17} /></ActionIcon>}
                     </Group>
                   </Table.Td>
                 </Table.Tr>
