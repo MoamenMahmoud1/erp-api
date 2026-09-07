@@ -134,8 +134,12 @@ def top_products(*, date_from=None, date_to=None, limit=10):
         output_field=DecimalField(max_digits=18, decimal_places=2),
     )
     rows = (
-        items.values("product_id", "product__name")
-        .annotate(quantity=Coalesce(Sum("quantity"), 0), revenue=Coalesce(Sum(line_total), ZERO))
+        items.annotate(line_total=line_total)
+        .values("product_id", "product__name")
+        .annotate(
+            quantity=Coalesce(Sum("quantity"), 0),
+            revenue=Coalesce(Sum("line_total"), ZERO),
+        )
         .order_by("-quantity", "-revenue", "product_id")[:limit]
     )
     return list(rows)
@@ -150,8 +154,12 @@ def sales_by_employee(*, date_from=None, date_to=None):
         output_field=DecimalField(max_digits=18, decimal_places=2),
     )
     rows = (
-        items.values("invoice__created_by_id", "invoice__created_by__email")
-        .annotate(quantity=Coalesce(Sum("quantity"), 0), revenue=Coalesce(Sum(line_total), ZERO))
+        items.annotate(line_total=line_total)
+        .values("invoice__created_by_id", "invoice__created_by__email")
+        .annotate(
+            quantity=Coalesce(Sum("quantity"), 0),
+            revenue=Coalesce(Sum("line_total"), ZERO),
+        )
         .order_by("-revenue", "invoice__created_by_id")
     )
     return list(rows)
