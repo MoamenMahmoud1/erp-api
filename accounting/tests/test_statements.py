@@ -12,6 +12,7 @@ class FinancialStatementTests(TestCase):
     def setUp(self):
         self.company = Company.objects.create(name="Statements Company")
         self.user = CustomUserModel.objects.create_user(
+            username="statements-user",
             email="statements@test.local",
             password="strong-password-123",
         )
