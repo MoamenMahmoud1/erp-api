@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Center, Loader } from '@mantine/core';
@@ -11,7 +12,7 @@ import { ProductsPage, CustomersPage, SuppliersPage } from './pages/MasterDataPa
 import { SalesPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage, BalancesPage } from './pages/AccountingPages';
 
-function Authenticated({ user, children }: { user: UserProfile; children: React.ReactNode }) {
+function Authenticated({ user, children }: { user: UserProfile; children: ReactNode }) {
   return <Shell user={user}>{children}</Shell>;
 }
 
@@ -38,12 +39,17 @@ export function App() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (location.pathname === '/login') { setLoading(false); return; }
+    if (location.pathname === '/login') {
+      setLoading(false);
+      return;
+    }
+    if (user) return;
+
     api.auth.me()
       .then(setUser)
       .catch(() => { setUser(null); navigate('/login', { replace: true }); })
       .finally(() => setLoading(false));
-  }, [location.pathname, navigate]);
+  }, [location.pathname, navigate, user]);
 
   if (loading) return <Center h="100vh"><Loader size="lg" /></Center>;
   if (!user && location.pathname !== '/login') return null;
