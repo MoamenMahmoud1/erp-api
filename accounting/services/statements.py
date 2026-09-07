@@ -90,8 +90,8 @@ def balance_sheet(*, as_of, company=None):
     """Build a balance sheet as of ``as_of``.
 
     The report groups asset, liability, and equity accounts. Revenue and
-    expense balances are accumulated as retained earnings until closing-entry
-    support is introduced.
+    expense balances are presented as cumulative retained earnings until
+    closing entries are introduced.
 
     The result exposes ``balanced`` to verify:
 
@@ -117,23 +117,23 @@ def balance_sheet(*, as_of, company=None):
         debit = row["total_debit"] or ZERO
         credit = row["total_credit"] or ZERO
         account_type = row["account__account_type"]
-        if account_type in (Account.AccountType.ASSET, Account.AccountType.LIABILITY, Account.AccountType.EQUITY):
-            if account_type == Account.AccountType.ASSET:
-                amount = debit - credit
-                total_assets += amount
-                assets.append({**row, "amount": amount})
-            elif account_type == Account.AccountType.LIABILITY:
-                amount = credit - debit
-                total_liabilities += amount
-                liabilities.append({**row, "amount": amount})
-            else:
-                amount = credit - debit
-                total_equity += amount
-                equity.append({**row, "amount": amount})
-        elif account_type in (Account.AccountType.REVENUE, Account.AccountType.EXPENSE):
-            retained_earnings += credit - debit if account_type == Account.AccountType.REVENUE else debit - credit
 
-    # Keep current-period presentation consistent until explicit closing entries exist.
+        if account_type == Account.AccountType.ASSET:
+            amount = debit - credit
+            total_assets += amount
+            assets.append({**row, "amount": amount})
+        elif account_type == Account.AccountType.LIABILITY:
+            amount = credit - debit
+            total_liabilities += amount
+            liabilities.append({**row, "amount": amount})
+        elif account_type == Account.AccountType.EQUITY:
+            amount = credit - debit
+            total_equity += amount
+            equity.append({**row, "amount": amount})
+        elif account_type in (Account.AccountType.REVENUE, Account.AccountType.EXPENSE):
+            # Revenue increases retained earnings; expenses reduce it.
+            retained_earnings += credit - debit
+
     total_equity += retained_earnings
 
     return {
