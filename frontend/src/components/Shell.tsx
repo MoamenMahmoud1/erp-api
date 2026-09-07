@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -14,10 +15,11 @@ import {
   Text,
   ThemeIcon,
   Tooltip,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { IconChevronRight, IconMoon, IconPower, IconSun } from '@tabler/icons-react';
 
-import { api, UserProfile } from '../lib/api';
+import { api, type UserProfile } from '../lib/api';
 
 const sections = [
   {
@@ -56,15 +58,17 @@ const sections = [
   },
 ];
 
-export function Shell({ user, children }: { user: UserProfile; children: React.ReactNode }) {
+export function Shell({ user, children }: { user: UserProfile; children: ReactNode }) {
   const [opened, setOpened] = useState(false);
-  const [dark, setDark] = useState(true);
+  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
 
   async function logout() {
     try { await api.auth.logout(); } finally { navigate('/login'); }
   }
+
+  const dark = colorScheme === 'dark';
 
   return (
     <div className="app-bg">
@@ -78,8 +82,8 @@ export function Shell({ user, children }: { user: UserProfile; children: React.R
         header={{ height: 72 }}
         styles={{
           main: { background: 'transparent' },
-          header: { background: 'rgba(7, 11, 23, 0.72)', backdropFilter: 'blur(20px)', borderColor: 'rgba(148,163,184,0.10)' },
-          navbar: { background: 'rgba(7, 11, 23, 0.72)', backdropFilter: 'blur(20px)', borderColor: 'rgba(148,163,184,0.10)' },
+          header: { background: dark ? 'rgba(7, 11, 23, 0.72)' : 'rgba(255, 255, 255, 0.82)', backdropFilter: 'blur(20px)', borderColor: 'rgba(148,163,184,0.10)' },
+          navbar: { background: dark ? 'rgba(7, 11, 23, 0.72)' : 'rgba(255, 255, 255, 0.82)', backdropFilter: 'blur(20px)', borderColor: 'rgba(148,163,184,0.10)' },
         }}
       >
         <AppShell.Header>
@@ -97,7 +101,7 @@ export function Shell({ user, children }: { user: UserProfile; children: React.R
 
             <Group gap="sm">
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
-                <ActionIcon variant="subtle" onClick={() => setDark((value) => !value)}>
+                <ActionIcon variant="subtle" onClick={() => toggleColorScheme()}>
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
                 </ActionIcon>
               </Tooltip>
