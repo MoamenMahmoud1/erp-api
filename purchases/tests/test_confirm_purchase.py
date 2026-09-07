@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from inventory.models import StockBalance, StockLocation, StockMovement, StockMovementItem
+from organization.models import Company
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.confirm_purchase import ConfirmPurchaseService
@@ -19,6 +20,7 @@ class ConfirmPurchaseServiceTests(TestCase):
             password="StrongPass123!",
             is_staff=True,
         )
+        self.company = Company.objects.create(name="Purchase Test Company")
         self.supplier = Supplier.objects.create(name="Test Supplier")
         self.product = Product.objects.create(
             name="Test Product",
