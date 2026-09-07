@@ -40,53 +40,33 @@ import {
 
 import { api, type UserProfile } from '../lib/api';
 
-type NavItem = {
-  label: string;
-  to: string;
-  icon: ReactNode;
-};
-
-type NavSection = {
-  label: string;
-  items: NavItem[];
-};
+type NavItem = { label: string; to: string; icon: ReactNode };
+type NavSection = { label: string; items: NavItem[] };
 
 const sections: NavSection[] = [
-  {
-    label: 'Workspace',
-    items: [
-      { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} /> },
-      { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} /> },
-      { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} /> },
-    ],
-  },
-  {
-    label: 'Master data',
-    items: [
-      { label: 'Products', to: '/products', icon: <IconBox size={17} /> },
-      { label: 'Customers', to: '/customers', icon: <IconUsers size={17} /> },
-      { label: 'Suppliers', to: '/suppliers', icon: <IconTruck size={17} /> },
-      { label: 'Employees', to: '/employees', icon: <IconUsers size={17} /> },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { label: 'Inventory', to: '/inventory', icon: <IconPackage size={17} /> },
-      { label: 'Payments', to: '/payments', icon: <IconWallet size={17} /> },
-      { label: 'Organization', to: '/organization/company', icon: <IconBuilding size={17} /> },
-    ],
-  },
-  {
-    label: 'Accounting',
-    items: [
-      { label: 'Overview', to: '/accounting', icon: <IconChartBar size={17} /> },
-      { label: 'Accounts', to: '/accounting/accounts', icon: <IconBook size={17} /> },
-      { label: 'Journals', to: '/accounting/journals', icon: <IconFileInvoice size={17} /> },
-      { label: 'Statements', to: '/accounting/statements', icon: <IconChartBar size={17} /> },
-      { label: 'AR / AP', to: '/accounting/balances', icon: <IconWallet size={17} /> },
-    ],
-  },
+  { label: 'Workspace', items: [
+    { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} /> },
+    { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} /> },
+    { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} /> },
+  ] },
+  { label: 'Master data', items: [
+    { label: 'Products', to: '/products', icon: <IconBox size={17} /> },
+    { label: 'Customers', to: '/customers', icon: <IconUsers size={17} /> },
+    { label: 'Suppliers', to: '/suppliers', icon: <IconTruck size={17} /> },
+    { label: 'Employees', to: '/employees', icon: <IconUsers size={17} /> },
+  ] },
+  { label: 'Operations', items: [
+    { label: 'Inventory', to: '/inventory', icon: <IconPackage size={17} /> },
+    { label: 'Payments', to: '/payments', icon: <IconWallet size={17} /> },
+    { label: 'Organization', to: '/organization/company', icon: <IconBuilding size={17} /> },
+  ] },
+  { label: 'Accounting', items: [
+    { label: 'Overview', to: '/accounting', icon: <IconChartBar size={17} /> },
+    { label: 'Accounts', to: '/accounting/accounts', icon: <IconBook size={17} /> },
+    { label: 'Journals', to: '/accounting/journals', icon: <IconFileInvoice size={17} /> },
+    { label: 'Statements', to: '/accounting/statements', icon: <IconChartBar size={17} /> },
+    { label: 'AR / AP', to: '/accounting/balances', icon: <IconWallet size={17} /> },
+  ] },
 ];
 
 const allItems = sections.flatMap((section) => section.items);
@@ -106,11 +86,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   }, [search]);
 
   async function logout() {
-    try {
-      await api.auth.logout();
-    } finally {
-      navigate('/login');
-    }
+    try { await api.auth.logout(); } finally { navigate('/login'); }
   }
 
   function submitSearch() {
@@ -124,7 +100,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
       <div className="aurora-orb one" />
       <div className="aurora-orb two" />
       <div className="aurora-orb three" />
-
       <AppShell
         padding="lg"
         navbar={{ width: 238, breakpoint: 'md', collapsed: { mobile: !opened } }}
@@ -147,16 +122,13 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             <Group gap="sm" miw={230}>
               <Burger opened={opened} onClick={() => setOpened((value) => !value)} hiddenFrom="md" size="sm" />
               <Group gap="sm">
-                <ThemeIcon variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }} size={36} radius="xl">
-                  E
-                </ThemeIcon>
+                <ThemeIcon variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }} size={36} radius="xl">E</ThemeIcon>
                 <div>
                   <Text fw={850} size="sm" lh={1.1}>ERP Command Center</Text>
                   <Text size="xs" c="dimmed" mt={3}>Sales & operations</Text>
                 </div>
               </Group>
             </Group>
-
             <TextInput
               className="topbar-search"
               leftSection={<IconSearch size={17} />}
@@ -171,20 +143,16 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               visibleFrom="sm"
               styles={{ input: { borderRadius: 999 } }}
             />
-
             <Group gap="xs">
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
                 <ActionIcon variant="subtle" radius="xl" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
                 </ActionIcon>
               </Tooltip>
-
               <Menu shadow="md" width={210} position="bottom-end">
                 <Menu.Target>
                   <button className="user-chip" type="button">
-                    <Avatar radius="xl" size="sm" color="indigo">
-                      {(user.first_name || user.username).slice(0, 1).toUpperCase()}
-                    </Avatar>
+                    <Avatar radius="xl" size="sm" color="indigo">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
                     <span className="user-chip-copy">
                       <Text size="sm" fw={750}>{user.first_name || user.username}</Text>
                       <Text size="xs" c="dimmed">{user.email}</Text>
@@ -200,15 +168,12 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             </Group>
           </Group>
         </AppShell.Header>
-
         <AppShell.Navbar p="sm">
           <AppShell.Section grow component={ScrollArea} scrollbarSize={4}>
             <Stack gap="md">
               {sections.map((section) => (
                 <div key={section.label}>
-                  <Text px="sm" mb={6} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">
-                    {section.label}
-                  </Text>
+                  <Text px="sm" mb={6} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">{section.label}</Text>
                   <Stack gap={2}>
                     {section.items.map((item) => {
                       const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
@@ -222,9 +187,8 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                           leftSection={<span className="nav-icon">{item.icon}</span>}
                           onClick={() => setOpened(false)}
                           variant="light"
-                          radius="md"
                           styles={{
-                            root: { minHeight: 40 },
+                            root: { minHeight: 40, borderRadius: 10 },
                             label: { fontWeight: active ? 750 : 600 },
                           }}
                         />
@@ -240,7 +204,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             <Text size="xs" c="dimmed" px="sm">ERP workspace</Text>
           </AppShell.Section>
         </AppShell.Navbar>
-
         {searchMatches.length > 0 && (
           <div className="search-results">
             {searchMatches.map((item) => (
@@ -251,7 +214,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             ))}
           </div>
         )}
-
         <AppShell.Main className="page-enter">{children}</AppShell.Main>
       </AppShell>
     </div>
