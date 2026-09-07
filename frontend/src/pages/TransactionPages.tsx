@@ -4,7 +4,6 @@ import { Button, Card, Divider, Group, NumberInput, Select, SimpleGrid, Stack, T
 import { notifications } from '@mantine/notifications';
 
 import { api, type Paginated } from '../lib/api';
-import { SalesPage, PurchasesPage, PaymentsPage } from './OperationsPages';
 
 type Line = { product: string; quantity: number | string; unit_purchase_price?: number | string };
 
@@ -41,9 +40,7 @@ export function CreateInvoicePage() {
   const [lines, setLines] = useState<Line[]>([{ product: '', quantity: 1 }]);
   const [loading, setLoading] = useState(false);
 
-  function updateLine(index: number, patch: Partial<Line>) {
-    setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line));
-  }
+  function updateLine(index: number, patch: Partial<Line>) { setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, ...patch } : line)); }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -129,5 +126,3 @@ export function SupplierPaymentPage() {
 
   return <Stack gap="xl"><WorkflowHeader eyebrow="PAYMENTS" title="Pay supplier" subtitle="Settle supplier payables using cash or bank transfer." /><Card className="glass" withBorder radius="lg" p="xl" maw={760}><form onSubmit={submit}><Stack><Select label="Supplier" searchable data={supplierOptions} value={supplier} onChange={(value) => setSupplier(value || '')} required /><SimpleGrid cols={{ base: 1, sm: 2 }}><NumberInput label="Cash" min={0} value={cash} onChange={setCash} /><NumberInput label="Bank / transfer" min={0} value={transfer} onChange={setTransfer} /></SimpleGrid><TextInput label="Reference" value={reference} onChange={(event) => setReference(event.currentTarget.value)} /><Button type="submit" loading={loading}>Pay supplier</Button></Stack></form></Card></Stack>;
 }
-
-export { SalesPage, PurchasesPage, PaymentsPage };
