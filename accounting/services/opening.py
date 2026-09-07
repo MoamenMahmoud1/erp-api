@@ -6,8 +6,12 @@ source key per company. Later corrections can use normal journal adjustments.
 
 from django.db import transaction
 
-from accounting.models import JournalEntry
-from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
+from accounting.models import Account, JournalEntry
+from accounting.services.journal import (
+    create_journal_entry,
+    get_default_company,
+    post_journal_entry,
+)
 from common.exceptions import InvalidBusinessOperation
 
 
@@ -15,9 +19,8 @@ from common.exceptions import InvalidBusinessOperation
 def create_opening_balance(*, entry_date, lines, created_by_id, company=None):
     """Create the company's single initial opening-balance journal.
 
-    The entry is immediately posted. A company cannot have more than one
-    opening-balance entry; subsequent changes should be recorded as normal
-    accounting adjustments.
+    Opening balances may only use Asset, Liability, or Equity accounts because
+    Revenue and Expense accounts start the new accounting period at zero.
     """
     company = company or get_default_company()
     if JournalEntry.objects.filter(
@@ -25,7 +28,9 @@ def create_opening_balance(*, entry_date, lines, created_by_id, company=None):
         source_type="opening_balance",
         source_id=company.pk,
     ).exists():
-        raise InvalidBusinessOperation("An opening balance already exists for this company.")
+        raise InvalidBusinessOperation(
+            "An opening balance already exists for this company."
+        )
 
     if JournalEntry.objects.filter(
         company=company,
@@ -34,6 +39,23 @@ def create_opening_balance(*, entry_date, lines, created_by_id, company=None):
     ).exists():
         raise InvalidBusinessOperation(
             "Opening balance date must not be later than existing posted accounting entries."
+        )
+
+    account_ids = {line["account_id"] for line in lines}
+    accounts = Account.objects.filter(company=company, pk__in=account_ids)
+    allowed_types = {
+        Account.AccountType.ASSET,
+        Account.AccountType.LIABILITY,
+        Account.AccountType.EQUITY,
+    }
+    if accounts.exclude(account_type__in=allowed_types).exists():
+        raise InvalidBusinessOperation(
+            "Opening balances may only use asset, liability, or equity accounts."
+        )
+
+    if accounts.count() != len(account_ids):
+        raise InvalidBusinessOperation(
+            "Every opening balance account must belong to the company."
         )
 
     entry = create_journal_entry(
