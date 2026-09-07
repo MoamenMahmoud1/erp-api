@@ -4,12 +4,14 @@ from django.contrib.auth import get_user_model
 
 from customers.models import Customer
 from inventory.models import StockLocation
+from organization.models import Company
 from products.models import Product
 
 
 class InvoiceTestMixin:
     def setUp(self):
         User = get_user_model()
+        self.company = Company.objects.create(name="Invoice Test Company")
         self.user = User.objects.create_user(
             username="invoice-user",
             email="invoice@example.com",
