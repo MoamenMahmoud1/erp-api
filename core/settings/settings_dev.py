@@ -4,6 +4,9 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 AUTH_COOKIE_SECURE = False
 
+# The React/Vite development server runs on port 5173.
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+
 INSTALLED_APPS += [
     'django_extensions',
     #'silk',
@@ -49,12 +52,20 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://127.0.0.1:5500,http://localhost:5500,http://localhost:3000',
+    default=(
+        'http://127.0.0.1:5173,http://localhost:5173,'
+        'http://127.0.0.1:5500,http://localhost:5500,'
+        'http://localhost:3000'
+    ),
     cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
 )
 CSRF_TRUSTED_ORIGINS = config(
     'CSRF_TRUSTED_ORIGINS',
-    default='http://127.0.0.1:5500,http://localhost:5500,http://localhost:3000',
+    default=(
+        'http://127.0.0.1:5173,http://localhost:5173,'
+        'http://127.0.0.1:5500,http://localhost:5500,'
+        'http://localhost:3000'
+    ),
     cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
 )
 
