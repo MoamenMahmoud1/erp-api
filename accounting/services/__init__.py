@@ -18,19 +18,15 @@ Service boundaries
           /     \
          v       v
  statements.py  balances.py
-         \       /
-          \     /
-           v   v
-      Financial / AR-AP reports
 
-analytics.py is a separate operational analytics layer. It currently uses
-Django ORM/database aggregation for request-time KPIs and is intended to gain
-a Celery + Pandas/NumPy path later for heavy analytics workloads.
+Small accounting workflows are kept in dedicated services only when they have
+an independent business rule:
 
-Boundary rule
--------------
-Business-domain services may call accounting automation, while the low-level
-journal engine should remain independent from domain applications.
+    expenses.py  -> paid operating expenses
+    opening.py   -> initial opening balance
+    periods.py   -> date-range posting lock
+
+analytics.py is a separate operational analytics layer.
 """
 
 from .automation import (
@@ -45,6 +41,7 @@ from .automation import (
     reverse_source_entry,
 )
 from .balances import customer_aging, customer_balances, supplier_aging, supplier_balances
+from .expenses import create_expense
 from .journal import (
     JournalEntryError,
     create_journal_entry,
@@ -53,23 +50,31 @@ from .journal import (
     post_journal_entry,
     trial_balance,
 )
+from .opening import create_opening_balance
+from .periods import AccountingPeriodError, assert_period_open, close_period, create_period
 from .statements import balance_sheet, cash_flow, profit_and_loss
 
 __all__ = (
+    "AccountingPeriodError",
     "JournalEntryError",
+    "assert_period_open",
     "balance_sheet",
     "cash_flow",
+    "close_period",
+    "create_expense",
     "create_journal_entry",
+    "create_opening_balance",
+    "create_period",
     "customer_aging",
     "customer_balances",
     "ensure_default_accounts",
     "general_ledger",
     "get_default_company",
     "post_customer_collection",
+    "post_journal_entry",
     "post_payment_refund",
     "post_purchase",
     "post_purchase_return",
-    "post_journal_entry",
     "post_sales_invoice",
     "post_sales_return",
     "post_supplier_payment",
