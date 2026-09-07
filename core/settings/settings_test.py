@@ -8,7 +8,7 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 
 # Django's test client uses HTTP. Keep test cookies usable without changing
-# the secure-cookie policy used by production.
+# the secure-cookie policy used in production.
 AUTH_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
@@ -16,3 +16,10 @@ CSRF_COOKIE_SECURE = False
 DATABASES["default"]["CONN_MAX_AGE"] = 0
 DATABASES["default"]["CONN_HEALTH_CHECKS"] = False
 DATABASES["default"]["OPTIONS"] = {}
+
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "erp-api-test-auth",
+    },
+}
