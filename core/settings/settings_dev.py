@@ -6,6 +6,7 @@ AUTH_COOKIE_SECURE = False
 
 # The React/Vite development server runs on port 5173.
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
 
 INSTALLED_APPS += [
     'django_extensions',
@@ -47,7 +48,6 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-
 # Keep the required local development origins even when the .env file
 # provides a custom origin list. This prevents local frontend ports from
 # silently replacing the safe development defaults.
@@ -76,8 +76,9 @@ CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'apihigh-erp-dev',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
     },
 }
 
