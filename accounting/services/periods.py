@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from accounting.models import AccountingPeriod, JournalEntry
 from common.exceptions import InvalidBusinessOperation
+from organization.models import Company
 
 
 class AccountingPeriodError(InvalidBusinessOperation):
@@ -29,11 +30,15 @@ def assert_period_open(*, entry_date, company):
         )
 
 
+@transaction.atomic
 def create_period(*, name, start_date, end_date, company):
     """Create a non-overlapping accounting period."""
     if start_date > end_date:
-        raise AccountingPeriodError("Period start date must be on or before its end date.")
+        raise AccountingPeriodError(
+            "Period start date must be on or before its end date."
+        )
 
+    Company.objects.select_for_update().get(pk=company.pk)
     overlapping = AccountingPeriod.objects.filter(
         company=company,
         start_date__lte=end_date,
