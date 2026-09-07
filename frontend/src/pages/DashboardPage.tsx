@@ -1,10 +1,10 @@
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
-import { AreaChart, BarChart, DonutChart } from '@mantine/charts';
+import { BarChart, DonutChart } from '@mantine/charts';
 import {
   Badge,
   Card,
-  DateInput,
   Group,
   Loader,
   Paper,
@@ -25,7 +25,6 @@ type PurchaseData = { purchase_value: number | string; units_purchased: number; 
 type InventoryData = { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock: { product_id: number; product_name: string; stock: number }[] };
 type TopProduct = { product_id: number; 'product__name': string; quantity: number; revenue: number | string };
 type EmployeeSales = { invoice__created_by_id: number; 'invoice__created_by__email': string; quantity: number; revenue: number | string };
-
 type Range = 'today' | 'week' | 'month' | 'year' | 'custom';
 
 const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,10 +42,10 @@ function isoDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function getRange(range: Range, customFrom: Date | null, customTo: Date | null) {
+function getRange(range: Range, customFrom: string | null, customTo: string | null) {
   const now = new Date();
   const today = isoDate(now);
-  if (range === 'custom') return { from: customFrom ? isoDate(customFrom) : undefined, to: customTo ? isoDate(customTo) : undefined };
+  if (range === 'custom') return { from: customFrom || undefined, to: customTo || undefined };
   if (range === 'today') return { from: today, to: today };
   const from = new Date(now);
   if (range === 'week') from.setDate(now.getDate() - 6);
@@ -55,7 +54,7 @@ function getRange(range: Range, customFrom: Date | null, customTo: Date | null) 
   return { from: isoDate(from), to: today };
 }
 
-function StatCard({ label, value, icon, trend, tone = 'indigo' }: { label: string; value: string; icon: React.ReactNode; trend?: string; tone?: string }) {
+function StatCard({ label, value, icon, trend, tone = 'indigo' }: { label: string; value: string; icon: ReactNode; trend?: string; tone?: string }) {
   return (
     <Card className="glass bento-card" radius="lg" p="lg" withBorder>
       <Group justify="space-between" align="flex-start">
@@ -64,9 +63,7 @@ function StatCard({ label, value, icon, trend, tone = 'indigo' }: { label: strin
           <Text className="kpi-number" fw={900} size="clamp(1.7rem, 3vw, 2.35rem)" mt={6}>{value}</Text>
           {trend && <Group gap={5} mt={4}><IconArrowUpRight size={14} /><Text size="xs" c="teal.4" fw={700}>{trend}</Text></Group>}
         </div>
-        <Paper p="sm" radius="md" withBorder bg={`${tone}.9`} c="white">
-          {icon}
-        </Paper>
+        <Paper p="sm" radius="md" withBorder bg={`${tone}.9`} c="white">{icon}</Paper>
       </Group>
     </Card>
   );
@@ -74,8 +71,8 @@ function StatCard({ label, value, icon, trend, tone = 'indigo' }: { label: strin
 
 export function DashboardPage() {
   const [range, setRange] = useState<Range>('month');
-  const [customFrom, setCustomFrom] = useState<Date | null>(null);
-  const [customTo, setCustomTo] = useState<Date | null>(null);
+  const [customFrom, setCustomFrom] = useState<string | null>(null);
+  const [customTo, setCustomTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState<SalesData | null>(null);
   const [purchases, setPurchases] = useState<PurchaseData | null>(null);
@@ -123,17 +120,7 @@ export function DashboardPage() {
           <Title order={1} mt={4} style={{ letterSpacing: '-0.04em' }}>Good morning, command center.</Title>
           <Text c="dimmed" mt={4}>A live view of sales, purchases, inventory and team performance.</Text>
         </div>
-        <SegmentedControl
-          value={range}
-          onChange={(value) => setRange(value as Range)}
-          data={[
-            { label: 'Today', value: 'today' },
-            { label: '7 days', value: 'week' },
-            { label: 'Month', value: 'month' },
-            { label: 'Year', value: 'year' },
-            { label: 'Custom', value: 'custom' },
-          ]}
-        />
+        <SegmentedControl value={range} onChange={(value) => setRange(value as Range)} data={[{ label: 'Today', value: 'today' }, { label: '7 days', value: 'week' }, { label: 'Month', value: 'month' }, { label: 'Year', value: 'year' }, { label: 'Custom', value: 'custom' }]} />
       </Group>
 
       {range === 'custom' && (
@@ -178,26 +165,14 @@ export function DashboardPage() {
             <Card className="glass bento-card" radius="lg" p="lg" withBorder>
               <Text fw={800}>Sales vs purchases</Text>
               <Text size="xs" c="dimmed">Selected period</Text>
-              <DonutChart
-                mt="md"
-                size={190}
-                thickness={22}
-                data={[
-                  { name: 'Sales', value: Math.max(Number(sales?.gross_sales || 0), 0), color: 'indigo.5' },
-                  { name: 'Purchases', value: Math.max(Number(purchases?.purchase_value || 0), 0), color: 'violet.5' },
-                ]}
-                withTooltip
-              />
+              <DonutChart mt="md" size={190} thickness={22} data={[{ name: 'Sales', value: Math.max(Number(sales?.gross_sales || 0), 0), color: 'indigo.5' }, { name: 'Purchases', value: Math.max(Number(purchases?.purchase_value || 0), 0), color: 'violet.5' }]} withTooltip />
             </Card>
 
             <Card className="glass bento-card" radius="lg" p="lg" withBorder>
               <Group justify="space-between"><div><Text fw={800}>Low stock</Text><Text size="xs" c="dimmed">Threshold-driven alerts</Text></div><IconArrowDownRight size={18} /></Group>
               <Stack mt="md" gap="sm">
                 {(inventory?.low_stock || []).slice(0, 5).map((item) => (
-                  <div key={item.product_id}>
-                    <Group justify="space-between" mb={4}><Text size="sm">{item.product_name}</Text><Badge size="sm" color="red" variant="light">{item.stock}</Badge></Group>
-                    <Progress value={Math.min(item.stock * 10, 100)} size="xs" color="red" radius="xl" />
-                  </div>
+                  <div key={item.product_id}><Group justify="space-between" mb={4}><Text size="sm">{item.product_name}</Text><Badge size="sm" color="red" variant="light">{item.stock}</Badge></Group><Progress value={Math.min(item.stock * 10, 100)} size="xs" color="red" radius="xl" /></div>
                 ))}
                 {!inventory?.low_stock?.length && <Text c="teal.4" size="sm">Inventory is healthy.</Text>}
               </Stack>
