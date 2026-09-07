@@ -7,10 +7,14 @@ from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
 from invoices.models import Invoice, InvoiceItem
 from invoices.services.lifecycle import _cancel_invoice_sync, _record_sale_movement_sync
+from organization.models import Company
 from products.models import Product
 
 
 class InvoiceCancellationOriginalLocationTests(TestCase):
+    def setUp(self):
+        self.company = Company.objects.create(name="Invoice Cancellation Test Company")
+
     def test_confirmed_invoice_cancel_restores_original_sale_location(self):
         User = get_user_model()
         user = User.objects.create_user(
