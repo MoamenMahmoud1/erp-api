@@ -2,6 +2,7 @@ from .settings_base import *
 
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
+AUTH_COOKIE_SECURE = False
 
 INSTALLED_APPS += [
     'django_extensions',
