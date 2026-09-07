@@ -16,15 +16,28 @@ use Accounts Payable and the existing supplier-payment flow.
 """
 
 from django.db import transaction
-from django.utils import timezone
 
 from accounting.models import Account, Expense
-from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
+from accounting.services.journal import (
+    create_journal_entry,
+    get_default_company,
+    post_journal_entry,
+)
 from common.exceptions import InvalidBusinessOperation
 
 
 @transaction.atomic
-def create_expense(*, amount, expense_account, payment_account, expense_date, description, reference="", created_by_id, company=None):
+def create_expense(
+    *,
+    amount,
+    expense_account,
+    payment_account,
+    expense_date,
+    description,
+    reference="",
+    created_by_id,
+    company=None,
+):
     """Create and immediately post a paid expense.
 
     ``expense_account`` must be an EXPENSE account. ``payment_account`` must be
@@ -35,9 +48,13 @@ def create_expense(*, amount, expense_account, payment_account, expense_date, de
     payment_account = Account.objects.get(pk=payment_account, company=company)
 
     if expense_account.account_type != Account.AccountType.EXPENSE:
-        raise InvalidBusinessOperation("The expense account must be an expense account.")
+        raise InvalidBusinessOperation(
+            "The expense account must be an expense account."
+        )
     if payment_account.account_type != Account.AccountType.ASSET:
-        raise InvalidBusinessOperation("The payment account must be an asset account.")
+        raise InvalidBusinessOperation(
+            "The payment account must be an asset account."
+        )
     if not description.strip():
         raise InvalidBusinessOperation("Expense description is required.")
 
@@ -68,8 +85,5 @@ def create_expense(*, amount, expense_account, payment_account, expense_date, de
         ],
         company=company,
     )
-    return post_journal_entry(
-        entry_id=entry.pk,
-        actor_id=created_by_id,
-        company=company,
-    )
+    post_journal_entry(entry_id=entry.pk, actor_id=created_by_id, company=company)
+    return expense
