@@ -45,29 +45,34 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 
+# Keep the required local development origins even when the .env file
+# provides a custom origin list. This prevents local frontend ports from
+# silently replacing the safe development defaults.
+def _origins_from_env(name):
+    value = config(name, default="")
+    return [origin.strip() for origin in value.split(',') if origin.strip()]
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default=(
-        'http://127.0.0.1:5173,http://localhost:5173,'
-        'http://127.0.0.1:5500,http://localhost:5500,'
-        'http://localhost:3000'
-    ),
-    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
-)
-CSRF_TRUSTED_ORIGINS = config(
-    'CSRF_TRUSTED_ORIGINS',
-    default=(
-        'http://127.0.0.1:5173,http://localhost:5173,'
-        'http://127.0.0.1:5500,http://localhost:5500,'
-        'http://localhost:3000'
-    ),
-    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
-)
+
+DEV_FRONTEND_ORIGINS = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://localhost:3000",
+]
+
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+    *DEV_FRONTEND_ORIGINS,
+    *_origins_from_env('CORS_ALLOWED_ORIGINS'),
+]))
+
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
+    *DEV_FRONTEND_ORIGINS,
+    *_origins_from_env('CSRF_TRUSTED_ORIGINS'),
+]))
 
 CACHES = {
     'default': {
@@ -77,6 +82,5 @@ CACHES = {
 }
 
 TRUSTED_PROXY_IPS = ()
-
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
