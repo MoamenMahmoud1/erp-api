@@ -1,4 +1,4 @@
-"""
+r"""
 Accounting Services Package
 ===========================
 
@@ -21,9 +21,9 @@ Service boundaries
          \       /
           \     /
            v   v
-       Financial / AR-AP reports
+      Financial / AR-AP reports
 
-analytics.py is a separate operational analytics layer.  It currently uses
+analytics.py is a separate operational analytics layer. It currently uses
 Django ORM/database aggregation for request-time KPIs and is intended to gain
 a Celery + Pandas/NumPy path later for heavy analytics workloads.
 
@@ -42,6 +42,7 @@ from .automation import (
     post_sales_invoice,
     post_sales_return,
     post_supplier_payment,
+    reverse_source_entry,
 )
 from .balances import customer_aging, customer_balances, supplier_aging, supplier_balances
 from .journal import (
@@ -73,6 +74,7 @@ __all__ = (
     "post_sales_return",
     "post_supplier_payment",
     "profit_and_loss",
+    "reverse_source_entry",
     "supplier_aging",
     "supplier_balances",
     "trial_balance",
