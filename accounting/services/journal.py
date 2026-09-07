@@ -55,37 +55,51 @@ def get_default_company():
     try:
         return Company.objects.get(singleton_marker=True)
     except Company.DoesNotExist as exc:
-        raise JournalEntryError("A company must exist before accounting can be used.") from exc
+        raise JournalEntryError(
+            "A company must exist before accounting can be used."
+        ) from exc
 
 
 def _validate_lines(lines, company):
-    """Validate journal structure, company ownership, and balance.
-
-    Each line must contain exactly one positive side (debit or credit), and
-    the complete entry must have equal debit and credit totals.
-    """
+    """Validate journal structure, company ownership, and balance."""
     if not lines:
-        raise JournalEntryError("A journal entry must contain at least two lines.")
+        raise JournalEntryError(
+            "A journal entry must contain at least two lines."
+        )
 
     total_debit = Decimal("0")
     total_credit = Decimal("0")
     account_ids = {line["account_id"] for line in lines}
-    accounts = {line_account.pk: line_account for line_account in Account.objects.filter(pk__in=account_ids, company=company)}
+    accounts = {
+        line_account.pk: line_account
+        for line_account in Account.objects.filter(
+            pk__in=account_ids,
+            company=company,
+        )
+    }
     if len(accounts) != len(account_ids):
-        raise JournalEntryError("Every journal line account must belong to the company.")
+        raise JournalEntryError(
+            "Every journal line account must belong to the company."
+        )
 
     for line in lines:
         debit = Decimal(line.get("debit", 0))
         credit = Decimal(line.get("credit", 0))
         if (debit > 0) == (credit > 0):
-            raise JournalEntryError("Each journal line must have either a debit or a credit amount.")
+            raise JournalEntryError(
+                "Each journal line must have either a debit or a credit amount."
+            )
         if debit < 0 or credit < 0:
-            raise JournalEntryError("Debit and credit amounts cannot be negative.")
+            raise JournalEntryError(
+                "Debit and credit amounts cannot be negative."
+            )
         total_debit += debit
         total_credit += credit
 
     if total_debit != total_credit:
-        raise JournalEntryError("Journal entry is not balanced: total debits must equal total credits.")
+        raise JournalEntryError(
+            "Journal entry is not balanced: total debits must equal total credits."
+        )
     if total_debit <= 0:
         raise JournalEntryError("Journal entry total must be greater than zero.")
     return total_debit, total_credit
@@ -105,18 +119,23 @@ def create_journal_entry(
 ):
     """Create a validated journal entry in ``DRAFT`` state.
 
-    The operation is atomic and allocates the next company-specific journal
-    number while locking the company row. Posting is a separate operation.
-
-    ``source_type`` and ``source_id`` identify the business event that caused
-    the entry and are used by the automation layer for idempotency.
+    The company is locked while allocating the next journal number. Entries
+    cannot be created inside a closed accounting period.
     """
     company = company or get_default_company()
     company = Company.objects.select_for_update().get(pk=company.pk)
+
+    from accounting.services.periods import assert_period_open
+
+    assert_period_open(entry_date=entry_date, company=company)
     _validate_lines(lines, company)
+
     next_number = (
-        JournalEntry.objects.filter(company=company).aggregate(max_number=Max("number"))["max_number"] or 0
+        JournalEntry.objects.filter(company=company)
+        .aggregate(max_number=Max("number"))["max_number"]
+        or 0
     ) + 1
+
     entry = JournalEntry.objects.create(
         company=company,
         number=next_number,
@@ -157,14 +176,24 @@ def post_journal_entry(*, entry_id, actor_id, company=None):
         .get(pk=entry_id)
     )
     if company is not None and entry.company_id != company.pk:
-        raise JournalEntryError("Journal entry does not belong to the active company.")
+        raise JournalEntryError(
+            "Journal entry does not belong to the active company."
+        )
     if entry.status != JournalEntry.Status.DRAFT:
         raise InvalidStateTransition("Only a draft journal entry can be posted.")
+
+    from accounting.services.periods import assert_period_open
+
+    assert_period_open(entry_date=entry.entry_date, company=entry.company)
 
     lines = list(entry.lines.all())
     _validate_lines(
         [
-            {"account_id": line.account_id, "debit": line.debit, "credit": line.credit}
+            {
+                "account_id": line.account_id,
+                "debit": line.debit,
+                "credit": line.credit,
+            }
             for line in lines
         ],
         entry.company,
@@ -177,18 +206,18 @@ def post_journal_entry(*, entry_id, actor_id, company=None):
 
 
 def general_ledger(*, account_id, date_from=None, date_to=None, company=None):
-    """Return posted activity and the running balance for one account.
-
-    The running balance follows the account's normal side (debit-normal or
-    credit-normal).
-    """
+    """Return posted activity and the running balance for one account."""
     company = company or get_default_company()
     account = Account.objects.get(pk=account_id, company=company)
-    queryset = JournalLine.objects.filter(
-        account=account,
-        entry__company=company,
-        entry__status=JournalEntry.Status.POSTED,
-    ).select_related("entry").order_by("entry__entry_date", "entry__number", "pk")
+    queryset = (
+        JournalLine.objects.filter(
+            account=account,
+            entry__company=company,
+            entry__status=JournalEntry.Status.POSTED,
+        )
+        .select_related("entry")
+        .order_by("entry__entry_date", "entry__number", "pk")
+    )
     if date_from:
         queryset = queryset.filter(entry__entry_date__gte=date_from)
     if date_to:
@@ -201,24 +230,22 @@ def general_ledger(*, account_id, date_from=None, date_to=None, company=None):
             running += line.debit - line.credit
         else:
             running += line.credit - line.debit
-        result.append({
-            "entry_number": line.entry.number,
-            "entry_date": line.entry.entry_date,
-            "description": line.description or line.entry.description,
-            "reference": line.entry.reference,
-            "debit": line.debit,
-            "credit": line.credit,
-            "balance": running,
-        })
+        result.append(
+            {
+                "entry_number": line.entry.number,
+                "entry_date": line.entry.entry_date,
+                "description": line.description or line.entry.description,
+                "reference": line.entry.reference,
+                "debit": line.debit,
+                "credit": line.credit,
+                "balance": running,
+            }
+        )
     return account, result
 
 
 def trial_balance(*, date_from=None, date_to=None, company=None):
-    """Summarize posted debit and credit totals for every account.
-
-    A healthy double-entry ledger should have equal grand totals for debit and
-    credit over the selected period.
-    """
+    """Summarize posted debit and credit totals for every account."""
     company = company or get_default_company()
     queryset = JournalLine.objects.filter(
         entry__company=company,
@@ -231,7 +258,12 @@ def trial_balance(*, date_from=None, date_to=None, company=None):
         queryset = queryset.filter(entry__entry_date__lte=date_to)
 
     rows = (
-        queryset.values("account_id", "account__code", "account__name", "account__account_type")
+        queryset.values(
+            "account_id",
+            "account__code",
+            "account__name",
+            "account__account_type",
+        )
         .annotate(total_debit=Sum("debit"), total_credit=Sum("credit"))
         .order_by("account__code")
     )
@@ -243,5 +275,12 @@ def trial_balance(*, date_from=None, date_to=None, company=None):
         credit = row["total_credit"] or Decimal("0")
         total_debit += debit
         total_credit += credit
-        result.append({**row, "debit": debit, "credit": credit, "balance": debit - credit})
+        result.append(
+            {
+                **row,
+                "debit": debit,
+                "credit": credit,
+                "balance": debit - credit,
+            }
+        )
     return result, total_debit, total_credit
