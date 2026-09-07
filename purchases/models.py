@@ -105,7 +105,12 @@ class SupplierPayment(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=("supplier", "created_at"), name="supplier_payment_supplier_created_idx")]
+        indexes = [
+            models.Index(
+                fields=("supplier", "created_at"),
+                name="suppay_supplier_created_idx",
+            )
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_transfer_non_negative"),
