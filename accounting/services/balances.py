@@ -1,53 +1,29 @@
-"""
-Accounts Receivable / Accounts Payable Service
-================================================
+"""Operational Accounts Receivable and Accounts Payable reports.
 
-Purpose
--------
-Provide operational customer and supplier balances plus aging analysis.
+Unlike ``statements.py``, these services currently calculate balances from
+business-domain records rather than directly from the general ledger.
 
-Unlike `statements.py`, this module currently works from business-domain
-records (invoices, purchases, payments, returns) rather than deriving the
-answer directly from the general ledger.
+Architecture::
 
-Architecture
-------------
-
-    Customer side
-
-    Invoice ----+
-               |
-    Collection-+----> Customer Balance ----> AR Aging
-               |
-    Refund ----+
-               |
-    Return ----+
-
-    Supplier side
-
-    Purchase --------+
+    Customer:
+        Invoice + Payment - Return + Refund
                     |
-    Supplier Payment-+--> Supplier Balance -> AP Aging
+                    v
+             Customer Balance
                     |
-    Purchase Return-+
+                    v
+                AR Aging
 
-Balance formulas
-----------------
+    Supplier:
+        Purchase - Supplier Payment - Return
+                    |
+                    v
+             Supplier Balance
+                    |
+                    v
+                AP Aging
 
-    Customer balance
-        Invoice total
-        - Returns
-        - Allocated collections
-        + Payment refunds
-
-    Supplier balance
-        Purchase total
-        - Purchase returns
-        - Supplier payment allocations
-
-Aging buckets
--------------
-    0-30 days | 31-60 days | 61-90 days | 90+ days
+Aging buckets: 0-30 | 31-60 | 61-90 | 90+
 """
 
 from collections import defaultdict
@@ -63,20 +39,13 @@ ZERO = Decimal("0.00")
 
 
 def customer_balances(*, as_of=None, customer_id=None):
-    """
-    Calculate outstanding receivables for customers as of a date.
+    """Return outstanding customer receivables as of an optional date.
 
-    The calculation follows the operational invoice lifecycle:
-
-        Invoices - Returns - Payments + Refunds = Balance
-
-    Args:
-        as_of: optional inclusive date.  Only activity on or before this date
-            is included.
-        customer_id: optional customer filter.
+    Formula:
+        Invoice total - Returns - Allocated payments + Refunds
 
     Returns:
-        list[dict]: one summary row per customer.
+        list[dict]: One balance summary per customer.
     """
     invoice_filter = Q()
     if as_of:
@@ -118,20 +87,13 @@ def customer_balances(*, as_of=None, customer_id=None):
 
 
 def supplier_balances(*, as_of=None, supplier_id=None):
-    """
-    Calculate outstanding payables for suppliers as of a date.
+    """Return outstanding supplier payables as of an optional date.
 
-    The calculation follows the operational purchase lifecycle:
-
-        Purchases - Returns - Supplier Payments = Balance
-
-    Args:
-        as_of: optional inclusive date.  Only activity on or before this date
-            is included.
-        supplier_id: optional supplier filter.
+    Formula:
+        Purchase total - Returns - Supplier payment allocations
 
     Returns:
-        list[dict]: one summary row per supplier.
+        list[dict]: One balance summary per supplier.
     """
     purchase_filter = Q(status=Purchase.Status.CONFIRMED)
     if as_of:
@@ -184,15 +146,7 @@ def supplier_balances(*, as_of=None, supplier_id=None):
 
 
 def _age_bucket(days):
-    """
-    Map an overdue age in days to the standard aging bucket.
-
-    Buckets:
-        0_30, 31_60, 61_90, 90_plus
-
-    Returns:
-        str: the bucket key.
-    """
+    """Return the aging bucket key for an age in days."""
     if days <= 30:
         return "0_30"
     if days <= 60:
@@ -203,20 +157,15 @@ def _age_bucket(days):
 
 
 def _empty_aging():
-    """Return an initialized aging-bucket mapping with zero balances."""
+    """Return a zeroed mapping for the supported aging buckets."""
     return {"0_30": ZERO, "31_60": ZERO, "61_90": ZERO, "90_plus": ZERO}
 
 
 def customer_aging(*, as_of=None, customer_id=None):
-    """
-    Distribute each customer's outstanding receivable into aging buckets.
+    """Return outstanding customer balances grouped by invoice age.
 
-    The age is measured from the invoice creation date to ``as_of``.  Fully
-    settled invoices are skipped; only outstanding balances contribute to a
-    bucket.
-
-    Returns:
-        list[dict]: customer totals split into 0-30, 31-60, 61-90, and 90+ days.
+    Only invoices with an outstanding amount contribute to an aging bucket.
+    The age is measured from invoice creation date to ``as_of``.
     """
     as_of = as_of or date.today()
     invoice_filter = Q(
@@ -257,15 +206,10 @@ def customer_aging(*, as_of=None, customer_id=None):
 
 
 def supplier_aging(*, as_of=None, supplier_id=None):
-    """
-    Distribute each supplier's outstanding payable into aging buckets.
+    """Return outstanding supplier balances grouped by purchase age.
 
-    The age is measured from the purchase creation date to ``as_of``.  Fully
-    settled purchases are skipped; only outstanding balances contribute to a
-    bucket.
-
-    Returns:
-        list[dict]: supplier totals split into 0-30, 31-60, 61-90, and 90+ days.
+    Only purchases with an outstanding payable contribute to an aging bucket.
+    The age is measured from purchase creation date to ``as_of``.
     """
     as_of = as_of or date.today()
     purchase_filter = Q(status=Purchase.Status.CONFIRMED, created_at__date__lte=as_of)
