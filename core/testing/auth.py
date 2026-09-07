@@ -10,7 +10,9 @@ import uuid
 from django.http import HttpResponse
 from django.urls import reverse
 from rest_framework.test import APIClient
+from rest_framework_simplejwt.tokens import AccessToken
 
+from authsession.cache import cache_active_session
 from authsession.http import ClientContext, set_login_cookies
 from authsession.models import AuthSession
 from authsession.services import start_auth_session
@@ -25,6 +27,16 @@ def _assert_success(response, *, action: str):
             f"{action} failed with HTTP {response.status_code}: "
             f"{getattr(response, 'data', None)!r}"
         )
+
+
+def _populate_auth_cache(*, user, access_token):
+    access = AccessToken(access_token)
+    session = AuthSession.objects.get(pk=access["sid"])
+    cache_active_session(
+        auth_session=session,
+        user=user,
+        access_token=access,
+    )
 
 
 def login_client(client: APIClient, *, user, password: str):
@@ -49,6 +61,7 @@ def login_client(client: APIClient, *, user, password: str):
 
     client.cookies.update(response.cookies)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {response.data['access']}")
+    _populate_auth_cache(user=user, access_token=response.data["access"])
     return response
 
 
@@ -84,6 +97,7 @@ def authenticate_stateful_client(
     )
     client.cookies.update(cookie_response.cookies)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {session_result.access_token}")
+    _populate_auth_cache(user=user, access_token=session_result.access_token)
     return AuthSession.objects.get(pk=session_result.session_id)
 
 
