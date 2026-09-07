@@ -1,3 +1,5 @@
+# Runtime dependencies
+
 # Core framework
 Django==6.0.8
 djangorestframework==3.17.2
@@ -5,18 +7,19 @@ django-filter==26.1
 djangorestframework-simplejwt==5.5.1
 drf-spectacular==0.30.0
 
-# Database (PostgreSQL via psycopg 3; the `pool` extra enables connection pooling)
+# Database
+# The pool extra enables psycopg 3 connection pooling.
 psycopg[binary,pool]==3.3.4
 
-# WSGI deployment
+# Production server
 gunicorn==26.0.0
 
-# Auth / sessions / email / uploads
+# Authentication / sessions / email / uploads
 django-cors-headers==4.9.0
 django-phonenumber-field[phonenumbers]==8.5.0
 Pillow==12.3.0
 
-# Storage / caching (production)
+# Storage / caching
 django-storages==1.14.6
 django-redis==7.0.0
 boto3==1.43.55
@@ -24,10 +27,3 @@ redis==8.0.1
 
 # Configuration
 python-decouple==3.8
-
-# Development / profiling tooling (not added to INSTALLED_APPS in production)
-django-extensions==4.1
-django-silk==5.5.0
-
-# Static analysis / formatting
-ruff==0.16.5
