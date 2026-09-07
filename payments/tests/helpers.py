@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
+from organization.models import Company
 from products.models import Product
 
 
@@ -15,6 +16,7 @@ class PaymentTestMixin:
             password="StrongPass123!",
             is_staff=True,
         )
+        self.company = Company.objects.create(name="Payment Test Company")
         self.customer = Customer.objects.create(name="Acme")
         self.product = Product.objects.create(
             name="Widget",
