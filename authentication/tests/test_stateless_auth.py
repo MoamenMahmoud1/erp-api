@@ -1,10 +1,13 @@
 """Tests for JWT validation followed by Redis-backed session authentication."""
 
+import uuid
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 from rest_framework_simplejwt.authentication import JWTStatelessUserAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
@@ -36,7 +39,7 @@ class RedisSessionAuthTests(TestCase):
         self.session_result = start_auth_session(
             user=self.user,
             client_context=ClientContext(
-                device_id=None,
+                device_id=uuid.uuid4(),
                 device_name="Test device",
                 user_agent="Test browser",
                 ip_address="127.0.0.1",
@@ -83,16 +86,14 @@ class RedisSessionAuthTests(TestCase):
         self.assertNotIn("is_staff", access.payload)
         self.assertNotIn("is_superuser", access.payload)
 
-    def test_revoking_session_cache_immediately_rejects_access_token(self):
+    def test_missing_session_cache_rejects_access_token(self):
         request = self.factory.get("/api/v1/invoices/")
         request.META["HTTP_AUTHORIZATION"] = f"Bearer {self.session_result.access_token}"
 
         delete_auth_session_cache(self.session.id)
 
-        with self.assertRaises(Exception) as error:
+        with self.assertRaises(AuthenticationFailed):
             RedisSessionAuthentication().authenticate(request)
-
-        self.assertIn("authentication session", str(error.exception).lower())
 
     def test_invalid_jwt_is_rejected_without_db_lookup(self):
         request = self.factory.get("/api/v1/invoices/")
