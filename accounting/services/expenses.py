@@ -15,6 +15,8 @@ The service intentionally handles only paid expenses. Unpaid liabilities should
 use Accounts Payable and the existing supplier-payment flow.
 """
 
+from decimal import Decimal
+
 from django.db import transaction
 
 from accounting.models import Account, Expense
@@ -47,6 +49,8 @@ def create_expense(
     expense_account = Account.objects.get(pk=expense_account, company=company)
     payment_account = Account.objects.get(pk=payment_account, company=company)
 
+    if amount <= Decimal("0"):
+        raise InvalidBusinessOperation("Expense amount must be greater than zero.")
     if expense_account.account_type != Account.AccountType.EXPENSE:
         raise InvalidBusinessOperation(
             "The expense account must be an expense account."
