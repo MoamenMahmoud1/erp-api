@@ -126,6 +126,7 @@ export const api = {
 
   organization: {
     company: () => request('/organization/company/'),
+    updateCompany: (body: Json) => jsonRequest('/organization/company/', 'PATCH', body),
     sites: (query = '') => request<Paginated>(`/organization/sites/${query}`),
     departments: (query = '') => request<Paginated>(`/organization/departments/${query}`),
     createSite: (body: Json) => jsonRequest('/organization/sites/', 'POST', body),
@@ -163,6 +164,14 @@ export const api = {
     update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body),
   },
 
+  coupons: {
+    list: (query = '') => request<Paginated>(`/coupons/${query}`),
+    get: (id: number) => request(`/coupons/${id}/`),
+    create: (body: Json) => jsonRequest('/coupons/', 'POST', body),
+    update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/`, 'PATCH', body),
+    delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }),
+  },
+
   employees: {
     list: (query = '') => request<Paginated>(`/employees/${query}`),
     get: (id: number) => request(`/employees/${id}/`),
@@ -179,6 +188,8 @@ export const api = {
     delete: (id: number) => request(`/invoices/${id}/`, { method: 'DELETE' }),
     confirm: (id: number) => request(`/invoices/${id}/confirm/`, { method: 'POST' }),
     cancel: (id: number) => request(`/invoices/${id}/cancel/`, { method: 'POST' }),
+    applyCoupon: (id: number, code: string) => jsonRequest(`/invoices/${id}/apply-coupon/`, 'POST', { code }),
+    removeCoupon: (id: number) => jsonRequest(`/invoices/${id}/remove-coupon/`, 'POST'),
     returns: (id: number, body: Json) => jsonRequest(`/invoices/${id}/returns/`, 'POST', body),
   },
 
@@ -214,12 +225,12 @@ export const api = {
     journalEntries: (query = '') => request<Paginated>(`/accounting/journal-entries/${query}`),
     journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`),
     createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body),
-    updateJournalEntry: (id: number, body: Json) => jsonRequest(`/accounting/journal-entries/${id}/`, 'PATCH', body),
-    deleteJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`, { method: 'DELETE' }),
+    postJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/post/`, { method: 'POST' }),
     expenses: (query = '') => request<Paginated>(`/accounting/expenses/${query}`),
     createExpense: (body: Json) => jsonRequest('/accounting/expenses/', 'POST', body),
     periods: (query = '') => request<Paginated>(`/accounting/periods/${query}`),
     createPeriod: (body: Json) => jsonRequest('/accounting/periods/', 'POST', body),
+    closePeriod: (id: number) => request(`/accounting/periods/${id}/close/`, { method: 'POST' }),
     generalLedger: (query = '') => request(`/accounting/general-ledger/${query}`),
     trialBalance: (query = '') => request(`/accounting/trial-balance/${query}`),
     openingBalance: (body: Json) => jsonRequest('/accounting/opening-balance/', 'POST', body),
