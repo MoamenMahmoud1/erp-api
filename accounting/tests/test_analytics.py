@@ -23,10 +23,12 @@ from suppliers.models import Supplier
 class AnalyticsTests(TestCase):
     def setUp(self):
         self.user = CustomUserModel.objects.create_user(
+            username="analytics-user",
             email="analytics@test.local",
             password="strong-password-123",
         )
         self.user_two = CustomUserModel.objects.create_user(
+            username="analytics-user-two",
             email="analytics-two@test.local",
             password="strong-password-123",
         )
