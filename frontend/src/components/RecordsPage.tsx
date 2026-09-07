@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { Badge, Button, Group, Pagination, Paper, ScrollArea, Stack, Table, Text, Title } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
@@ -5,7 +6,7 @@ import { notifications } from '@mantine/notifications';
 
 import type { Paginated } from '../lib/api';
 
-type Column = { key: string; label: string; format?: (value: unknown, row: Record<string, unknown>) => React.ReactNode };
+type Column = { key: string; label: string; format?: (value: unknown, row: Record<string, unknown>) => ReactNode };
 type Action = { label: string; color?: string; run: (row: Record<string, unknown>) => Promise<unknown> };
 
 type Props = {
