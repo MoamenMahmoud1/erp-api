@@ -13,7 +13,8 @@ import { CartonPricingPage, CouponsPage } from './pages/CommercialPages';
 import { SalesPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { InventoryLocationsPage, InventoryMovementsPage, InventoryTransferPage } from './pages/InventoryPages';
 import { CreateInvoicePage, CreatePurchasePage, CollectPaymentPage, SupplierPaymentPage } from './pages/TransactionPages';
-import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage, BalancesPage } from './pages/AccountingPages';
+import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage } from './pages/AccountingPages';
+import { BalancesPage, OpeningBalancePage, ManualJournalPage } from './pages/AccountingReportsPages';
 import { ExpensesPage, PeriodsPage, GeneralLedgerPage, TrialBalancePage } from './pages/AccountingOperationsPages';
 import { CompanyPage, SitesPage, DepartmentsPage } from './pages/OrganizationPages';
 
@@ -22,15 +23,7 @@ function Authenticated({ user, children }: { user: UserProfile; children: ReactN
 }
 
 function EmployeesPage() {
-  return (
-    <RecordsPage
-      eyebrow="MASTER DATA"
-      title="Employees"
-      subtitle="Staff directory and account access visibility."
-      list={api.employees.list}
-      columns={[{ key: 'id', label: '#' }, { key: 'username', label: 'Username' }, { key: 'email', label: 'Email' }, { key: 'first_name', label: 'First name' }, { key: 'last_name', label: 'Last name' }, { key: 'is_staff', label: 'Staff' }]}
-    />
-  );
+  return <RecordsPage eyebrow="MASTER DATA" title="Employees" subtitle="Staff directory and account access visibility." list={api.employees.list} columns={[{ key: 'id', label: '#' }, { key: 'username', label: 'Username' }, { key: 'email', label: 'Email' }, { key: 'first_name', label: 'First name' }, { key: 'last_name', label: 'Last name' }, { key: 'is_staff', label: 'Staff' }]} />;
 }
 
 function NotFound() {
@@ -46,7 +39,6 @@ export function App() {
   useEffect(() => {
     if (location.pathname === '/login') { setLoading(false); return; }
     if (user) return;
-
     api.auth.me()
       .then(setUser)
       .catch(() => { setUser(null); navigate('/login', { replace: true }); })
@@ -96,6 +88,8 @@ export function App() {
         <Route path="/accounting/balances" element={<BalancesPage />} />
         <Route path="/accounting/expenses" element={<ExpensesPage />} />
         <Route path="/accounting/periods" element={<PeriodsPage />} />
+        <Route path="/accounting/opening-balance" element={<OpeningBalancePage />} />
+        <Route path="/accounting/manual-journal" element={<ManualJournalPage />} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>
