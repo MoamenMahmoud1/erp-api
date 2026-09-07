@@ -6,7 +6,7 @@ from django.test import TestCase
 from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
 from invoices.models import Invoice, InvoiceItem
-from invoices.services.lifecycle import _cancel_invoice_sync, _record_sale_movement_sync
+from invoices.services.lifecycle import _cancel_invoice_sync, confirm_invoice
 from organization.models import Company
 from products.models import Product
 
@@ -42,7 +42,6 @@ class InvoiceCancellationOriginalLocationTests(TestCase):
         invoice = Invoice.objects.create(
             customer=customer,
             created_by=user,
-            status=Invoice.Status.CONFIRMED,
         )
         InvoiceItem.objects.create(
             invoice=invoice,
@@ -51,7 +50,7 @@ class InvoiceCancellationOriginalLocationTests(TestCase):
             unit_price=Decimal("20.00"),
         )
 
-        _record_sale_movement_sync(invoice, original)
+        confirm_invoice(invoice.pk, user)
 
         original.employee = None
         original.save(update_fields=("employee",))
