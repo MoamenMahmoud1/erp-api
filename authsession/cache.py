@@ -25,7 +25,10 @@ def cache_active_session(*, auth_session, user, access_token):
         int(access_token["exp"]),
         tz=datetime_timezone.utc,
     )
-    timeout = max(1, int((expires_at - datetime.now(datetime_timezone.utc)).total_seconds()))
+    timeout = max(
+        1,
+        int((expires_at - datetime.now(datetime_timezone.utc)).total_seconds()),
+    )
 
     cache.set(
         auth_session_cache_key(auth_session.id),
@@ -36,6 +39,7 @@ def cache_active_session(*, auth_session, user, access_token):
             "email": user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
+            "is_active": bool(user.is_active),
             "is_staff": bool(user.is_staff),
             "is_superuser": bool(user.is_superuser),
             "role_level": Role.level_for_user(user),
@@ -54,4 +58,6 @@ def delete_auth_session_cache(session_id):
 
 
 def delete_auth_session_caches(session_ids):
-    cache.delete_many([auth_session_cache_key(session_id) for session_id in session_ids])
+    cache.delete_many(
+        [auth_session_cache_key(session_id) for session_id in session_ids]
+    )
