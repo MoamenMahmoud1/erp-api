@@ -2,7 +2,7 @@ from django.db import transaction
 
 from accounting.services import get_default_company, post_purchase_return
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
-from inventory.models import StockMovement, StockMovementItem
+from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
@@ -33,7 +33,10 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
             raise InvalidBusinessOperation("Return quantity exceeds the remaining purchased quantity.")
         cleaned.append((line, quantity))
 
-    warehouse = StockLocation.objects.select_for_update().filter(location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True).first()
+    warehouse = StockLocation.objects.select_for_update().filter(
+        location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
+        is_active=True,
+    ).first()
     if warehouse is None:
         raise InvalidBusinessOperation("Active main warehouse does not exist.")
 
