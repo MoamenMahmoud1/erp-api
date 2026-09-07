@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from common.exceptions import InvalidBusinessOperation
 from inventory.models import StockBalance, StockLocation, StockMovement
+from organization.models import Company
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.confirm_purchase import ConfirmPurchaseService
@@ -21,6 +22,7 @@ class PurchaseReturnTests(TestCase):
             password="StrongPass123!",
             is_staff=True,
         )
+        self.company = Company.objects.create(name="Purchase Return Test Company")
         self.supplier = Supplier.objects.create(name="Supplier")
         self.product = Product.objects.create(
             name="Product",
