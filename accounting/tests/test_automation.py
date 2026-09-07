@@ -17,7 +17,11 @@ from suppliers.models import Supplier
 class AccountingAutomationTests(TestCase):
     def setUp(self):
         self.company = Company.objects.create(name="Automation Company")
-        self.user = CustomUserModel.objects.create_user(email="automation@test.local", password="strong-password-123")
+        self.user = CustomUserModel.objects.create_user(
+            username="automation-user",
+            email="automation@test.local",
+            password="strong-password-123",
+        )
         self.customer = Customer.objects.create(name="Customer")
         self.supplier = Supplier.objects.create(name="Supplier")
         self.product = Product.objects.create(name="Widget", purchase_price=Decimal("40.00"), selling_price=Decimal("100.00"))
