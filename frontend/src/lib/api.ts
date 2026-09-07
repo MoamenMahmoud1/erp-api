@@ -20,18 +20,11 @@ async function parseResponse(response: Response) {
   if (response.status === 204) return null;
   const text = await response.text();
   if (!text) return null;
-  try {
-    return JSON.parse(text) as Json;
-  } catch {
-    return text;
-  }
+  try { return JSON.parse(text) as Json; } catch { return text; }
 }
 
 async function getCsrfToken() {
-  const response = await fetch(`${API_BASE}/auth/csrf/`, {
-    credentials: 'include',
-    headers: { Accept: 'application/json' },
-  });
+  const response = await fetch(`${API_BASE}/auth/csrf/`, { credentials: 'include', headers: { Accept: 'application/json' } });
   const data = (await parseResponse(response)) as { csrf_token?: string } | null;
   if (!response.ok || !data?.csrf_token) throw new Error('Unable to initialize CSRF protection.');
   csrfToken = data.csrf_token;
@@ -44,25 +37,13 @@ async function refreshAccessToken() {
   refreshPromise = (async () => {
     try {
       if (!csrfToken) await getCsrfToken();
-      const response = await fetch(`${API_BASE}/auth/refresh/`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
-      });
+      const response = await fetch(`${API_BASE}/auth/refresh/`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken } });
       const data = (await parseResponse(response)) as { access?: string } | null;
-      if (!response.ok || !data?.access) {
-        setAccessToken(null);
-        return false;
-      }
+      if (!response.ok || !data?.access) { setAccessToken(null); return false; }
       setAccessToken(data.access);
       return true;
-    } catch {
-      setAccessToken(null);
-      return false;
-    } finally {
-      refreshing = false;
-      refreshPromise = null;
-    }
+    } catch { setAccessToken(null); return false; }
+    finally { refreshing = false; refreshPromise = null; }
   })();
   return refreshPromise;
 }
@@ -71,53 +52,34 @@ async function request<T = Json>(path: string, init: RequestInit = {}, retry = t
   const method = (init.method || 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
-
   const token = getAccessToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
-
   if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
     if (!csrfToken) await getCsrfToken();
     headers.set('X-CSRFToken', csrfToken);
     if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    credentials: 'include',
-    headers,
-  });
-
+  const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers });
   if (response.status === 401 && retry && path !== '/auth/refresh/' && path !== '/auth/login/') {
     const refreshed = await refreshAccessToken();
     if (refreshed) return request<T>(path, init, false);
   }
-
   const data = await parseResponse(response);
   if (!response.ok) {
-    const message = typeof data === 'object' && data !== null && 'detail' in data
-      ? String((data as Record<string, unknown>).detail)
-      : `Request failed with status ${response.status}`;
+    const message = typeof data === 'object' && data !== null && 'detail' in data ? String((data as Record<string, unknown>).detail) : `Request failed with status ${response.status}`;
     throw new Error(message);
   }
   return data as T;
 }
 
 async function jsonRequest<T = Json>(path: string, method: string, body?: unknown) {
-  return request<T>(path, {
-    method,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  return request<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
 }
 
 export const api = {
   auth: {
     csrf: getCsrfToken,
-    login: async (identifier: string, password: string) => {
-      await getCsrfToken();
-      const data = await jsonRequest<{ access: string }>('/auth/login/', 'POST', { identifier, password });
-      setAccessToken(data.access);
-      return data;
-    },
+    login: async (identifier: string, password: string) => { await getCsrfToken(); const data = await jsonRequest<{ access: string }>('/auth/login/', 'POST', { identifier, password }); setAccessToken(data.access); return data; },
     me: () => request<UserProfile>('/auth/me/'),
     refresh: refreshAccessToken,
     logout: () => jsonRequest('/auth/logout/', 'POST').finally(() => setAccessToken(null)),
@@ -158,7 +120,7 @@ export const api = {
   },
 
   suppliers: {
-    list: (query = '') => request<Paginated>('/suppliers/' + query),
+    list: (query = '') => request<Paginated>(`/suppliers/${query}`),
     get: (id: number) => request(`/suppliers/${id}/`),
     create: (body: Json) => jsonRequest('/suppliers/', 'POST', body),
     update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body),
@@ -222,6 +184,7 @@ export const api = {
     accounts: (query = '') => request<Paginated>(`/accounting/accounts/${query}`),
     createAccount: (body: Json) => jsonRequest('/accounting/accounts/', 'POST', body),
     updateAccount: (id: number, body: Json) => jsonRequest(`/accounting/accounts/${id}/`, 'PATCH', body),
+    deleteAccount: (id: number) => request(`/accounting/accounts/${id}/`, { method: 'DELETE' }),
     journalEntries: (query = '') => request<Paginated>(`/accounting/journal-entries/${query}`),
     journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`),
     createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body),
@@ -249,28 +212,12 @@ export const api = {
   },
 };
 
-export type Paginated = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Record<string, unknown>[];
-};
-
-export type UserProfile = {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  is_staff: boolean;
-  is_superuser: boolean;
-};
+export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
+export type UserProfile = { id: number; username: string; email: string; first_name: string; last_name: string; is_staff: boolean; is_superuser: boolean };
 
 export function query(params: Record<string, string | number | undefined>) {
   const search = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== '') search.set(key, String(value));
-  });
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); });
   const value = search.toString();
   return value ? `?${value}` : '';
 }
