@@ -16,7 +16,9 @@ class SupplierPaymentTests(TestCase):
     def setUp(self):
         self.company = Company.objects.create(name="Supplier Payment Company")
         self.user = CustomUserModel.objects.create_user(
-            email="supplier-payment@test.local", password="strong-password-123"
+            username="supplier-payment",
+            email="supplier-payment@test.local",
+            password="strong-password-123",
         )
         self.supplier = Supplier.objects.create(name="Supplier")
         self.product = Product.objects.create(
