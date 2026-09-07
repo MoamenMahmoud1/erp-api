@@ -1,3 +1,4 @@
+import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Button, Card, Group, Loader, SimpleGrid, Stack, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -15,15 +16,7 @@ export function CompanyPage() {
     try {
       const data = await api.organization.company() as Record<string, unknown>;
       setCompany(data);
-      setForm({
-        name: String(data.name || ''),
-        legal_name: String(data.legal_name || ''),
-        registration_number: String(data.registration_number || ''),
-        tax_number: String(data.tax_number || ''),
-        email: String(data.email || ''),
-        phone: String(data.phone || ''),
-        website: String(data.website || ''),
-      });
+      setForm({ name: String(data.name || ''), legal_name: String(data.legal_name || ''), registration_number: String(data.registration_number || ''), tax_number: String(data.tax_number || ''), email: String(data.email || ''), phone: String(data.phone || ''), website: String(data.website || '') });
     } catch (error) {
       notifications.show({ title: 'Company unavailable', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
     } finally { setLoading(false); }
@@ -31,7 +24,7 @@ export function CompanyPage() {
 
   useEffect(() => { void load(); }, []);
 
-  async function save(event: React.FormEvent) {
+  async function save(event: FormEvent) {
     event.preventDefault();
     setSaving(true);
     try {
@@ -69,18 +62,7 @@ export function SitesPage() {
       create={api.organization.createSite}
       update={api.organization.updateSite}
       remove={api.organization.deleteSite}
-      fields={[
-        { key: 'code', label: 'Code', required: true },
-        { key: 'name', label: 'Name', required: true },
-        { key: 'site_type', label: 'Site type', required: true },
-        { key: 'parent', label: 'Parent site ID', type: 'number' },
-        { key: 'address_line_1', label: 'Address' },
-        { key: 'city', label: 'City' },
-        { key: 'country_code', label: 'Country code' },
-        { key: 'email', label: 'Email' },
-        { key: 'phone', label: 'Phone' },
-        { key: 'is_active', label: 'Active', type: 'boolean' },
-      ]}
+      fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'site_type', label: 'Site type', required: true }, { key: 'parent', label: 'Parent site ID', type: 'number' }, { key: 'address_line_1', label: 'Address' }, { key: 'city', label: 'City' }, { key: 'country_code', label: 'Country code' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'is_active', label: 'Active', type: 'boolean' }]}
       columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Site' }, { key: 'site_type', label: 'Type' }, { key: 'parent_name', label: 'Parent' }, { key: 'city', label: 'City' }, { key: 'is_active', label: 'Status' }]}
     />
   );
