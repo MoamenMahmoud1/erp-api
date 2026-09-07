@@ -11,3 +11,9 @@ media/
 .vscode/
 AGENTS.md
 CHANGELOG.md
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
