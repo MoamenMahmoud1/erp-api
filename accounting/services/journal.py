@@ -1,46 +1,34 @@
-"""
-Accounting Journal Service
-==========================
+"""Core accounting journal services.
 
-Purpose
--------
-The journal service is the low-level accounting engine.  It knows how to
-validate, create, post, and read journal entries; it does not know about
-invoices, purchases, or payments.
+Responsibilities:
+    - Validate double-entry journal lines.
+    - Create and post journal entries.
+    - Read the general ledger and trial balance.
 
-Architecture
-------------
+Architecture::
 
-    Business operation
-            |
-            v
-      automation.py
-            |
-            v
-      journal.py
-            |
-            +-------------------+
-            |                   |
-            v                   v
-      JournalEntry         JournalLine
-            |                   |
-            +---------+---------+
-                      |
-                      v
-                    Account
+    Business event
+        |
+        v
+    automation.py
+        |
+        v
+    journal.py
+        |
+        +--> JournalEntry
+        |       |
+        |       +--> JournalLine --> Account
+        |       +--> JournalLine --> Account
+        |
+        +--> General Ledger / Trial Balance
 
-Write path:
-    validate -> create (DRAFT) -> post (POSTED)
+Write flow: validate -> create (DRAFT) -> post (POSTED)
+Read flow: POSTED lines -> ledger/reporting
 
-Read path:
-    POSTED JournalLines -> General Ledger / Trial Balance
+Invariant: Total Debit == Total Credit
 
-Accounting invariant:
-    Total Debit == Total Credit
-
-Important
----------
-Only POSTED entries are considered by ledger and financial-reporting reads.
+Business-specific mappings (sales, purchases, payments, returns) belong in
+``automation.py`` and are intentionally kept out of this module.
 """
 
 from decimal import Decimal
@@ -59,18 +47,10 @@ class JournalEntryError(InvalidBusinessOperation):
 
 
 def get_default_company():
-    """
-    Return the company's singleton accounting context.
-
-    Why it exists:
-        Accounting entries must belong to a company.  The current ERP uses
-        the company's singleton marker as the default accounting context.
-
-    Returns:
-        Company: the active/default company.
+    """Return the company used as the default accounting context.
 
     Raises:
-        JournalEntryError: if no default company exists.
+        JournalEntryError: If no default company exists.
     """
     try:
         return Company.objects.get(singleton_marker=True)
@@ -79,38 +59,10 @@ def get_default_company():
 
 
 def _validate_lines(lines, company):
-    """
-    Validate the accounting lines before a journal is persisted or posted.
+    """Validate journal structure, company ownership, and balance.
 
-    Rules enforced:
-        1. A journal must contain at least two lines.
-        2. Every referenced account must belong to the same company.
-        3. Each line must contain a debit OR a credit, never both or neither.
-        4. Debit and credit amounts cannot be negative.
-        5. Total debits must equal total credits.
-        6. The journal total must be greater than zero.
-
-    Conceptual flow:
-
-        Journal Lines
-             |
-             v
-        Validate structure
-             |
-             v
-        Validate company ownership
-             |
-             v
-        Validate Debit / Credit
-             |
-             v
-        Validate balance
-
-    Returns:
-        tuple[Decimal, Decimal]: total debit and total credit.
-
-    Raises:
-        JournalEntryError: when any accounting rule is violated.
+    Each line must contain exactly one positive side (debit or credit), and
+    the complete entry must have equal debit and credit totals.
     """
     if not lines:
         raise JournalEntryError("A journal entry must contain at least two lines.")
@@ -151,30 +103,13 @@ def create_journal_entry(
     lines,
     company=None,
 ):
-    """
-    Create a new journal entry in DRAFT state.
+    """Create a validated journal entry in ``DRAFT`` state.
 
-    What this function does:
-        1. Resolve the company context.
-        2. Lock the company row while allocating the next journal number.
-        3. Validate all journal lines.
-        4. Generate the next journal number for that company.
-        5. Create the JournalEntry header.
-        6. Create all JournalLine records in bulk.
+    The operation is atomic and allocates the next company-specific journal
+    number while locking the company row. Posting is a separate operation.
 
-    Important:
-        This function creates the journal but does not post it.  Posting is
-        a separate state transition handled by post_journal_entry().
-
-    Transaction boundary:
-        The entry header and all of its lines are created atomically.  If any
-        step fails, the whole operation is rolled back.
-
-    Returns:
-        JournalEntry: the newly created DRAFT entry.
-
-    Raises:
-        JournalEntryError: when validation fails.
+    ``source_type`` and ``source_id`` identify the business event that caused
+    the entry and are used by the automation layer for idempotency.
     """
     company = company or get_default_company()
     company = Company.objects.select_for_update().get(pk=company.pk)
@@ -210,23 +145,10 @@ def create_journal_entry(
 
 @transaction.atomic
 def post_journal_entry(*, entry_id, actor_id, company=None):
-    """
-    Transition a valid journal entry from DRAFT to POSTED.
+    """Move a valid journal entry from ``DRAFT`` to ``POSTED``.
 
-    Why it is separate from creation:
-        A draft can be prepared and reviewed before becoming part of the
-        official accounting ledger.
-
-    Concurrency protection:
-        The entry row is locked with select_for_update() so two concurrent
-        requests cannot post the same journal successfully.
-
-    Returns:
-        JournalEntry: the POSTED entry.
-
-    Raises:
-        JournalEntryError: if the entry belongs to another company.
-        InvalidStateTransition: if the entry is not a DRAFT.
+    The entry is locked during the transition and validated again immediately
+    before posting. Posted entries are the source for ledger and statements.
     """
     entry = (
         JournalEntry.objects.select_for_update()
@@ -255,19 +177,10 @@ def post_journal_entry(*, entry_id, actor_id, company=None):
 
 
 def general_ledger(*, account_id, date_from=None, date_to=None, company=None):
-    """
-    Return the posted activity and running balance for one account.
+    """Return posted activity and the running balance for one account.
 
-    Input:
-        account_id: account to inspect.
-        date_from/date_to: optional inclusive posting-date filters.
-
-    Balance rule:
-        Debit-normal accounts increase with debit and decrease with credit.
-        Credit-normal accounts increase with credit and decrease with debit.
-
-    Returns:
-        tuple[Account, list[dict]]: the account plus ordered ledger rows.
+    The running balance follows the account's normal side (debit-normal or
+    credit-normal).
     """
     company = company or get_default_company()
     account = Account.objects.get(pk=account_id, company=company)
@@ -301,18 +214,10 @@ def general_ledger(*, account_id, date_from=None, date_to=None, company=None):
 
 
 def trial_balance(*, date_from=None, date_to=None, company=None):
-    """
-    Summarize all posted account activity for a period.
+    """Summarize posted debit and credit totals for every account.
 
-    The trial balance groups posted journal lines by account and returns the
-    total debits and credits for each account plus grand totals.
-
-    Main invariant:
-        total_debit == total_credit for a healthy double-entry ledger.
-
-    Returns:
-        tuple[list[dict], Decimal, Decimal]: account rows, total debit, total
-        credit.
+    A healthy double-entry ledger should have equal grand totals for debit and
+    credit over the selected period.
     """
     company = company or get_default_company()
     queryset = JournalLine.objects.filter(
