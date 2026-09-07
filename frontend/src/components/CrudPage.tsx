@@ -11,6 +11,7 @@ import {
   Pagination,
   Paper,
   ScrollArea,
+  Select,
   Stack,
   Table,
   Text,
@@ -22,10 +23,13 @@ import { notifications } from '@mantine/notifications';
 
 import type { Json, Paginated } from '../lib/api';
 
+export type CrudOption = { value: string; label: string };
+
 export type CrudField = {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'boolean';
+  type?: 'text' | 'number' | 'boolean' | 'select';
+  options?: CrudOption[];
   required?: boolean;
 };
 
@@ -83,7 +87,11 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
   function openCreate() {
     setEditing(null);
     const initial: Record<string, unknown> = {};
-    fields.forEach((field) => { initial[field.key] = field.type === 'boolean' ? true : ''; });
+    fields.forEach((field) => {
+      if (field.type === 'boolean') initial[field.key] = true;
+      else if (field.type === 'select') initial[field.key] = field.options?.[0]?.value ?? '';
+      else initial[field.key] = '';
+    });
     setForm(initial);
     setModalOpen(true);
   }
@@ -156,10 +164,7 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
             </Table.Tbody>
           </Table>
         </ScrollArea>
-        <Group justify="space-between" p="md">
-          <Text size="sm" c="dimmed">{data.count.toLocaleString()} records</Text>
-          <Pagination total={Math.max(1, Math.ceil(data.count / pageSize))} value={page} onChange={setPage} />
-        </Group>
+        <Group justify="space-between" p="md"><Text size="sm" c="dimmed">{data.count.toLocaleString()} records</Text><Pagination total={Math.max(1, Math.ceil(data.count / pageSize))} value={page} onChange={setPage} /></Group>
       </Paper>
 
       <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `Edit ${title.slice(0, -1)}` : `New ${title.slice(0, -1)}`} centered size="md">
@@ -171,6 +176,9 @@ export function CrudPage({ title, subtitle, fields, columns, list, create, updat
               }
               if (field.type === 'number') {
                 return <NumberInput key={field.key} label={field.label} value={form[field.key] as number | string} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} />;
+              }
+              if (field.type === 'select') {
+                return <Select key={field.key} label={field.label} data={field.options || []} value={String(form[field.key] ?? '')} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} allowDeselect={false} />;
               }
               return <TextInput key={field.key} label={field.label} value={String(form[field.key] ?? '')} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.currentTarget.value }))} required={field.required} />;
             })}
