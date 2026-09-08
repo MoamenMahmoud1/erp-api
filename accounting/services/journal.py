@@ -38,6 +38,7 @@ from django.db.models import Max, Sum
 from django.utils import timezone
 
 from accounting.models import Account, JournalEntry, JournalLine
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
 from organization.models import Company
 
@@ -202,6 +203,17 @@ def post_journal_entry(*, entry_id, actor_id, company=None):
     entry.posted_by_id = actor_id
     entry.posted_at = timezone.now()
     entry.save(update_fields=("status", "posted_by", "posted_at", "updated_at"))
+    record_event(
+        action="accounting.post",
+        entity_type="JournalEntry",
+        entity_id=entry.pk,
+        actor_id=actor_id,
+        metadata={
+            "company_id": entry.company_id,
+            "source_type": entry.source_type,
+            "source_id": entry.source_id,
+        },
+    )
     return entry
 
 
