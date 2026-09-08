@@ -1,12 +1,10 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from .models import Supplier
 
 
 @admin.register(Supplier)
-class SupplierAdmin(ModelAdmin):
+class SupplierAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "phone",
