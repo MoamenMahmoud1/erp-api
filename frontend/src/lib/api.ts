@@ -2,18 +2,30 @@ export type Json = Record<string, unknown> | unknown[] | string | number | boole
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 const ACCESS_KEY = 'erp_access_token';
+const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
 
 let csrfToken = '';
 let refreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
+let authExpiredNotified = false;
 
 function getAccessToken() {
   return localStorage.getItem(ACCESS_KEY);
 }
 
 function setAccessToken(token: string | null) {
-  if (token) localStorage.setItem(ACCESS_KEY, token);
-  else localStorage.removeItem(ACCESS_KEY);
+  if (token) {
+    localStorage.setItem(ACCESS_KEY, token);
+    authExpiredNotified = false;
+  } else {
+    localStorage.removeItem(ACCESS_KEY);
+  }
+}
+
+function notifyAuthExpired() {
+  if (authExpiredNotified) return;
+  authExpiredNotified = true;
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
 async function parseResponse(response: Response) {
@@ -42,8 +54,13 @@ async function refreshAccessToken() {
       if (!response.ok || !data?.access) { setAccessToken(null); return false; }
       setAccessToken(data.access);
       return true;
-    } catch { setAccessToken(null); return false; }
-    finally { refreshing = false; refreshPromise = null; }
+    } catch {
+      setAccessToken(null);
+      return false;
+    } finally {
+      refreshing = false;
+      refreshPromise = null;
+    }
   })();
   return refreshPromise;
 }
@@ -59,14 +76,21 @@ async function request<T = Json>(path: string, init: RequestInit = {}, retry = t
     headers.set('X-CSRFToken', csrfToken);
     if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   }
+
   const response = await fetch(`${API_BASE}${path}`, { ...init, credentials: 'include', headers });
+
   if (response.status === 401 && retry && path !== '/auth/refresh/' && path !== '/auth/login/') {
     const refreshed = await refreshAccessToken();
     if (refreshed) return request<T>(path, init, false);
+    setAccessToken(null);
+    notifyAuthExpired();
   }
+
   const data = await parseResponse(response);
   if (!response.ok) {
-    const message = typeof data === 'object' && data !== null && 'detail' in data ? String((data as Record<string, unknown>).detail) : `Request failed with status ${response.status}`;
+    const message = typeof data === 'object' && data !== null && 'detail' in data
+      ? String((data as Record<string, unknown>).detail)
+      : `Request failed with status ${response.status}`;
     throw new Error(message);
   }
   return data as T;
@@ -79,7 +103,12 @@ async function jsonRequest<T = Json>(path: string, method: string, body?: unknow
 export const api = {
   auth: {
     csrf: getCsrfToken,
-    login: async (identifier: string, password: string) => { await getCsrfToken(); const data = await jsonRequest<{ access: string }>('/auth/login/', 'POST', { identifier, password }); setAccessToken(data.access); return data; },
+    login: async (identifier: string, password: string) => {
+      await getCsrfToken();
+      const data = await jsonRequest<{ access: string }>('/auth/login/', 'POST', { identifier, password });
+      setAccessToken(data.access);
+      return data;
+    },
     me: () => request<UserProfile>('/auth/me/'),
     refresh: refreshAccessToken,
     logout: () => jsonRequest('/auth/logout/', 'POST').finally(() => setAccessToken(null)),
