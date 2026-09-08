@@ -16,6 +16,7 @@ from accounting.api.serializers import (
     TrialBalanceRowSerializer,
 )
 from accounting.models import Account, AccountingPeriod, Expense, JournalEntry
+from accounting.permissions import AccountingModelPermission, AccountingReportPermission
 from accounting.services import (
     AccountingPeriodError,
     JournalEntryError,
@@ -33,7 +34,8 @@ from common.exceptions import InvalidBusinessOperation
 
 class AccountViewSet(viewsets.ModelViewSet):
     serializer_class = AccountSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AccountingModelPermission,)
+    write_permission_codename = "accounting.manage_chart_of_accounts"
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_fields = ("account_type", "is_active", "parent")
     search_fields = ("code", "name")
@@ -51,7 +53,7 @@ class AccountViewSet(viewsets.ModelViewSet):
 
 class JournalEntryViewSet(viewsets.ModelViewSet):
     serializer_class = JournalEntrySerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_fields = ("status", "entry_date", "reference", "source_type")
@@ -85,6 +87,8 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def post(self, request, pk=None):
+        if not request.user.has_perm("accounting.post_journal_entry") and not request.user.is_superuser:
+            return Response({"detail": "You do not have permission to post journal entries."}, status=403)
         try:
             entry = post_journal_entry(
                 entry_id=pk,
@@ -106,7 +110,7 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
 
 class ExpenseViewSet(viewsets.ModelViewSet):
     serializer_class = ExpenseSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_fields = ("expense_date", "expense_account", "payment_account")
@@ -150,7 +154,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
 
 class AccountingPeriodViewSet(viewsets.ModelViewSet):
     serializer_class = AccountingPeriodSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
     filterset_fields = ("is_closed", "start_date", "end_date")
@@ -181,6 +185,8 @@ class AccountingPeriodViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def close(self, request, pk=None):
+        if not request.user.has_perm("accounting.close_accounting_period") and not request.user.is_superuser:
+            return Response({"detail": "You do not have permission to close accounting periods."}, status=403)
         try:
             period = close_period(
                 period_id=pk,
@@ -204,6 +210,8 @@ class AccountingPeriodViewSet(viewsets.ModelViewSet):
 @permission_classes([IsAuthenticated])
 def opening_balance_view(request):
     """Create the company's initial posted opening-balance journal."""
+    if not request.user.is_superuser and not request.user.has_perm("accounting.manage_chart_of_accounts"):
+        return Response({"detail": "You do not have permission to create opening balances."}, status=403)
     serializer = OpeningBalanceSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     lines = [
@@ -231,7 +239,7 @@ def opening_balance_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def general_ledger_view(request):
     account_id = request.query_params.get("account")
     if not account_id:
@@ -253,7 +261,7 @@ def general_ledger_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def trial_balance_view(request):
     rows, total_debit, total_credit = trial_balance(
         date_from=request.query_params.get("from"),
