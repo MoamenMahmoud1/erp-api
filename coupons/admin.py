@@ -1,12 +1,10 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from coupons.models import Coupon
 
 
 @admin.register(Coupon)
-class CouponAdmin(ModelAdmin):
+class CouponAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "discount_type",
