@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from accounting.services.analytics import (
+    dashboard_overview,
     inventory_dashboard,
     purchase_dashboard,
     sales_by_employee,
@@ -39,6 +40,17 @@ def _positive_int(request, name, default, maximum):
     if value <= 0 or value > maximum:
         return None, Response({"detail": f"{name} must be between 1 and {maximum}."}, status=400)
     return value, None
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dashboard_overview_view(request):
+    if not _can_view_reports(request):
+        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
+    date_from, date_to, error = _date_range(request)
+    if error:
+        return error
+    return Response(dashboard_overview(date_from=date_from, date_to=date_to))
 
 
 @api_view(["GET"])
