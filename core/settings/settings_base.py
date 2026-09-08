@@ -52,6 +52,7 @@ THIRD_PARTY_APPS = [
 ]
 
 PROJECT_APPS = [
+    "auditlog.apps.AuditlogConfig",
     "accounts.apps.AccountsConfig",
     "authsession.apps.AuthSessionConfig",
     "organization.apps.OrganizationConfig",
@@ -197,7 +198,8 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
     "DESCRIPTION": (
         "Backend API for the Sales ERP suite. "
-        "Authentication is JWT-based; include the token in the "
+        "Authentication uses short-lived JWT access tokens backed by an "
+        "active server-side Redis session; include the access token in the "
         "Authorization header as `Bearer <token>`."
     ),
     "VERSION": __import__("core.version", fromlist=["API_VERSION"]).API_VERSION,
