@@ -30,6 +30,7 @@ export type CrudField = {
   type?: 'text' | 'number' | 'boolean' | 'select';
   options?: CrudOption[];
   required?: boolean;
+  createOnly?: boolean;
 };
 export type CrudColumn = {
   key: string;
@@ -119,6 +120,7 @@ export function CrudPage({
     setEditing(row);
     const next: Record<string, unknown> = {};
     fields.forEach((field) => {
+      if (field.createOnly) return;
       next[field.key] = row[field.key] ?? (field.type === 'boolean' ? false : '');
     });
     setForm(next);
@@ -164,6 +166,7 @@ export function CrudPage({
     }
   }
 
+  const visibleFields = fields.filter((field) => !editing || !field.createOnly);
   const hasWrite = Boolean(create) || Boolean(canEdit && update) || Boolean(canDelete && remove);
 
   return (
@@ -278,7 +281,7 @@ export function CrudPage({
       >
         <form onSubmit={submit}>
           <Stack gap="md">
-            {fields.map((field) => {
+            {visibleFields.map((field) => {
               if (field.type === 'boolean') {
                 return (
                   <Checkbox
