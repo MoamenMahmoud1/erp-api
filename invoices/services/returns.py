@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 
 from accounting.services import get_default_company, post_sales_return
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockMovement, StockMovementItem
@@ -80,6 +81,18 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
     if _is_full_return(invoice, cleaned):
         invoice.status = Invoice.Status.RETURNED
         invoice.save(update_fields=("status", "updated_at"))
+    record_event(
+        action="invoice.return",
+        entity_type="InvoiceReturn",
+        entity_id=sales_return.pk,
+        actor_id=created_by_id,
+        metadata={
+            "invoice_id": invoice.pk,
+            "stock_movement_id": movement.pk,
+            "full_return": invoice.status == Invoice.Status.RETURNED,
+            "reason": reason,
+        },
+    )
     return sales_return
 
 
