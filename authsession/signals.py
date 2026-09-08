@@ -51,6 +51,12 @@ def invalidate_group_permissions(sender, instance, action, **kwargs):
         _invalidate_group_users(instance.pk)
 
 
+@receiver(post_save, sender=User)
+def invalidate_user_session_cache(sender, instance, **kwargs):
+    """Drop cached auth state when activation or privileged flags change."""
+    _invalidate_users((instance.pk,))
+
+
 @receiver(post_save, sender=Role)
 def invalidate_role_level_cache(sender, instance, **kwargs):
     _invalidate_group_users(instance.group_id)
