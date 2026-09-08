@@ -17,5 +17,7 @@ class CurrentUserView(APIView):
                 "last_name": user.last_name,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
+                "role_level": getattr(user, "role_level", 0),
+                "permissions": sorted(user.get_all_permissions()),
             }
         )
