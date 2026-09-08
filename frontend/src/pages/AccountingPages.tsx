@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
 import { Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { Link } from 'react-router-dom';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
 import { RecordsPage } from '../components/RecordsPage';
@@ -51,7 +52,13 @@ export function AccountsPage() {
 function JournalDetails({ data }: { data: Record<string, unknown> }) {
   const lines = Array.isArray(data.lines) ? data.lines as Record<string, unknown>[] : [];
   const status = String(data.status || '');
-  return <Stack gap="lg"><SimpleGrid cols={{ base: 1, sm: 2 }}><Card withBorder radius="lg"><Text size="xs" c="dimmed">ENTRY</Text><Text fw={900} size="xl">{String(data.number || '—')}</Text><Text size="sm" c="dimmed" mt="xs">{String(data.entry_date || '—')}</Text></Card><Card withBorder radius="lg"><Text size="xs" c="dimmed">STATUS</Text><Badge mt="xs" color={status === 'posted' ? 'teal' : 'yellow'} size="lg">{status || '—'}</Badge><Text size="sm" c="dimmed" mt="sm">Reference: {String(data.reference || '—')}</Text></Card></SimpleGrid><Card withBorder radius="lg"><Text fw={800}>{String(data.description || 'Journal entry')}</Text><Text size="sm" c="dimmed" mt={4}>{lines.length} line{lines.length === 1 ? '' : 's'}</Text><Table.ScrollContainer minWidth={620} mt="md"><Table highlightOnHover><Table.Thead><Table.Tr><Table.Th>Account</Table.Th><Table.Th>Description</Table.Th><Table.Th ta="right">Debit</Table.Th><Table.Th ta="right">Credit</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{lines.map((line, index) => <Table.Tr key={String(line.id ?? index)}><Table.Td><Text fw={700}>{String(line.account_name || 'Unknown account')}</Text><Text size="xs" c="dimmed">{String(line.account_code || '')}</Text></Table.Td><Table.Td>{String(line.description || '—')}</Table.Td><Table.Td ta="right">{money(line.debit)}</Table.Td><Table.Td ta="right">{money(line.credit)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></Table.ScrollContainer></Card></Stack>;
+  const sourceId = data.source_id == null ? null : Number(data.source_id);
+  const sourceType = String(data.source_type || '');
+  const sourceLabel = String(data.source_label || '');
+  const isInvoice = sourceType === 'invoice.sale' && sourceId !== null;
+  const sourceText = sourceId !== null ? `${sourceLabel || sourceType || 'Source'} #${sourceId}` : sourceLabel || sourceType || 'Manual journal';
+
+  return <Stack gap="lg"><SimpleGrid cols={{ base: 1, sm: 2 }}><Card withBorder radius="lg"><Text size="xs" c="dimmed">ENTRY</Text><Text fw={900} size="xl">{String(data.number || '—')}</Text><Text size="sm" c="dimmed" mt="xs">{String(data.entry_date || '—')}</Text></Card><Card withBorder radius="lg"><Text size="xs" c="dimmed">STATUS</Text><Badge mt="xs" color={status === 'posted' ? 'teal' : 'yellow'} size="lg">{status || '—'}</Badge><Text size="sm" c="dimmed" mt="sm">Reference: {String(data.reference || '—')}</Text></Card></SimpleGrid><Card withBorder radius="lg"><Group justify="space-between" align="flex-start" wrap="wrap"><div><Text fw={800}>{String(data.description || 'Journal entry')}</Text><Text size="sm" c="dimmed" mt={4}>{lines.length} line{lines.length === 1 ? '' : 's'}</Text></div><div><Text size="xs" c="dimmed">SOURCE</Text>{isInvoice ? <Button component={Link} to={`/sales/${sourceId}`} variant="subtle" px={0}>{sourceText}</Button> : <Text fw={800} mt={3}>{sourceText}</Text>}</div></Group><Group gap="lg" mt="md"><div><Text size="xs" c="dimmed">Created by</Text><Text fw={700} mt={2}>{String(data.created_by_employee_name || data.created_by_name || data.created_by_username || '—')}</Text></div><div><Text size="xs" c="dimmed">Posted by</Text><Text fw={700} mt={2}>{String(data.posted_by_employee_name || data.posted_by_name || data.posted_by_username || '—')}</Text></div></Group><Table.ScrollContainer minWidth={620} mt="md"><Table highlightOnHover><Table.Thead><Table.Tr><Table.Th>Account</Table.Th><Table.Th>Description</Table.Th><Table.Th ta="right">Debit</Table.Th><Table.Th ta="right">Credit</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{lines.map((line, index) => <Table.Tr key={String(line.id ?? index)}><Table.Td><Text fw={700}>{String(line.account_name || 'Unknown account')}</Text><Text size="xs" c="dimmed">{String(line.account_code || '')}</Text></Table.Td><Table.Td>{String(line.description || '—')}</Table.Td><Table.Td ta="right">{money(line.debit)}</Table.Td><Table.Td ta="right">{money(line.credit)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></Table.ScrollContainer></Card></Stack>;
 }
 
 export function JournalsPage() {
@@ -71,7 +78,7 @@ export function StatementsPage() {
       const params = query({ from, to });
       const [pnl, bs, cf] = await Promise.all([api.accounting.profitAndLoss(params), api.accounting.balanceSheet(query({ as_of: to })), api.accounting.cashFlow(params)]);
       setData({ pnl: pnl as Record<string, unknown>, bs: bs as Record<string, unknown>, cf: cf as Record<string, unknown> });
-    } catch (error) { notifications.show({ title: 'Report failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
+    } catch (error) { notifications.show({ title: 'Report failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' }); }
     finally { setLoading(false); }
   }
   useEffect(() => { void load(); }, []);
