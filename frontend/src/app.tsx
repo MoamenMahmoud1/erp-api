@@ -18,6 +18,8 @@ import { BalancesPage, OpeningBalancePage, ManualJournalPage } from './pages/Acc
 import { ExpensesPage, PeriodsPage, GeneralLedgerPage, TrialBalancePage } from './pages/AccountingOperationsPages';
 import { CompanyPage, SitesPage, DepartmentsPage } from './pages/OrganizationPages';
 
+const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
+
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
 
@@ -68,13 +70,29 @@ export function App() {
   const authCheckStarted = useRef(false);
 
   useEffect(() => {
+    const handleAuthExpired = () => {
+      authCheckStarted.current = false;
+      setUser(null);
+      setLoading(false);
+      if (window.location.pathname !== '/login') {
+        navigate('/login', { replace: true });
+      }
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, [navigate]);
+
+  useEffect(() => {
     if (location.pathname === '/login') {
+      authCheckStarted.current = false;
       setLoading(false);
       return;
     }
     if (user || authCheckStarted.current) return;
 
     authCheckStarted.current = true;
+    setLoading(true);
     api.auth.me()
       .then(setUser)
       .catch(() => {
