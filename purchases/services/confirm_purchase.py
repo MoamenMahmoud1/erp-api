@@ -50,11 +50,13 @@ class ConfirmPurchaseService:
                 location=warehouse,
                 product=item.product,
                 quantity=item.quantity,
+                unit_cost=item.unit_purchase_price,
             )
             StockMovementItem.objects.create(
                 movement=movement,
                 product=item.product,
                 quantity=item.quantity,
+                unit_cost=item.unit_purchase_price,
             )
 
         post_purchase(
