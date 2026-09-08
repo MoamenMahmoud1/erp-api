@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from accounting.models import (
     Account,
     AccountingPeriod,
@@ -12,7 +10,7 @@ from accounting.models import (
 
 
 @admin.register(Account)
-class AccountAdmin(ModelAdmin):
+class AccountAdmin(admin.ModelAdmin):
     list_display = ("code", "name", "account_type", "company", "is_active")
     list_filter = ("account_type", "is_active")
     search_fields = ("code", "name")
@@ -26,7 +24,7 @@ class JournalLineInline(admin.TabularInline):
 
 
 @admin.register(JournalEntry)
-class JournalEntryAdmin(ModelAdmin):
+class JournalEntryAdmin(admin.ModelAdmin):
     list_display = ("number", "entry_date", "description", "status", "company")
     list_filter = ("status", "entry_date")
     search_fields = ("description", "reference")
@@ -37,7 +35,7 @@ class JournalEntryAdmin(ModelAdmin):
 
 
 @admin.register(Expense)
-class ExpenseAdmin(ModelAdmin):
+class ExpenseAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "expense_date",
@@ -55,7 +53,7 @@ class ExpenseAdmin(ModelAdmin):
 
 
 @admin.register(AccountingPeriod)
-class AccountingPeriodAdmin(ModelAdmin):
+class AccountingPeriodAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "company",
