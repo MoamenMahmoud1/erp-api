@@ -1,28 +1,14 @@
 """Fast operational analytics for ERP dashboards.
 
-Architecture::
-
-    ERP business data
-          |
-          v
-    Django ORM / DB aggregation
-          |
-          v
-       Dashboard
-
-Current scope is request-time, database-backed KPIs. Heavy historical analysis
-or statistical workloads should run asynchronously through Celery and may use
-Pandas/NumPy without blocking API requests.
-
-Accounting distinction:
-    Financial statements are built from posted journals in ``statements.py``.
-    This service focuses on operational analytics and rankings.
+The dashboard uses database-backed KPIs and small grouped result sets. Heavy
+historical or statistical workloads should move to Celery later; the request
+path stays intentionally simple.
 """
 
 from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncDate
 
 from inventory.models import StockBalance
 from invoices.models import Invoice, InvoiceItem
@@ -43,11 +29,7 @@ def _range_filter(queryset, field, date_from=None, date_to=None):
 
 
 def sales_dashboard(*, date_from=None, date_to=None):
-    """Return sales KPIs for the selected date range.
-
-    Metrics include net line sales after invoice-level coupon discounts, sold
-    units, and distinct qualifying invoices.
-    """
+    """Return sales KPIs and a daily net-sales trend."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -61,18 +43,42 @@ def sales_dashboard(*, date_from=None, date_to=None):
     )
     invoices = Invoice.objects.filter(status__in=SALES_STATUSES)
     invoices = _range_filter(invoices, "created_at", date_from, date_to)
-    discount_total = invoices.aggregate(total=Coalesce(Sum("coupon_discount"), ZERO))["total"]
+    discount_total = invoices.aggregate(
+        total=Coalesce(Sum("coupon_discount"), ZERO)
+    )["total"]
+
+    daily_gross = (
+        items.annotate(day=TruncDate("invoice__created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum(line_total), ZERO))
+        .order_by("day")
+    )
+    daily_discounts = {
+        row["day"]: row["value"]
+        for row in invoices.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum("coupon_discount"), ZERO))
+    }
+    trend = [
+        {
+            "date": row["day"].isoformat(),
+            "value": row["value"] - daily_discounts.get(row["day"], ZERO),
+        }
+        for row in daily_gross
+    ]
+
     return {
         "date_from": date_from,
         "date_to": date_to,
         "gross_sales": totals["gross_sales"] - discount_total,
         "units_sold": totals["units_sold"],
         "invoice_count": totals["invoice_count"],
+        "trend": trend,
     }
 
 
 def purchase_dashboard(*, date_from=None, date_to=None):
-    """Return purchase value, quantity, and document count for a date range."""
+    """Return purchase KPIs and a daily purchase-value trend."""
     items = PurchaseItem.objects.filter(purchase__status=Purchase.Status.CONFIRMED)
     items = _range_filter(items, "purchase__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -84,21 +90,24 @@ def purchase_dashboard(*, date_from=None, date_to=None):
         units_purchased=Coalesce(Sum("quantity"), 0),
         purchase_count=Count("purchase", distinct=True),
     )
+    daily = (
+        items.annotate(day=TruncDate("purchase__created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum(line_total), ZERO))
+        .order_by("day")
+    )
     return {
         "date_from": date_from,
         "date_to": date_to,
         "purchase_value": totals["purchase_value"],
         "units_purchased": totals["units_purchased"],
         "purchase_count": totals["purchase_count"],
+        "trend": [{"date": row["day"].isoformat(), "value": row["value"]} for row in daily],
     }
 
 
 def inventory_dashboard(*, low_stock_threshold=10):
-    """Return current inventory KPIs and products at/below a stock threshold.
-
-    Inventory value is an operational estimate based on current quantity times
-    the product purchase price; it is not the formal accounting valuation.
-    """
+    """Return current inventory KPIs and low-stock products."""
     stock_rows = (
         Product.objects.filter(is_active=True)
         .values("id", "name", "purchase_price")
@@ -126,7 +135,7 @@ def inventory_dashboard(*, low_stock_threshold=10):
 
 
 def top_products(*, date_from=None, date_to=None, limit=10):
-    """Return top-selling products ordered by quantity, then revenue."""
+    """Return top-selling products by quantity then gross line revenue."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -146,7 +155,7 @@ def top_products(*, date_from=None, date_to=None, limit=10):
 
 
 def sales_by_employee(*, date_from=None, date_to=None):
-    """Return sales quantity and revenue grouped by invoice creator."""
+    """Return sales grouped by invoice creator using gross line revenue."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(
@@ -163,3 +172,23 @@ def sales_by_employee(*, date_from=None, date_to=None):
         .order_by("-revenue", "invoice__created_by_id")
     )
     return list(rows)
+
+
+def dashboard_overview(*, date_from=None, date_to=None):
+    """Compose the data required by the main dashboard in one API response."""
+    from accounting.services.balances import customer_balances, supplier_balances
+    from accounting.services.journal import get_default_company
+    from accounting.services.statements import cash_flow, profit_and_loss
+
+    company = get_default_company()
+    return {
+        "sales": sales_dashboard(date_from=date_from, date_to=date_to),
+        "purchases": purchase_dashboard(date_from=date_from, date_to=date_to),
+        "inventory": inventory_dashboard(),
+        "pnl": profit_and_loss(date_from=date_from, date_to=date_to, company=company),
+        "cash_flow": cash_flow(date_from=date_from, date_to=date_to, company=company),
+        "top_products": top_products(date_from=date_from, date_to=date_to, limit=6),
+        "sales_by_employee": sales_by_employee(date_from=date_from, date_to=date_to),
+        "customer_balances": customer_balances(as_of=date_to),
+        "supplier_balances": supplier_balances(as_of=date_to),
+    }
