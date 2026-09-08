@@ -1,10 +1,12 @@
 from django.contrib import admin
 
-from .models import PaymentTransaction, PaymentAllocation
+from unfold.admin import ModelAdmin
+
+from .models import PaymentAllocation, PaymentTransaction
 
 
 @admin.register(PaymentTransaction)
-class PaymentTransactionAdmin(admin.ModelAdmin):
+class PaymentTransactionAdmin(ModelAdmin):
     list_display = (
         "id",
         "customer",
@@ -14,10 +16,12 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     )
     list_filter = ("created_at",)
     search_fields = ("customer__name",)
+    ordering = ("-created_at", "-id")
+    list_select_related = ("customer",)
 
 
 @admin.register(PaymentAllocation)
-class PaymentAllocationAdmin(admin.ModelAdmin):
+class PaymentAllocationAdmin(ModelAdmin):
     list_display = (
         "id",
         "transaction",
@@ -27,4 +31,6 @@ class PaymentAllocationAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("created_at",)
-    search_fields = ("invoice__id",)
+    search_fields = ("invoice__id", "invoice__customer__name")
+    ordering = ("-created_at", "-id")
+    list_select_related = ("transaction", "invoice", "invoice__customer")
