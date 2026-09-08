@@ -1,12 +1,10 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from .models import Company, Department, Site
 
 
 @admin.register(Company)
-class CompanyAdmin(ModelAdmin):
+class CompanyAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "registration_number",
@@ -32,7 +30,7 @@ class CompanyAdmin(ModelAdmin):
 
 
 @admin.register(Site)
-class SiteAdmin(ModelAdmin):
+class SiteAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "name",
@@ -51,7 +49,7 @@ class SiteAdmin(ModelAdmin):
 
 
 @admin.register(Department)
-class DepartmentAdmin(ModelAdmin):
+class DepartmentAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "name",
