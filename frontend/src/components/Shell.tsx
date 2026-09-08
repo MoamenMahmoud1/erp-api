@@ -38,38 +38,37 @@ import {
   IconWallet,
 } from '@tabler/icons-react';
 
+import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
 
-type NavItem = { label: string; to: string; icon: ReactNode };
+type NavItem = { label: string; to: string; icon: ReactNode; permission: string };
 type NavSection = { label: string; items: NavItem[] };
 
 const sections: NavSection[] = [
   { label: 'Workspace', items: [
-    { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} /> },
-    { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} /> },
-    { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} /> },
+    { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} />, permission: 'accounting.view_financial_reports' },
+    { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
+    { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
   ] },
   { label: 'Master data', items: [
-    { label: 'Products', to: '/products', icon: <IconBox size={17} /> },
-    { label: 'Customers', to: '/customers', icon: <IconUsers size={17} /> },
-    { label: 'Suppliers', to: '/suppliers', icon: <IconTruck size={17} /> },
-    { label: 'Employees', to: '/employees', icon: <IconUsers size={17} /> },
+    { label: 'Products', to: '/products', icon: <IconBox size={17} />, permission: 'products.view_product' },
+    { label: 'Customers', to: '/customers', icon: <IconUsers size={17} />, permission: 'customers.view_customer' },
+    { label: 'Suppliers', to: '/suppliers', icon: <IconTruck size={17} />, permission: 'suppliers.view_supplier' },
+    { label: 'Employees', to: '/employees', icon: <IconUsers size={17} />, permission: 'accounts.view_employee' },
   ] },
   { label: 'Operations', items: [
-    { label: 'Inventory', to: '/inventory', icon: <IconPackage size={17} /> },
-    { label: 'Payments', to: '/payments', icon: <IconWallet size={17} /> },
-    { label: 'Organization', to: '/organization/company', icon: <IconBuilding size={17} /> },
+    { label: 'Inventory', to: '/inventory', icon: <IconPackage size={17} />, permission: 'inventory.view_stockbalance' },
+    { label: 'Payments', to: '/payments', icon: <IconWallet size={17} />, permission: 'payments.view_paymenttransaction' },
+    { label: 'Organization', to: '/organization/company', icon: <IconBuilding size={17} />, permission: 'organization.view_company' },
   ] },
   { label: 'Accounting', items: [
-    { label: 'Overview', to: '/accounting', icon: <IconChartBar size={17} /> },
-    { label: 'Accounts', to: '/accounting/accounts', icon: <IconBook size={17} /> },
-    { label: 'Journals', to: '/accounting/journals', icon: <IconFileInvoice size={17} /> },
-    { label: 'Statements', to: '/accounting/statements', icon: <IconChartBar size={17} /> },
-    { label: 'AR / AP', to: '/accounting/balances', icon: <IconWallet size={17} /> },
+    { label: 'Overview', to: '/accounting', icon: <IconChartBar size={17} />, permission: 'accounting.view_financial_reports' },
+    { label: 'Accounts', to: '/accounting/accounts', icon: <IconBook size={17} />, permission: 'accounting.view_account' },
+    { label: 'Journals', to: '/accounting/journals', icon: <IconFileInvoice size={17} />, permission: 'accounting.view_journalentry' },
+    { label: 'Statements', to: '/accounting/statements', icon: <IconChartBar size={17} />, permission: 'accounting.view_financial_reports' },
+    { label: 'AR / AP', to: '/accounting/balances', icon: <IconWallet size={17} />, permission: 'accounting.view_financial_reports' },
   ] },
 ];
-
-const allItems = sections.flatMap((section) => section.items);
 
 export function Shell({ user, children }: { user: UserProfile; children: ReactNode }) {
   const [opened, setOpened] = useState(false);
@@ -79,11 +78,19 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   const navigate = useNavigate();
   const dark = colorScheme === 'dark';
 
+  const visibleSections = useMemo(
+    () => sections
+      .map((section) => ({ ...section, items: section.items.filter((item) => can(user, item.permission)) }))
+      .filter((section) => section.items.length > 0),
+    [user],
+  );
+  const allItems = useMemo(() => visibleSections.flatMap((section) => section.items), [visibleSections]);
+
   const searchMatches = useMemo(() => {
     const value = search.trim().toLowerCase();
     if (!value) return [];
     return allItems.filter((item) => item.label.toLowerCase().includes(value)).slice(0, 5);
-  }, [search]);
+  }, [allItems, search]);
 
   async function logout() {
     try { await api.auth.logout(); } finally { navigate('/login'); }
@@ -171,7 +178,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
         <AppShell.Navbar p="sm">
           <AppShell.Section grow component={ScrollArea} scrollbarSize={4}>
             <Stack gap="md">
-              {sections.map((section) => (
+              {visibleSections.map((section) => (
                 <div key={section.label}>
                   <Text px="sm" mb={6} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">{section.label}</Text>
                   <Stack gap={2}>
