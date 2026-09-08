@@ -4,6 +4,7 @@ from django.db import transaction
 from django.db.models import Prefetch
 
 from accounting.services import get_default_company, post_supplier_payment
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from common.observability import log_operation
@@ -100,6 +101,7 @@ def pay_supplier(*, supplier, cash_amount, transfer_amount, paid_by_id, referenc
     )
 
     cash_remaining, transfer_remaining = cash, transfer
+    allocated_purchases = 0
     for purchase, due in outstanding:
         cash_use = min(cash_remaining, due)
         transfer_use = min(transfer_remaining, due - cash_use)
@@ -111,6 +113,7 @@ def pay_supplier(*, supplier, cash_amount, transfer_amount, paid_by_id, referenc
             cash_amount=cash_use,
             transfer_amount=transfer_use,
         )
+        allocated_purchases += 1
         cash_remaining -= cash_use
         transfer_remaining -= transfer_use
         if cash_remaining == 0 and transfer_remaining == 0:
@@ -127,6 +130,17 @@ def pay_supplier(*, supplier, cash_amount, transfer_amount, paid_by_id, referenc
         supplier=supplier.pk,
         payment=payment.pk,
         amount=str(payment.total_amount),
+    )
+    record_event(
+        action="payment.supplier",
+        entity_type="SupplierPayment",
+        entity_id=payment.pk,
+        actor_id=paid_by_id,
+        metadata={
+            "supplier_id": supplier.pk,
+            "allocated_purchases": allocated_purchases,
+            "reference": reference,
+        },
     )
     return payment
 
