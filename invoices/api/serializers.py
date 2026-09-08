@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
@@ -23,6 +25,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     created_by_name = serializers.SerializerMethodField()
     created_by_username = serializers.SerializerMethodField()
+    salesperson_name = serializers.SerializerMethodField()
     items = InvoiceItemSerializer(many=True)
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -37,13 +40,14 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = (
-            "id", "customer", "customer_name", "created_by", "created_by_name", "created_by_username", "coupon", "coupon_discount", "status",
-            "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount",
-            "sold_quantity", "gross_profit", "items", "created_at", "updated_at",
+            "id", "customer", "customer_name", "created_by", "created_by_name", "created_by_username", "salesperson_name",
+            "coupon", "coupon_discount", "status", "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount",
+            "returned_amount", "outstanding_amount", "sold_quantity", "gross_profit", "items", "created_at", "updated_at",
         )
         read_only_fields = (
-            "id", "created_by", "customer_name", "created_by_name", "created_by_username", "coupon", "coupon_discount", "status", "subtotal", "total",
-            "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount", "sold_quantity", "gross_profit", "created_at", "updated_at",
+            "id", "created_by", "customer_name", "created_by_name", "created_by_username", "salesperson_name", "coupon", "coupon_discount", "status",
+            "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount", "sold_quantity",
+            "gross_profit", "created_at", "updated_at",
         )
 
     def get_created_by_name(self, obj):
@@ -52,13 +56,27 @@ class InvoiceSerializer(serializers.ModelSerializer):
     def get_created_by_username(self, obj):
         return obj.created_by.username
 
+    def get_salesperson_name(self, obj):
+        employee = getattr(obj.created_by, "employee", None)
+        if employee is not None:
+            return str(employee)
+        return obj.created_by.get_full_name() or obj.created_by.username
+
     def get_gross_profit(self, obj):
-        from decimal import Decimal
-        return sum((item.gross_profit for item in obj.items.all() if item.gross_profit is not None), Decimal("0"))
+        return sum(
+            (
+                (item.unit_price - item.cost_price) * item.quantity
+                for item in obj.items.all()
+                if item.cost_price is not None
+            ),
+            Decimal("0"),
+        )
 
 
 class InvoiceSummarySerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.name", read_only=True)
+    salesperson_name = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     sold_quantity = serializers.IntegerField(read_only=True)
@@ -71,10 +89,19 @@ class InvoiceSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = (
-            "id", "customer", "customer_name", "status", "subtotal", "coupon_discount",
-            "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount",
-            "outstanding_amount", "sold_quantity", "created_at", "updated_at",
+            "id", "customer", "customer_name", "created_by", "created_by_name", "salesperson_name", "status", "subtotal", "coupon_discount",
+            "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount", "sold_quantity", "created_at", "updated_at",
         )
+        read_only_fields = fields
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_salesperson_name(self, obj):
+        employee = getattr(obj.created_by, "employee", None)
+        if employee is not None:
+            return str(employee)
+        return obj.created_by.get_full_name() or obj.created_by.username
 
 
 class InvoiceReturnItemInputSerializer(serializers.ModelSerializer):
