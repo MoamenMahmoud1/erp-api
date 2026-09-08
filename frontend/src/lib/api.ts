@@ -214,7 +214,17 @@ export const api = {
 };
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
-export type UserProfile = { id: number; username: string; email: string; first_name: string; last_name: string; is_staff: boolean; is_superuser: boolean };
+export type UserProfile = {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  is_staff: boolean;
+  is_superuser: boolean;
+  role_level: number;
+  permissions: string[];
+};
 export type DashboardOverview = {
   sales: { gross_sales: number | string; units_sold: number; invoice_count: number; trend: { date: string; value: number | string }[] };
   purchases: { purchase_value: number | string; units_purchased: number; purchase_count: number; trend: { date: string; value: number | string }[] };
