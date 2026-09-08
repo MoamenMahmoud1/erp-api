@@ -43,9 +43,7 @@ def sales_dashboard(*, date_from=None, date_to=None):
     )
     invoices = Invoice.objects.filter(status__in=SALES_STATUSES)
     invoices = _range_filter(invoices, "created_at", date_from, date_to)
-    discount_total = invoices.aggregate(
-        total=Coalesce(Sum("coupon_discount"), ZERO)
-    )["total"]
+    discount_total = invoices.aggregate(total=Coalesce(Sum("coupon_discount"), ZERO))["total"]
 
     daily_gross = (
         items.annotate(day=TruncDate("invoice__created_at"))
@@ -164,14 +162,28 @@ def sales_by_employee(*, date_from=None, date_to=None):
     )
     rows = (
         items.annotate(line_total=line_total)
-        .values("invoice__created_by_id", "invoice__created_by__email")
+        .values(
+            "invoice__created_by_id",
+            "invoice__created_by__email",
+            "invoice__created_by__first_name",
+            "invoice__created_by__last_name",
+        )
         .annotate(
             quantity=Coalesce(Sum("quantity"), 0),
             revenue=Coalesce(Sum("line_total"), ZERO),
         )
         .order_by("-revenue", "invoice__created_by_id")
     )
-    return list(rows)
+    return [
+        {
+            **row,
+            "employee_name": (
+                f"{row['invoice__created_by__first_name']} {row['invoice__created_by__last_name']}".strip()
+                or row["invoice__created_by__email"]
+            ),
+        }
+        for row in rows
+    ]
 
 
 def dashboard_overview(*, date_from=None, date_to=None):
