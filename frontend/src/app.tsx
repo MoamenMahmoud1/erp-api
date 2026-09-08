@@ -10,7 +10,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductsPage, CustomersPage, SuppliersPage, EmployeesPage } from './pages/MasterDataPages';
 import { CartonPricingPage, CouponsPage } from './pages/CommercialPages';
-import { SalesPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
+import { SalesPage, InvoiceDetailsPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { InventoryLocationsPage, InventoryMovementsPage, InventoryTransferPage } from './pages/InventoryPages';
 import { CreateInvoicePage, CreatePurchasePage, CollectPaymentPage, SupplierPaymentPage } from './pages/TransactionPages';
 import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage } from './pages/AccountingPages';
@@ -91,6 +91,7 @@ export function App() {
   const securedRoutes = [
     { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
     { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage /> },
+    { path: '/sales/:id', permission: 'invoices.view_invoice', element: <InvoiceDetailsPage /> },
     { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage /> },
     { path: '/purchases', permission: 'purchases.view_purchase', element: <PurchasesPage /> },
     { path: '/purchases/new', permission: 'purchases.add_purchase', element: <CreatePurchasePage /> },
