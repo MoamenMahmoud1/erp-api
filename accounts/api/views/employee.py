@@ -1,10 +1,18 @@
+from django.contrib.auth import get_user_model
+from django.db.models import IntegerField, OuterRef, Q, Subquery, Value
+from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
-from common.pagination import StandardPagination
 from accounts.api.serializers import EmployeeSerializer
-from accounts.models import Employee
+from accounts.models import Employee, Role
 from accounts.permissions import EmployeeAccessPermission
+from common.pagination import StandardPagination
+
+
+User = get_user_model()
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
@@ -37,3 +45,52 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
             .order_by(*self.ordering)
         )
+
+    @action(detail=False, methods=("get",), url_path="options")
+    def options(self, request):
+        """Return assignable users for the employee form without trusting client-supplied IDs."""
+        users = User.objects.filter(
+            is_active=True,
+            employee__isnull=True,
+        )
+
+        if not request.user.is_superuser:
+            actor_level = Role.level_for_user(request.user)
+            target_role_level = Subquery(
+                Role.objects.filter(group__user=OuterRef("pk"))
+                .order_by("-level")
+                .values("level")[:1],
+                output_field=IntegerField(),
+            )
+            users = (
+                users.filter(is_superuser=False)
+                .annotate(_role_level=Coalesce(target_role_level, Value(0)))
+                .filter(_role_level__lt=actor_level)
+            )
+
+        search = request.query_params.get("search", "").strip()
+        if search:
+            users = users.filter(
+                Q(username__icontains=search)
+                | Q(email__icontains=search)
+                | Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+            )
+
+        users = users.order_by("first_name", "last_name", "username", "pk")
+        page = self.paginate_queryset(users)
+        rows = page if page is not None else users
+        data = [
+            {
+                "id": user.pk,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_staff": user.is_staff,
+            }
+            for user in rows
+        ]
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data, status=status.HTTP_200_OK)
