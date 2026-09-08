@@ -31,25 +31,25 @@ export function EmployeesPage() {
       ]}
       columns={[
         {
-          key: 'user_details',
+          key: 'employee',
           label: 'Employee',
-          render: (value) => {
-            const user = value as Record<string, unknown> | null;
+          render: (_value, row) => {
+            const user = row.user_details as Record<string, unknown> | null;
             if (!user) return '—';
             const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || String(user.username || '—');
             return `${name} (@${user.username})`;
           },
         },
         {
-          key: 'user_details',
+          key: 'email',
           label: 'Email',
-          render: (value) => String((value as Record<string, unknown> | null)?.email || '—'),
+          render: (_value, row) => String((row.user_details as Record<string, unknown> | null)?.email || '—'),
         },
         {
-          key: 'manager_details',
+          key: 'manager_name',
           label: 'Manager',
-          render: (value) => {
-            const manager = value as Record<string, unknown> | null;
+          render: (_value, row) => {
+            const manager = row.manager_details as Record<string, unknown> | null;
             if (!manager) return '—';
             return [manager.first_name, manager.last_name].filter(Boolean).join(' ') || String(manager.username || '—');
           },
@@ -57,9 +57,9 @@ export function EmployeesPage() {
         { key: 'work_site', label: 'Work site' },
         { key: 'department', label: 'Department' },
         {
-          key: 'user_details',
+          key: 'status',
           label: 'Status',
-          render: (value) => Boolean((value as Record<string, unknown> | null)?.is_active) ? 'Active' : 'Inactive',
+          render: (_value, row) => Boolean((row.user_details as Record<string, unknown> | null)?.is_active) ? 'Active' : 'Inactive',
         },
       ]}
     />
