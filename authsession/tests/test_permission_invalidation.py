@@ -56,3 +56,12 @@ class PermissionInvalidationTests(TestCase):
         group.permissions.add(self.permission)
 
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
+
+    def test_user_auth_state_change_invalidates_active_session_cache(self):
+        session_id = self._session()
+        self.assertIsNotNone(cache.get(auth_session_cache_key(session_id)))
+
+        self.user.is_active = False
+        self.user.save(update_fields=("is_active",))
+
+        self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
