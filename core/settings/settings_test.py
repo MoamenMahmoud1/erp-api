@@ -23,3 +23,7 @@ CACHES = {
         "LOCATION": "erp-api-test-auth",
     },
 }
+
+# Read-only reports must never leak cached results between isolated Django
+# TestCase databases. Production keeps the short Redis TTL.
+REPORT_CACHE_TTL = 0
