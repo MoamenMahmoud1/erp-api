@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from unfold.admin import ModelAdmin
+
 from authsession.models import AuthSession
 
 
 @admin.register(AuthSession)
-class AuthSessionAdmin(admin.ModelAdmin):
+class AuthSessionAdmin(ModelAdmin):
     list_display = (
         "id",
         "user",
@@ -17,6 +19,7 @@ class AuthSessionAdmin(admin.ModelAdmin):
     )
     list_filter = ("created_at", "expires_at", "revoked_at")
     search_fields = ("user__username", "user__email", "device_name", "ip_address")
+    ordering = ("-created_at",)
     list_select_related = ("user",)
     readonly_fields = (
         "id",
@@ -31,3 +34,12 @@ class AuthSessionAdmin(admin.ModelAdmin):
         "expires_at",
         "revoked_at",
     )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
