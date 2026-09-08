@@ -31,7 +31,7 @@ def create_purchase(*, created_by, validated_data):
     _validate_items(items)
     if not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
-    purchase = Purchase.objects.create(created_by=created_by, **data)
+    purchase = Purchase.objects.create(created_by_id=created_by.pk, **data)
     PurchaseItem.objects.bulk_create([PurchaseItem(purchase=purchase, **item) for item in items])
     return purchase
 
