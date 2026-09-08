@@ -2,10 +2,17 @@ from rest_framework.permissions import BasePermission
 
 
 class InventoryReadPermission(BasePermission):
-    """Inventory visibility stays intentionally broad to authenticated staff/users."""
+    """Require an explicit read permission for the requested inventory resource."""
 
     def has_permission(self, request, view):
-        return bool(request.user and request.user.is_authenticated)
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+
+        codename = getattr(view, "permission_codename", None)
+        return bool(codename and user.has_perm(codename))
 
 
 class InventoryTransferPermission(BasePermission):
