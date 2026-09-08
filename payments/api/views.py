@@ -76,7 +76,7 @@ class TransactionListView(generics.ListAPIView):
     pagination_class = StandardPagination
     permission_classes = (TransactionReadPermission,)
     filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("customer", "collected_by")
+    filterset_fields = ("id", "customer", "collected_by")
 
     def get_queryset(self):
         return PaymentTransaction.objects.visible_to(self.request.user).with_payment_data().order_by("-created_at")
