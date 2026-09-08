@@ -33,10 +33,13 @@ class AccountSerializer(serializers.ModelSerializer):
 
 
 class JournalLineSerializer(serializers.ModelSerializer):
+    account_code = serializers.CharField(source="account.code", read_only=True)
+    account_name = serializers.CharField(source="account.name", read_only=True)
+
     class Meta:
         model = JournalLine
-        fields = ("id", "account", "description", "debit", "credit")
-        read_only_fields = ("id",)
+        fields = ("id", "account", "account_code", "account_name", "description", "debit", "credit")
+        read_only_fields = ("id", "account_code", "account_name")
 
 
 class JournalEntrySerializer(serializers.ModelSerializer):
@@ -75,10 +78,7 @@ class JournalEntrySerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         raw_lines = validated_data.pop("lines")
-        lines = [
-            {**line, "account_id": line.pop("account").pk}
-            for line in raw_lines
-        ]
+        lines = [{**line, "account_id": line.pop("account").pk} for line in raw_lines]
         request = self.context["request"]
         return create_journal_entry(
             created_by_id=request.user.pk,
@@ -160,7 +160,5 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if attrs["start_date"] > attrs["end_date"]:
-            raise serializers.ValidationError(
-                {"end_date": "End date must be on or after start date."}
-            )
+            raise serializers.ValidationError({"end_date": "End date must be on or after start date."})
         return attrs

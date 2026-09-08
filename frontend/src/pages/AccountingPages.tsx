@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
-import { Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
@@ -18,7 +18,7 @@ export function AccountingHomePage() {
     const asOf = new Date().toISOString().slice(0, 10);
     Promise.all([api.accounting.profitAndLoss(), api.accounting.balanceSheet(query({ as_of: asOf }))])
       .then(([profit, balance]) => { setPnl(profit as Record<string, unknown>); setBs(balance as Record<string, unknown>); })
-      .catch((error) => notifications.show({ title: 'Accounting unavailable', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }))
+      .catch((error) => notifications.show({ title: 'Accounting unavailable', message: error instanceof Error ? error.message : 'Request failed', color: 'red' }))
       .finally(() => setLoading(false));
   }, []);
   if (loading) return <Card className="glass" radius="lg" p={60} withBorder><Group justify="center"><Loader /></Group></Card>;
@@ -45,11 +45,17 @@ export function AccountsPage() {
   if (error) return <Card className="glass" radius="xl" p="xl" withBorder><Text fw={800}>Accounts unavailable</Text><Text c="dimmed" mt="xs">{error}</Text></Card>;
   if (!data) return <Card className="glass" radius="xl" p={56} withBorder><Group justify="center"><Loader size="sm" /></Group><Text ta="center" size="sm" c="dimmed" mt="md">Loading account hierarchy…</Text></Card>;
 
-  return <CrudPage title="Accounts" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={api.accounting.createAccount} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account', type: 'select', options, clearable: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
+  return <CrudPage title="Accounts" singularTitle="Account" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={api.accounting.createAccount} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account', type: 'select', options, clearable: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
+}
+
+function JournalDetails({ data }: { data: Record<string, unknown> }) {
+  const lines = Array.isArray(data.lines) ? data.lines as Record<string, unknown>[] : [];
+  const status = String(data.status || '');
+  return <Stack gap="lg"><SimpleGrid cols={{ base: 1, sm: 2 }}><Card withBorder radius="lg"><Text size="xs" c="dimmed">ENTRY</Text><Text fw={900} size="xl">{String(data.number || '—')}</Text><Text size="sm" c="dimmed" mt="xs">{String(data.entry_date || '—')}</Text></Card><Card withBorder radius="lg"><Text size="xs" c="dimmed">STATUS</Text><Badge mt="xs" color={status === 'posted' ? 'teal' : 'yellow'} size="lg">{status || '—'}</Badge><Text size="sm" c="dimmed" mt="sm">Reference: {String(data.reference || '—')}</Text></Card></SimpleGrid><Card withBorder radius="lg"><Text fw={800}>{String(data.description || 'Journal entry')}</Text><Text size="sm" c="dimmed" mt={4}>{lines.length} line{lines.length === 1 ? '' : 's'}</Text><Table.ScrollContainer minWidth={620} mt="md"><Table highlightOnHover><Table.Thead><Table.Tr><Table.Th>Account</Table.Th><Table.Th>Description</Table.Th><Table.Th ta="right">Debit</Table.Th><Table.Th ta="right">Credit</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{lines.map((line, index) => <Table.Tr key={String(line.id ?? index)}><Table.Td><Text fw={700}>{String(line.account_name || 'Unknown account')}</Text><Text size="xs" c="dimmed">{String(line.account_code || '')}</Text></Table.Td><Table.Td>{String(line.description || '—')}</Table.Td><Table.Td ta="right">{money(line.debit)}</Table.Td><Table.Td ta="right">{money(line.credit)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></Table.ScrollContainer></Card></Stack>;
 }
 
 export function JournalsPage() {
-  return <RecordsPage eyebrow="ACCOUNTING" title="Journal entries" subtitle="Posted and draft accounting entries generated by ERP operations." list={api.accounting.journalEntries} columns={[{ key: 'number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'status', label: 'Status', format: (value) => <Badge color={String(value) === 'posted' ? 'teal' : 'yellow'} variant="light">{String(value)}</Badge> }]} actions={[{ label: 'Post', color: 'teal', visible: (row) => String(row.status) === 'draft', run: (row) => api.accounting.postJournalEntry(Number(row.id)) }]} />;
+  return <RecordsPage eyebrow="ACCOUNTING" title="Journal entries" subtitle="Posted and draft accounting entries generated by ERP operations." list={api.accounting.journalEntries} details={{ load: api.accounting.journalEntry, render: (data) => <JournalDetails data={data} /> }} columns={[{ key: 'number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'status', label: 'Status', format: (value) => <Badge color={String(value) === 'posted' ? 'teal' : 'yellow'} variant="light">{String(value)}</Badge> }]} actions={[{ label: 'Post', color: 'teal', visible: (row) => String(row.status) === 'draft', run: (row) => api.accounting.postJournalEntry(Number(row.id)) }]} />;
 }
 
 export function StatementsPage() {
@@ -59,6 +65,7 @@ export function StatementsPage() {
   const [loading, setLoading] = useState(false);
   async function load() {
     if (!from || !to) return;
+    if (to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
     setLoading(true);
     try {
       const params = query({ from, to });

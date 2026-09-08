@@ -19,7 +19,7 @@ function useOptions() {
       api.suppliers.list('?page_size=50'),
     ]).then(([productData, customerData, supplierData]) => {
       setProducts(productData); setCustomers(customerData); setSuppliers(supplierData);
-    }).catch(() => undefined);
+    }).catch((error) => notifications.show({ title: 'Unable to load form options', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }));
   }, []);
 
   return {
@@ -36,7 +36,6 @@ function WorkflowHeader({ eyebrow, title, subtitle }: { eyebrow: string; title: 
 export function CreateInvoicePage() {
   const { productOptions, customerOptions } = useOptions();
   const [customer, setCustomer] = useState('');
-  const [reference, setReference] = useState('');
   const [lines, setLines] = useState<Line[]>([{ product: '', quantity: 1 }]);
   const [loading, setLoading] = useState(false);
 
@@ -47,14 +46,14 @@ export function CreateInvoicePage() {
     if (!customer || lines.some((line) => !line.product || Number(line.quantity) < 1)) return;
     setLoading(true);
     try {
-      await api.invoices.create({ customer: Number(customer), reference, items: lines.map((line) => ({ product: Number(line.product), quantity: Number(line.quantity) })) });
+      await api.invoices.create({ customer: Number(customer), items: lines.map((line) => ({ product: Number(line.product), quantity: Number(line.quantity) })) });
       notifications.show({ title: 'Invoice created', message: 'The invoice is ready for confirmation.', color: 'teal' });
-      setReference(''); setLines([{ product: '', quantity: 1 }]);
+      setLines([{ product: '', quantity: 1 }]);
     } catch (error) { notifications.show({ title: 'Invoice failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
     finally { setLoading(false); }
   }
 
-  return <Stack gap="xl"><WorkflowHeader eyebrow="SALES" title="New invoice" subtitle="Create a draft, then confirm it when the sale is ready." /><Card className="glass" withBorder radius="lg" p="xl" maw={980}><form onSubmit={submit}><Stack><Select label="Customer" searchable data={customerOptions} value={customer} onChange={(value) => setCustomer(value || '')} required /><TextInput label="Reference" value={reference} onChange={(event) => setReference(event.currentTarget.value)} placeholder="Optional" /><Divider my="sm" /><Text fw={800}>Items</Text>{lines.map((line, index) => <SimpleGrid key={index} cols={{ base: 1, sm: 3 }}><Select label={`Product ${index + 1}`} searchable data={productOptions} value={line.product} onChange={(value) => updateLine(index, { product: value || '' })} required /><NumberInput label="Quantity" min={1} value={line.quantity} onChange={(value) => updateLine(index, { quantity: value })} required /><Group align="flex-end"><Button type="button" variant="subtle" color="red" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}>Remove</Button></Group></SimpleGrid>)}<Button type="button" variant="light" onClick={() => setLines((current) => [...current, { product: '', quantity: 1 }])}>Add item</Button><Button type="submit" loading={loading} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>Create draft invoice</Button></Stack></form></Card></Stack>;
+  return <Stack gap="xl"><WorkflowHeader eyebrow="SALES" title="New invoice" subtitle="Create a draft, then confirm it when the sale is ready." /><Card className="glass" withBorder radius="lg" p="xl" maw={980}><form onSubmit={submit}><Stack><Select label="Customer" searchable data={customerOptions} value={customer} onChange={(value) => setCustomer(value || '')} required /><Divider my="sm" /><Text fw={800}>Items</Text>{lines.map((line, index) => <SimpleGrid key={index} cols={{ base: 1, sm: 3 }}><Select label={`Product ${index + 1}`} searchable data={productOptions} value={line.product} onChange={(value) => updateLine(index, { product: value || '' })} required /><NumberInput label="Quantity" min={1} value={line.quantity} onChange={(value) => updateLine(index, { quantity: value })} required /><Group align="flex-end"><Button type="button" variant="subtle" color="red" disabled={lines.length === 1} onClick={() => setLines((current) => current.filter((_, lineIndex) => lineIndex !== index))}>Remove</Button></Group></SimpleGrid>)}<Button type="button" variant="light" onClick={() => setLines((current) => [...current, { product: '', quantity: 1 }])}>Add item</Button><Button type="submit" loading={loading} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>Create draft invoice</Button></Stack></form></Card></Stack>;
 }
 
 export function CreatePurchasePage() {
@@ -68,7 +67,7 @@ export function CreatePurchasePage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!supplier || lines.some((line) => !line.product || Number(line.quantity) < 1 || Number(line.unit_purchase_price) < 0)) return;
+    if (!supplier || lines.some((line) => !line.product || Number(line.quantity) < 1 || line.unit_purchase_price === '' || Number(line.unit_purchase_price) < 0)) return;
     setLoading(true);
     try {
       await api.purchases.create({ supplier: Number(supplier), reference, items: lines.map((line) => ({ product: Number(line.product), quantity: Number(line.quantity), unit_purchase_price: Number(line.unit_purchase_price) })) });

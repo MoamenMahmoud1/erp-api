@@ -66,7 +66,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         )
 
     def get_serializer_class(self):
-        return InvoiceSummarySerializer if self.action in {"list", "retrieve"} else InvoiceSerializer
+        return InvoiceSummarySerializer if self.action == "list" else InvoiceSerializer
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -82,11 +82,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data, partial=request.method == "PATCH")
         serializer.is_valid(raise_exception=True)
         invoice, error = _run_invoice(
-            lambda: UpdateInvoice()(
-                invoice_id=kwargs["pk"],
-                validated_data=serializer.validated_data,
-                actor=request.user,
-            )
+            lambda: UpdateInvoice()(invoice_id=kwargs["pk"], validated_data=serializer.validated_data, actor=request.user)
         )
         if error:
             return error
@@ -138,13 +134,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         result, error = _run_invoice(
-            lambda: CreateSalesReturn()(
-                invoice_id=pk,
-                items=data["items"],
-                created_by_id=request.user.pk,
-                reason=data.get("reason", ""),
-                actor=request.user,
-            )
+            lambda: CreateSalesReturn()(invoice_id=pk, items=data["items"], created_by_id=request.user.pk, reason=data.get("reason", ""), actor=request.user)
         )
         if error:
             return error

@@ -14,6 +14,7 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
 
 
 class InvoiceSerializer(serializers.ModelSerializer):
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
     items = InvoiceItemSerializer(many=True)
     subtotal = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -27,12 +28,12 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = (
-            "id", "customer", "created_by", "coupon", "coupon_discount", "status",
+            "id", "customer", "customer_name", "created_by", "coupon", "coupon_discount", "status",
             "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount",
             "returned_amount", "outstanding_amount", "sold_quantity", "items", "created_at", "updated_at",
         )
         read_only_fields = (
-            "id", "created_by", "coupon", "coupon_discount", "status", "subtotal", "total",
+            "id", "created_by", "customer_name", "coupon", "coupon_discount", "status", "subtotal", "total",
             "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount",
             "outstanding_amount", "sold_quantity", "created_at", "updated_at",
         )
