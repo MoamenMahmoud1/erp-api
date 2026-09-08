@@ -15,14 +15,21 @@ class UserSummarySerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "username",
+            "email",
             "first_name",
             "last_name",
+            "is_active",
+            "is_staff",
         )
 
 
 class EmployeeSerializer(serializers.ModelSerializer):
     user_details = UserSummarySerializer(
         source="user",
+        read_only=True,
+    )
+    manager_details = UserSummarySerializer(
+        source="manager.user",
         read_only=True,
     )
 
@@ -33,6 +40,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "user",
             "user_details",
             "manager",
+            "manager_details",
             "work_site",
             "department",
             "created_at",
