@@ -9,12 +9,14 @@ function statusBadge(value: unknown) {
   return <Badge color={color} variant="light">{String(value || '—')}</Badge>;
 }
 
+const draftOnly = (row: Record<string, unknown>) => row.status === 'draft';
+
 export function SalesPage() {
   return (
     <RecordsPage
       eyebrow="COMMAND CENTER"
       title="Sales"
-      subtitle="Invoice pipeline with direct confirmation and cancellation actions."
+      subtitle="Invoice pipeline with draft-only confirmation and cancellation actions."
       list={api.invoices.list}
       columns={[
         { key: 'id', label: '#' },
@@ -26,8 +28,8 @@ export function SalesPage() {
         { key: 'created_at', label: 'Created' },
       ]}
       actions={[
-        { label: 'Confirm', color: 'teal', run: (row) => api.invoices.confirm(Number(row.id)) },
-        { label: 'Cancel', color: 'red', run: (row) => api.invoices.cancel(Number(row.id)) },
+        { label: 'Confirm', color: 'teal', visible: draftOnly, run: (row) => api.invoices.confirm(Number(row.id)) },
+        { label: 'Cancel', color: 'red', visible: draftOnly, run: (row) => api.invoices.cancel(Number(row.id)) },
       ]}
     />
   );
@@ -49,8 +51,8 @@ export function PurchasesPage() {
         { key: 'reference', label: 'Reference' },
       ]}
       actions={[
-        { label: 'Confirm', color: 'teal', run: (row) => api.purchases.confirm(Number(row.id)) },
-        { label: 'Cancel', color: 'red', run: (row) => api.purchases.cancel(Number(row.id)) },
+        { label: 'Confirm', color: 'teal', visible: draftOnly, run: (row) => api.purchases.confirm(Number(row.id)) },
+        { label: 'Cancel', color: 'red', visible: draftOnly, run: (row) => api.purchases.cancel(Number(row.id)) },
       ]}
     />
   );
