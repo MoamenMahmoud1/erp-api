@@ -6,9 +6,6 @@ from django.contrib.auth.models import Group
 from django.urls import reverse
 from django.utils.html import format_html
 
-from unfold.admin import ModelAdmin
-from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
-
 from .models import Employee, Role
 
 User = get_user_model()
@@ -20,11 +17,7 @@ except admin.sites.NotRegistered:
 
 
 @admin.register(User)
-class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
-    form = UserChangeForm
-    add_form = UserCreationForm
-    change_password_form = AdminPasswordChangeForm
-
+class CustomUserAdmin(BaseUserAdmin):
     list_display = (
         "id",
         "username",
@@ -87,13 +80,13 @@ class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
 
 
 @admin.register(Group)
-class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+class GroupAdmin(BaseGroupAdmin):
     search_fields = ("name",)
     ordering = ("name",)
 
 
 @admin.register(Employee)
-class EmployeeAdmin(ModelAdmin):
+class EmployeeAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user_link",
@@ -148,7 +141,7 @@ class EmployeeAdmin(ModelAdmin):
 
 
 @admin.register(Role)
-class RoleAdmin(ModelAdmin):
+class RoleAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "code",
