@@ -1,4 +1,7 @@
-import { Badge, Button } from '@mantine/core';
+import { useEffect, useState } from 'react';
+import { Badge, Button, Card, Group, Loader, Stack, Table, Text, Title } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { useParams } from 'react-router-dom';
 
 import { RecordsPage } from '../components/RecordsPage';
 import { api } from '../lib/api';
@@ -14,7 +17,7 @@ const money = (value: unknown) => Number(value || 0).toLocaleString('en-US', { m
 
 function invoiceDetails(data: Record<string, unknown>) {
   const items = Array.isArray(data.items) ? data.items as Record<string, unknown>[] : [];
-  return <div style={{ display: 'grid', gap: 16 }}><div><b>Customer:</b> {String(data.customer_name || '—')}</div><div><b>Status:</b> {String(data.status || '—')}</div><div><b>Subtotal:</b> {money(data.subtotal)} &nbsp; <b>Total:</b> {money(data.total)}</div><div><b>Paid:</b> {money(data.net_paid_amount)} &nbsp; <b>Outstanding:</b> {money(data.outstanding_amount)}</div><div><b>Created:</b> {String(data.created_at || '—')}</div><div><b>Items</b><TableLike rows={items} fields={[['product_name', 'Product'], ['quantity', 'Qty'], ['unit_price', 'Unit price'], ['line_total', 'Total']]} moneyFields={['unit_price', 'line_total']} /></div></div>;
+  return <div style={{ display: 'grid', gap: 16 }}><div><b>Customer:</b> {String(data.customer_name || '—')}</div><div><b>Salesperson:</b> {String(data.salesperson_name || data.created_by_name || '—')}</div><div><b>Status:</b> {String(data.status || '—')}</div><div><b>Subtotal:</b> {money(data.subtotal)} &nbsp; <b>Total:</b> {money(data.total)} &nbsp; <b>Gross profit:</b> {money(data.gross_profit)}</div><div><b>Paid:</b> {money(data.net_paid_amount)} &nbsp; <b>Outstanding:</b> {money(data.outstanding_amount)} &nbsp; <b>Returned:</b> {money(data.returned_amount)}</div><div><b>Created:</b> {String(data.created_at || '—')}</div><div><b>Items</b><TableLike rows={items} fields={[['product_name', 'Product'], ['quantity', 'Qty'], ['unit_price', 'Unit price'], ['line_total', 'Total'], ['gross_profit', 'Profit']]} moneyFields={['unit_price', 'line_total', 'gross_profit']} /></div></div>;
 }
 
 function purchaseDetails(data: Record<string, unknown>) {
@@ -26,8 +29,31 @@ function TableLike({ rows, fields, moneyFields }: { rows: Record<string, unknown
   return <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}><thead><tr>{fields.map(([, label]) => <th key={label} style={{ textAlign: 'left', padding: 8 }}>{label}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={String(row.id ?? index)}>{fields.map(([key]) => <td key={key} style={{ padding: 8 }}>{moneyFields.includes(key) ? money(row[key]) : String(row[key] ?? '—')}</td>)}</tr>)}</tbody></table></div>;
 }
 
+export function InvoiceDetailsPage() {
+  const { id } = useParams();
+  const [data, setData] = useState<Record<string, unknown> | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const invoiceId = Number(id);
+    if (!Number.isInteger(invoiceId) || invoiceId <= 0) {
+      setLoading(false);
+      notifications.show({ title: 'Invalid invoice', message: 'The requested invoice number is invalid.', color: 'red' });
+      return;
+    }
+    api.invoices.get(invoiceId)
+      .then((result) => setData(result as Record<string, unknown>))
+      .catch((error) => notifications.show({ title: 'Invoice unavailable', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return <Card className="glass" radius="xl" p={60} withBorder><Group justify="center"><Loader /></Group></Card>;
+  if (!data) return <Card className="glass" radius="xl" p="xl" withBorder><Text fw={800}>Invoice unavailable</Text><Text c="dimmed" mt="xs">The invoice could not be loaded.</Text></Card>;
+  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>SALES</Text><Title order={1} mt={4}>Invoice #{String(data.id)}</Title><Text c="dimmed" mt={4}>Full commercial and payment details for this invoice.</Text></div><Card className="glass" radius="xl" withBorder p="xl">{invoiceDetails(data)}</Card></Stack>;
+}
+
 export function SalesPage() {
-  return <RecordsPage eyebrow="COMMAND CENTER" title="Sales" subtitle="Invoice pipeline with draft-only confirmation and cancellation actions." list={api.invoices.list} details={{ load: api.invoices.get, render: invoiceDetails }} columns={[{ key: 'id', label: '#' }, { key: 'customer_name', label: 'Customer' }, { key: 'status', label: 'Status', format: statusBadge }, { key: 'total', label: 'Total' }, { key: 'paid_amount', label: 'Paid' }, { key: 'outstanding_amount', label: 'Outstanding' }, { key: 'created_at', label: 'Created' }]} actions={[{ label: 'Confirm', color: 'teal', visible: draftOnly, run: (row) => api.invoices.confirm(Number(row.id)) }, { label: 'Cancel', color: 'red', visible: draftOnly, run: (row) => api.invoices.cancel(Number(row.id)) }]} />;
+  return <RecordsPage eyebrow="COMMAND CENTER" title="Sales" subtitle="Invoice pipeline with draft-only confirmation and cancellation actions." list={api.invoices.list} details={{ load: api.invoices.get, render: invoiceDetails }} columns={[{ key: 'id', label: '#' }, { key: 'customer_name', label: 'Customer' }, { key: 'salesperson_name', label: 'Salesperson' }, { key: 'status', label: 'Status', format: statusBadge }, { key: 'total', label: 'Total' }, { key: 'paid_amount', label: 'Paid' }, { key: 'outstanding_amount', label: 'Outstanding' }, { key: 'created_at', label: 'Created' }]} actions={[{ label: 'Confirm', color: 'teal', visible: draftOnly, run: (row) => api.invoices.confirm(Number(row.id)) }, { label: 'Cancel', color: 'red', visible: draftOnly, run: (row) => api.invoices.cancel(Number(row.id)) }]} />;
 }
 
 export function PurchasesPage() {
