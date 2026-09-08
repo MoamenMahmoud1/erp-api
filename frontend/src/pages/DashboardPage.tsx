@@ -1,19 +1,12 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DatePickerInput } from '@mantine/dates';
-import { BarChart, DonutChart } from '@mantine/charts';
-import { Badge, Card, Group, Loader, Paper, Progress, SegmentedControl, SimpleGrid, Stack, Text, Title } from '@mantine/core';
-import { IconArrowDownRight, IconArrowUpRight, IconBox, IconCash, IconChartBar, IconShoppingCart } from '@tabler/icons-react';
+import { AreaChart, BarChart } from '@mantine/charts';
+import { Badge, Card, DatePickerInput, Group, Loader, Progress, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { IconArrowDownRight, IconArrowUpRight, IconBox, IconCash, IconChartLine, IconReceipt, IconShoppingCart, IconUsers } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
-import { api, query } from '../lib/api';
+import { api, query, type DashboardOverview } from '../lib/api';
 
-type SalesData = { gross_sales: number | string; units_sold: number; invoice_count: number };
-type PurchaseData = { purchase_value: number | string; units_purchased: number; purchase_count: number };
-type InventoryData = { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock: { product_id: number; product_name: string; stock: number }[] };
-type PnlData = { total_revenue: number | string; total_expenses: number | string; net_income: number | string };
-type TopProduct = { product_id: number; 'product__name': string; quantity: number; revenue: number | string };
-type EmployeeSales = { invoice__created_by_id: number; 'invoice__created_by__email': string; quantity: number; revenue: number | string };
 type Range = 'today' | 'week' | 'month' | 'year' | 'custom';
 
 const money = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,8 +36,34 @@ function getRange(range: Range, customFrom: string | null, customTo: string | nu
   return { from: isoDate(from), to: today };
 }
 
-function StatCard({ label, value, icon, trend, tone = 'indigo' }: { label: string; value: string; icon: ReactNode; trend?: string; tone?: string }) {
-  return <Card className="glass bento-card" radius="lg" p="lg" withBorder><Group justify="space-between" align="flex-start"><div><Text size="xs" c="dimmed" fw={800} tt="uppercase" lts=".08em">{label}</Text><Text className="kpi-number" fw={900} size="clamp(1.7rem, 3vw, 2.35rem)" mt={6}>{value}</Text>{trend && <Group gap={5} mt={4}><IconArrowUpRight size={14} /><Text size="xs" c="teal.4" fw={700}>{trend}</Text></Group>}</div><Paper p="sm" radius="md" withBorder bg={`${tone}.9`} c="white">{icon}</Paper></Group></Card>;
+function StatCard({ label, value, meta, icon, tone }: { label: string; value: string; meta: string; icon: ReactNode; tone: string }) {
+  return (
+    <Card className="surface-panel bento-card" radius="xl" p="lg" withBorder>
+      <Group justify="space-between" align="flex-start">
+        <div>
+          <Text size="xs" c="dimmed" fw={800} tt="uppercase" lts=".08em">{label}</Text>
+          <Text className="kpi-number" fw={900} size="clamp(1.55rem, 2.6vw, 2.15rem)" mt={7}>{value}</Text>
+          <Text size="xs" c="dimmed" mt={5}>{meta}</Text>
+        </div>
+        <ThemeIcon size={42} radius="lg" variant="light" color={tone}>{icon}</ThemeIcon>
+      </Group>
+    </Card>
+  );
+}
+
+function Panel({ title, subtitle, children, right }: { title: string; subtitle?: string; children: ReactNode; right?: ReactNode }) {
+  return (
+    <Card className="surface-panel bento-card" radius="xl" p="lg" withBorder>
+      <Group justify="space-between" align="flex-start" mb="md">
+        <div>
+          <Text fw={800}>{title}</Text>
+          {subtitle && <Text size="xs" c="dimmed" mt={2}>{subtitle}</Text>}
+        </div>
+        {right}
+      </Group>
+      {children}
+    </Card>
+  );
 }
 
 export function DashboardPage() {
@@ -52,33 +71,14 @@ export function DashboardPage() {
   const [customFrom, setCustomFrom] = useState<string | null>(null);
   const [customTo, setCustomTo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sales, setSales] = useState<SalesData | null>(null);
-  const [purchases, setPurchases] = useState<PurchaseData | null>(null);
-  const [inventory, setInventory] = useState<InventoryData | null>(null);
-  const [pnl, setPnl] = useState<PnlData | null>(null);
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
-  const [employeeSales, setEmployeeSales] = useState<EmployeeSales[]>([]);
+  const [data, setData] = useState<DashboardOverview | null>(null);
   const rangeParams = useMemo(() => getRange(range, customFrom, customTo), [range, customFrom, customTo]);
 
   const load = useCallback(async () => {
     if (range === 'custom' && (!rangeParams.from || !rangeParams.to)) return;
     setLoading(true);
     try {
-      const suffix = query({ from: rangeParams.from, to: rangeParams.to });
-      const [salesResult, purchaseResult, inventoryResult, pnlResult, topResult, employeeResult] = await Promise.all([
-        api.accounting.salesAnalytics(suffix),
-        api.accounting.purchaseAnalytics(suffix),
-        api.accounting.inventoryAnalytics(),
-        api.accounting.profitAndLoss(suffix),
-        api.accounting.topProducts(query({ from: rangeParams.from, to: rangeParams.to, limit: 6 })),
-        api.accounting.salesByEmployee(suffix),
-      ]);
-      setSales(salesResult as SalesData);
-      setPurchases(purchaseResult as PurchaseData);
-      setInventory(inventoryResult as InventoryData);
-      setPnl(pnlResult as PnlData);
-      setTopProducts(((topResult as { products: TopProduct[] }).products || []).slice(0, 6));
-      setEmployeeSales(((employeeResult as { employees: EmployeeSales[] }).employees || []).slice(0, 6));
+      setData(await api.accounting.dashboardOverview(query({ from: rangeParams.from, to: rangeParams.to })));
     } catch (error) {
       notifications.show({ title: 'Dashboard unavailable', message: error instanceof Error ? error.message : 'Unable to load dashboard data.', color: 'red' });
     } finally {
@@ -88,30 +88,204 @@ export function DashboardPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  const chartProducts = topProducts.map((item) => ({ name: item['product__name'], revenue: Number(item.revenue || 0) }));
-  const chartEmployees = employeeSales.map((item) => ({ name: item['invoice__created_by__email'] || `Employee ${item.invoice__created_by_id}`, revenue: Number(item.revenue || 0) }));
+  const receivables = useMemo(
+    () => (data?.customer_balances || []).reduce((sum, row) => sum + Number(row.balance || 0), 0),
+    [data],
+  );
+  const payables = useMemo(
+    () => (data?.supplier_balances || []).reduce((sum, row) => sum + Number(row.balance || 0), 0),
+    [data],
+  );
+
+  const trend = useMemo(() => {
+    const values = new Map<string, { date: string; sales: number; purchases: number }>();
+    (data?.sales.trend || []).forEach((row) => {
+      values.set(row.date, { date: row.date, sales: Number(row.value || 0), purchases: values.get(row.date)?.purchases || 0 });
+    });
+    (data?.purchases.trend || []).forEach((row) => {
+      values.set(row.date, { date: row.date, sales: values.get(row.date)?.sales || 0, purchases: Number(row.value || 0) });
+    });
+    return Array.from(values.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [data]);
+
+  const topProducts = useMemo(
+    () => (data?.top_products || []).map((item) => ({ name: item['product__name'], revenue: Number(item.revenue || 0) })),
+    [data],
+  );
+  const employeeSales = useMemo(
+    () => (data?.sales_by_employee || []).slice(0, 6).map((item) => ({ name: item.employee_name, revenue: Number(item.revenue || 0) })),
+    [data],
+  );
+  const topReceivables = useMemo(
+    () => [...(data?.customer_balances || [])].filter((row) => Number(row.balance || 0) > 0).sort((a, b) => Number(b.balance) - Number(a.balance)).slice(0, 4),
+    [data],
+  );
+  const topPayables = useMemo(
+    () => [...(data?.supplier_balances || [])].filter((row) => Number(row.balance || 0) > 0).sort((a, b) => Number(b.balance) - Number(a.balance)).slice(0, 4),
+    [data],
+  );
 
   return (
     <Stack gap="xl">
-      <Group justify="space-between" align="flex-end" wrap="wrap"><div><Text size="sm" c="indigo.3" fw={800}>OPERATIONS OVERVIEW</Text><Title order={1} mt={4} style={{ letterSpacing: '-0.04em' }}>Good morning, command center.</Title><Text c="dimmed" mt={4}>A live view of sales, purchases, inventory and team performance.</Text></div><SegmentedControl value={range} onChange={(value) => setRange(value as Range)} data={[{ label: 'Today', value: 'today' }, { label: '7 days', value: 'week' }, { label: 'Month', value: 'month' }, { label: 'Year', value: 'year' }, { label: 'Custom', value: 'custom' }]} /></Group>
-      {range === 'custom' && <Group grow maw={640}><DatePickerInput label="From" value={customFrom} onChange={setCustomFrom} placeholder="Start date" clearable /><DatePickerInput label="To" value={customTo} onChange={setCustomTo} placeholder="End date" clearable /></Group>}
-      {loading && !sales ? <Card className="glass" radius="lg" p={50} withBorder><Group justify="center"><Loader /></Group></Card> : <>
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}>
-          <StatCard label="Net sales" value={asMoney(sales?.gross_sales)} icon={<IconChartBar size={20} />} trend={`${number.format(sales?.invoice_count || 0)} invoices`} />
-          <StatCard label="Net income" value={asMoney(pnl?.net_income)} icon={<IconCash size={20} />} trend={`${number.format(sales?.units_sold || 0)} units sold`} tone="cyan" />
-          <StatCard label="Purchases" value={asMoney(purchases?.purchase_value)} icon={<IconShoppingCart size={20} />} trend={`${number.format(purchases?.purchase_count || 0)} purchases`} tone="violet" />
-          <StatCard label="Inventory value" value={asMoney(inventory?.inventory_value)} icon={<IconBox size={20} />} trend={`${number.format(inventory?.total_units || 0)} units`} tone="teal" />
-        </SimpleGrid>
-        <SimpleGrid cols={{ base: 1, lg: 2 }}>
-          <Card className="glass bento-card" radius="lg" p="lg" withBorder><Group justify="space-between" mb="md"><div><Text fw={800}>Top products</Text><Text size="xs" c="dimmed">Revenue in the selected period</Text></div><Badge variant="light">Live</Badge></Group>{chartProducts.length ? <BarChart h={300} data={chartProducts} dataKey="name" series={[{ name: 'revenue', color: 'indigo.5' }]} tickLine="y" gridAxis="y" /> : <Text c="dimmed" py="xl" ta="center">No sales data for this period.</Text>}</Card>
-          <Card className="glass bento-card" radius="lg" p="lg" withBorder><Group justify="space-between" mb="md"><div><Text fw={800}>Sales by employee</Text><Text size="xs" c="dimmed">Ranked by revenue</Text></div><Badge variant="light" color="cyan">Team</Badge></Group>{chartEmployees.length ? <BarChart h={300} data={chartEmployees} dataKey="name" series={[{ name: 'revenue', color: 'cyan.5' }]} tickLine="y" gridAxis="y" /> : <Text c="dimmed" py="xl" ta="center">No employee sales yet.</Text>}</Card>
-        </SimpleGrid>
-        <SimpleGrid cols={{ base: 1, md: 3 }}>
-          <Card className="glass bento-card" radius="lg" p="lg" withBorder><Text fw={800}>Inventory health</Text><Text size="xs" c="dimmed">Current stock position</Text><Group align="flex-end" mt="xl"><Text fw={900} size="2.5rem">{number.format(inventory?.product_count || 0)}</Text><Text c="dimmed" pb={8}>active products</Text></Group><Progress value={inventory ? Math.max(8, 100 - ((inventory.low_stock_count / Math.max(inventory.product_count, 1)) * 100)) : 8} mt="md" radius="xl" /><Text size="xs" c="dimmed" mt="sm">{number.format(inventory?.low_stock_count || 0)} items need attention</Text></Card>
-          <Card className="glass bento-card" radius="lg" p="lg" withBorder><Text fw={800}>Sales vs purchases</Text><Text size="xs" c="dimmed">Selected period</Text><DonutChart mt="md" size={190} thickness={22} data={[{ name: 'Sales', value: Math.max(Number(sales?.gross_sales || 0), 0), color: 'indigo.5' }, { name: 'Purchases', value: Math.max(Number(purchases?.purchase_value || 0), 0), color: 'violet.5' }]} withTooltip /></Card>
-          <Card className="glass bento-card" radius="lg" p="lg" withBorder><Group justify="space-between"><div><Text fw={800}>Low stock</Text><Text size="xs" c="dimmed">Threshold-driven alerts</Text></div><IconArrowDownRight size={18} /></Group><Stack mt="md" gap="sm">{(inventory?.low_stock || []).slice(0, 5).map((item) => <div key={item.product_id}><Group justify="space-between" mb={4}><Text size="sm">{item.product_name}</Text><Badge size="sm" color="red" variant="light">{item.stock}</Badge></Group><Progress value={Math.min(item.stock * 10, 100)} size="xs" color="red" radius="xl" /></div>)}{!inventory?.low_stock?.length && <Text c="teal.4" size="sm">Inventory is healthy.</Text>}</Stack></Card>
-        </SimpleGrid>
-      </>}
+      <Group justify="space-between" align="flex-end" wrap="wrap">
+        <div>
+          <Text size="sm" c="indigo.3" fw={800} tt="uppercase" lts=".08em">Executive overview</Text>
+          <Title order={1} mt={4} style={{ letterSpacing: '-0.04em' }}>Command center</Title>
+          <Text c="dimmed" mt={4}>Sales, cash, working capital and inventory in one view.</Text>
+        </div>
+        <SegmentedControl
+          value={range}
+          onChange={(value) => setRange(value as Range)}
+          data={[
+            { label: 'Today', value: 'today' },
+            { label: '7 days', value: 'week' },
+            { label: 'Month', value: 'month' },
+            { label: 'Year', value: 'year' },
+            { label: 'Custom', value: 'custom' },
+          ]}
+        />
+      </Group>
+
+      {range === 'custom' && (
+        <Group grow maw={640}>
+          <DatePickerInput label="From" value={customFrom} onChange={setCustomFrom} placeholder="Start date" clearable />
+          <DatePickerInput label="To" value={customTo} onChange={setCustomTo} placeholder="End date" clearable />
+        </Group>
+      )}
+
+      {loading && !data ? (
+        <Card className="surface-panel" radius="xl" p={56} withBorder>
+          <Group justify="center"><Loader size="sm" /></Group>
+        </Card>
+      ) : data ? (
+        <>
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3, xl: 6 }}>
+            <StatCard label="Net sales" value={asMoney(data.sales.gross_sales)} meta={`${number.format(data.sales.invoice_count)} invoices`} icon={<IconChartLine size={20} />} tone="indigo" />
+            <StatCard label="Net income" value={asMoney(data.pnl.net_income)} meta={`${asMoney(data.pnl.total_expenses)} expenses`} icon={<IconCash size={20} />} tone="teal" />
+            <StatCard label="Cash & bank" value={asMoney(data.cash_flow.ending_cash)} meta={`${asMoney(data.cash_flow.net_change)} net change`} icon={<IconCash size={20} />} tone="cyan" />
+            <StatCard label="Receivables" value={asMoney(receivables)} meta="Customer balances" icon={<IconUsers size={20} />} tone="orange" />
+            <StatCard label="Payables" value={asMoney(payables)} meta="Supplier balances" icon={<IconReceipt size={20} />} tone="violet" />
+            <StatCard label="Inventory" value={asMoney(data.inventory.inventory_value)} meta={`${number.format(data.inventory.total_units)} units`} icon={<IconBox size={20} />} tone="blue" />
+          </SimpleGrid>
+
+          <Panel title="Sales vs purchases" subtitle="Daily values for the selected period" right={<Badge variant="light">Live</Badge>}>
+            {trend.length ? (
+              <AreaChart
+                h={330}
+                data={trend}
+                dataKey="date"
+                curveType="monotone"
+                withLegend
+                legendProps={{ verticalAlign: 'bottom' }}
+                valueFormatter={(value) => asMoney(value)}
+                series={[
+                  { name: 'sales', label: 'Sales', color: 'indigo.6' },
+                  { name: 'purchases', label: 'Purchases', color: 'violet.5' },
+                ]}
+              />
+            ) : <Text c="dimmed" ta="center" py={100}>No activity in this period.</Text>}
+          </Panel>
+
+          <SimpleGrid cols={{ base: 1, lg: 2 }}>
+            <Panel title="Top products" subtitle="Highest gross product revenue">
+              {topProducts.length ? (
+                <BarChart
+                  h={320}
+                  data={topProducts}
+                  dataKey="name"
+                  orientation="vertical"
+                  yAxisProps={{ width: 190 }}
+                  barProps={{ radius: 8 }}
+                  valueFormatter={(value) => asMoney(value)}
+                  series={[{ name: 'revenue', label: 'Revenue', color: 'indigo.6' }]}
+                />
+              ) : <Text c="dimmed" ta="center" py={100}>No product sales in this period.</Text>}
+            </Panel>
+            <Panel title="Sales by employee" subtitle="Highest gross sales contribution">
+              {employeeSales.length ? (
+                <BarChart
+                  h={320}
+                  data={employeeSales}
+                  dataKey="name"
+                  orientation="vertical"
+                  yAxisProps={{ width: 150 }}
+                  barProps={{ radius: 8 }}
+                  valueFormatter={(value) => asMoney(value)}
+                  series={[{ name: 'revenue', label: 'Revenue', color: 'cyan.6' }]}
+                />
+              ) : <Text c="dimmed" ta="center" py={100}>No employee sales in this period.</Text>}
+            </Panel>
+          </SimpleGrid>
+
+          <SimpleGrid cols={{ base: 1, md: 2, xl: 4 }}>
+            <Panel title="Inventory health" subtitle="Current stock position">
+              <Group justify="space-between" align="flex-end" mt="sm">
+                <div>
+                  <Text fw={900} size="2.2rem">{number.format(data.inventory.product_count)}</Text>
+                  <Text size="xs" c="dimmed">active products</Text>
+                </div>
+                <Badge color={data.inventory.low_stock_count ? 'orange' : 'teal'} variant="light">
+                  {number.format(data.inventory.low_stock_count)} low stock
+                </Badge>
+              </Group>
+              <Progress value={Math.max(4, 100 - (data.inventory.low_stock_count / Math.max(data.inventory.product_count, 1)) * 100)} mt="lg" radius="xl" />
+              <Text size="xs" c="dimmed" mt="sm">Threshold: {number.format(data.inventory.low_stock_threshold || 10)} units</Text>
+            </Panel>
+
+            <Panel title="Cash movement" subtitle="Selected period">
+              <Group justify="space-between" mt="sm">
+                <div><Text size="xs" c="dimmed">Inflows</Text><Text fw={800} mt={3}>{asMoney(data.cash_flow.total_inflows)}</Text></div>
+                <div style={{ textAlign: 'right' }}><Text size="xs" c="dimmed">Outflows</Text><Text fw={800} mt={3}>{asMoney(data.cash_flow.total_outflows)}</Text></div>
+              </Group>
+              <Group gap={6} mt="lg">
+                {Number(data.cash_flow.net_change || 0) >= 0 ? <IconArrowUpRight size={15} /> : <IconArrowDownRight size={15} />}
+                <Text size="sm" fw={800}>Net change {asMoney(data.cash_flow.net_change)}</Text>
+              </Group>
+            </Panel>
+
+            <Panel title="Largest receivables" subtitle="Customers with open balances">
+              <Stack gap="sm">
+                {topReceivables.map((row) => (
+                  <Group key={row.customer_id} justify="space-between" wrap="nowrap">
+                    <Text size="sm" truncate>{row.customer_name}</Text>
+                    <Text size="sm" fw={800}>{asMoney(row.balance)}</Text>
+                  </Group>
+                ))}
+                {!topReceivables.length && <Text size="sm" c="teal.4">No outstanding receivables.</Text>}
+              </Stack>
+            </Panel>
+
+            <Panel title="Largest payables" subtitle="Suppliers with open balances">
+              <Stack gap="sm">
+                {topPayables.map((row) => (
+                  <Group key={row.supplier_id} justify="space-between" wrap="nowrap">
+                    <Text size="sm" truncate>{row.supplier_name}</Text>
+                    <Text size="sm" fw={800}>{asMoney(row.balance)}</Text>
+                  </Group>
+                ))}
+                {!topPayables.length && <Text size="sm" c="teal.4">No outstanding payables.</Text>}
+              </Stack>
+            </Panel>
+          </SimpleGrid>
+
+          <Panel title="Low stock" subtitle="Products that need replenishment">
+            <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }}>
+              {(data.inventory.low_stock || []).slice(0, 6).map((item) => (
+                <Card key={item.product_id} withBorder radius="lg" p="sm" bg="transparent">
+                  <Group justify="space-between" wrap="nowrap">
+                    <Group gap="sm" wrap="nowrap">
+                      <ThemeIcon size={34} radius="md" color="orange" variant="light"><IconShoppingCart size={16} /></ThemeIcon>
+                      <Text size="sm" fw={700} truncate>{item.product_name}</Text>
+                    </Group>
+                    <Badge color="orange" variant="light">{item.stock}</Badge>
+                  </Group>
+                </Card>
+              ))}
+            </SimpleGrid>
+            {!data.inventory.low_stock?.length && <Text size="sm" c="teal.4">Inventory is healthy.</Text>}
+          </Panel>
+        </>
+      ) : null}
     </Stack>
   );
 }
