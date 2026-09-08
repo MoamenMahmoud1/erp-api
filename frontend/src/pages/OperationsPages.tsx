@@ -9,7 +9,7 @@ function statusBadge(value: unknown) {
   return <Badge color={color} variant="light">{String(value || '—')}</Badge>;
 }
 
-const draftOnly = (row: Record<string, unknown>) => row.status === 'draft';
+const draftOnly = (row: Record<string, unknown>) => String(row.status || '').toLowerCase() === 'draft';
 
 export function SalesPage() {
   return (
