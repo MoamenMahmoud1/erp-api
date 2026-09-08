@@ -61,9 +61,18 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
         actor=actor,
     )
 
-    sale = StockMovement.objects.filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE).select_related("source_location").first()
+    sale = (
+        StockMovement.objects.filter(
+            reference=f"Invoice #{invoice.pk}",
+            movement_type=StockMovement.MovementType.SALE,
+        )
+        .select_related("source_location")
+        .prefetch_related("items")
+        .first()
+    )
     if sale is None or sale.source_location is None:
         raise InvalidBusinessOperation("Cannot return sale: original sale movement was not found.")
+    sale_costs = {item.product_id: item.unit_cost for item in sale.items.all()}
 
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.SALEABLE_RETURN,
@@ -72,9 +81,20 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
         reference=f"Return Invoice #{invoice.pk}",
     )
     for line, quantity in cleaned:
-        StockBalanceService.increase(location=sale.source_location, product=line.product, quantity=quantity)
+        unit_cost = sale_costs.get(line.product_id) or line.cost_price or line.product.purchase_price
+        StockBalanceService.increase(
+            location=sale.source_location,
+            product=line.product,
+            quantity=quantity,
+            unit_cost=unit_cost,
+        )
         InvoiceReturnItem.objects.create(invoice_return=sales_return, invoice_item=line, quantity=quantity, unit_price=line.unit_price)
-        StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=line.product,
+            quantity=quantity,
+            unit_cost=unit_cost,
+        )
 
     post_sales_return(sales_return=sales_return, actor_id=created_by_id, company=get_default_company())
 
