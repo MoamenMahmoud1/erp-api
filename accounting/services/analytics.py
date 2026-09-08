@@ -1,16 +1,11 @@
-"""Fast operational analytics for ERP dashboards.
-
-The dashboard uses database-backed KPIs and small grouped result sets. Heavy
-historical or statistical workloads should move to Celery later; the request
-path stays intentionally simple.
-"""
+"""Fast operational analytics for ERP dashboards."""
 
 from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
 from django.db.models.functions import Coalesce, TruncDate
 
-from inventory.models import StockBalance
+from common.report_cache import cached_report
 from invoices.models import Invoice, InvoiceItem
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
@@ -20,7 +15,6 @@ SALES_STATUSES = (Invoice.Status.CONFIRMED, Invoice.Status.PAID)
 
 
 def _range_filter(queryset, field, date_from=None, date_to=None):
-    """Apply optional inclusive date boundaries to a queryset field."""
     if date_from:
         queryset = queryset.filter(**{f"{field}__date__gte": date_from})
     if date_to:
@@ -28,179 +22,66 @@ def _range_filter(queryset, field, date_from=None, date_to=None):
     return queryset
 
 
+@cached_report("sales_dashboard")
 def sales_dashboard(*, date_from=None, date_to=None):
     """Return sales KPIs and a daily net-sales trend."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(
-        F("unit_price") * F("quantity"),
-        output_field=DecimalField(max_digits=18, decimal_places=2),
-    )
-    totals = items.aggregate(
-        gross_sales=Coalesce(Sum(line_total), ZERO),
-        units_sold=Coalesce(Sum("quantity"), 0),
-        invoice_count=Count("invoice", distinct=True),
-    )
+    line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    totals = items.aggregate(gross_sales=Coalesce(Sum(line_total), ZERO), units_sold=Coalesce(Sum("quantity"), 0), invoice_count=Count("invoice", distinct=True))
     invoices = Invoice.objects.filter(status__in=SALES_STATUSES)
     invoices = _range_filter(invoices, "created_at", date_from, date_to)
     discount_total = invoices.aggregate(total=Coalesce(Sum("coupon_discount"), ZERO))["total"]
-
-    daily_gross = (
-        items.annotate(day=TruncDate("invoice__created_at"))
-        .values("day")
-        .annotate(value=Coalesce(Sum(line_total), ZERO))
-        .order_by("day")
-    )
-    daily_discounts = {
-        row["day"]: row["value"]
-        for row in invoices.annotate(day=TruncDate("created_at"))
-        .values("day")
-        .annotate(value=Coalesce(Sum("coupon_discount"), ZERO))
-    }
-    trend = [
-        {
-            "date": row["day"].isoformat(),
-            "value": row["value"] - daily_discounts.get(row["day"], ZERO),
-        }
-        for row in daily_gross
-    ]
-
-    return {
-        "date_from": date_from,
-        "date_to": date_to,
-        "gross_sales": totals["gross_sales"] - discount_total,
-        "units_sold": totals["units_sold"],
-        "invoice_count": totals["invoice_count"],
-        "trend": trend,
-    }
+    daily_gross = items.annotate(day=TruncDate("invoice__created_at")).values("day").annotate(value=Coalesce(Sum(line_total), ZERO)).order_by("day")
+    daily_discounts = {row["day"]: row["value"] for row in invoices.annotate(day=TruncDate("created_at")).values("day").annotate(value=Coalesce(Sum("coupon_discount"), ZERO))}
+    trend = [{"date": row["day"].isoformat(), "value": row["value"] - daily_discounts.get(row["day"], ZERO)} for row in daily_gross]
+    return {"date_from": date_from, "date_to": date_to, "gross_sales": totals["gross_sales"] - discount_total, "units_sold": totals["units_sold"], "invoice_count": totals["invoice_count"], "trend": trend}
 
 
+@cached_report("purchase_dashboard")
 def purchase_dashboard(*, date_from=None, date_to=None):
     """Return purchase KPIs and a daily purchase-value trend."""
     items = PurchaseItem.objects.filter(purchase__status=Purchase.Status.CONFIRMED)
     items = _range_filter(items, "purchase__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(
-        F("unit_purchase_price") * F("quantity"),
-        output_field=DecimalField(max_digits=18, decimal_places=2),
-    )
-    totals = items.aggregate(
-        purchase_value=Coalesce(Sum(line_total), ZERO),
-        units_purchased=Coalesce(Sum("quantity"), 0),
-        purchase_count=Count("purchase", distinct=True),
-    )
-    daily = (
-        items.annotate(day=TruncDate("purchase__created_at"))
-        .values("day")
-        .annotate(value=Coalesce(Sum(line_total), ZERO))
-        .order_by("day")
-    )
-    return {
-        "date_from": date_from,
-        "date_to": date_to,
-        "purchase_value": totals["purchase_value"],
-        "units_purchased": totals["units_purchased"],
-        "purchase_count": totals["purchase_count"],
-        "trend": [{"date": row["day"].isoformat(), "value": row["value"]} for row in daily],
-    }
+    line_total = ExpressionWrapper(F("unit_purchase_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    totals = items.aggregate(purchase_value=Coalesce(Sum(line_total), ZERO), units_purchased=Coalesce(Sum("quantity"), 0), purchase_count=Count("purchase", distinct=True))
+    daily = items.annotate(day=TruncDate("purchase__created_at")).values("day").annotate(value=Coalesce(Sum(line_total), ZERO)).order_by("day")
+    return {"date_from": date_from, "date_to": date_to, "purchase_value": totals["purchase_value"], "units_purchased": totals["units_purchased"], "purchase_count": totals["purchase_count"], "trend": [{"date": row["day"].isoformat(), "value": row["value"]} for row in daily]}
 
 
+@cached_report("inventory_dashboard")
 def inventory_dashboard(*, low_stock_threshold=10):
-    """Return current inventory KPIs and low-stock products."""
-    stock_rows = (
-        Product.objects.filter(is_active=True)
-        .values("id", "name", "purchase_price")
-        .annotate(stock=Coalesce(Sum("stock_balances__quantity"), 0))
-        .order_by("name")
-    )
+    """Return current inventory KPIs and weighted-average inventory value."""
+    stock_rows = Product.objects.filter(is_active=True).values("id", "name").annotate(stock=Coalesce(Sum("stock_balances__quantity"), 0), inventory_value=Coalesce(Sum("stock_balances__total_cost"), ZERO)).order_by("name")
     total_units = sum((row["stock"] for row in stock_rows), 0)
-    inventory_value = sum(
-        ((row["stock"] or 0) * (row["purchase_price"] or ZERO) for row in stock_rows),
-        ZERO,
-    )
-    low_stock = [
-        {"product_id": row["id"], "product_name": row["name"], "stock": row["stock"]}
-        for row in stock_rows
-        if row["stock"] <= low_stock_threshold
-    ]
-    return {
-        "total_units": total_units,
-        "inventory_value": inventory_value,
-        "product_count": len(stock_rows),
-        "low_stock_threshold": low_stock_threshold,
-        "low_stock": low_stock,
-        "low_stock_count": len(low_stock),
-    }
+    inventory_value = sum((row["inventory_value"] for row in stock_rows), ZERO)
+    low_stock = [{"product_id": row["id"], "product_name": row["name"], "stock": row["stock"]} for row in stock_rows if row["stock"] <= low_stock_threshold]
+    return {"total_units": total_units, "inventory_value": inventory_value, "product_count": len(stock_rows), "low_stock_threshold": low_stock_threshold, "low_stock": low_stock, "low_stock_count": len(low_stock)}
 
 
+@cached_report("top_products")
 def top_products(*, date_from=None, date_to=None, limit=10):
-    """Return top-selling products by quantity then gross line revenue."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(
-        F("unit_price") * F("quantity"),
-        output_field=DecimalField(max_digits=18, decimal_places=2),
-    )
-    rows = (
-        items.annotate(line_total=line_total)
-        .values("product_id", "product__name")
-        .annotate(
-            quantity=Coalesce(Sum("quantity"), 0),
-            revenue=Coalesce(Sum("line_total"), ZERO),
-        )
-        .order_by("-quantity", "-revenue", "product_id")[:limit]
-    )
+    line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    rows = items.annotate(line_total=line_total).values("product_id", "product__name").annotate(quantity=Coalesce(Sum("quantity"), 0), revenue=Coalesce(Sum("line_total"), ZERO)).order_by("-quantity", "-revenue", "product_id")[:limit]
     return list(rows)
 
 
+@cached_report("sales_by_employee")
 def sales_by_employee(*, date_from=None, date_to=None):
-    """Return sales grouped by invoice creator using gross line revenue."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(
-        F("unit_price") * F("quantity"),
-        output_field=DecimalField(max_digits=18, decimal_places=2),
-    )
-    rows = (
-        items.annotate(line_total=line_total)
-        .values(
-            "invoice__created_by_id",
-            "invoice__created_by__email",
-            "invoice__created_by__first_name",
-            "invoice__created_by__last_name",
-        )
-        .annotate(
-            quantity=Coalesce(Sum("quantity"), 0),
-            revenue=Coalesce(Sum("line_total"), ZERO),
-        )
-        .order_by("-revenue", "invoice__created_by_id")
-    )
-    return [
-        {
-            **row,
-            "employee_name": (
-                f"{row['invoice__created_by__first_name']} {row['invoice__created_by__last_name']}".strip()
-                or row["invoice__created_by__email"]
-            ),
-        }
-        for row in rows
-    ]
+    line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
+    rows = items.annotate(line_total=line_total).values("invoice__created_by_id", "invoice__created_by__email", "invoice__created_by__first_name", "invoice__created_by__last_name").annotate(quantity=Coalesce(Sum("quantity"), 0), revenue=Coalesce(Sum("line_total"), ZERO)).order_by("-revenue", "invoice__created_by_id")
+    return [{**row, "employee_name": (f"{row['invoice__created_by__first_name']} {row['invoice__created_by__last_name']}".strip() or row["invoice__created_by__email"])} for row in rows]
 
 
+@cached_report("dashboard_overview")
 def dashboard_overview(*, date_from=None, date_to=None):
-    """Compose the data required by the main dashboard in one API response."""
     from accounting.services.balances import customer_balances, supplier_balances
     from accounting.services.journal import get_default_company
     from accounting.services.statements import cash_flow, profit_and_loss
 
     company = get_default_company()
-    return {
-        "sales": sales_dashboard(date_from=date_from, date_to=date_to),
-        "purchases": purchase_dashboard(date_from=date_from, date_to=date_to),
-        "inventory": inventory_dashboard(),
-        "pnl": profit_and_loss(date_from=date_from, date_to=date_to, company=company),
-        "cash_flow": cash_flow(date_from=date_from, date_to=date_to, company=company),
-        "top_products": top_products(date_from=date_from, date_to=date_to, limit=6),
-        "sales_by_employee": sales_by_employee(date_from=date_from, date_to=date_to),
-        "customer_balances": customer_balances(as_of=date_to),
-        "supplier_balances": supplier_balances(as_of=date_to),
-    }
+    return {"sales": sales_dashboard(date_from=date_from, date_to=date_to), "purchases": purchase_dashboard(date_from=date_from, date_to=date_to), "inventory": inventory_dashboard(), "pnl": profit_and_loss(date_from=date_from, date_to=date_to, company=company), "cash_flow": cash_flow(date_from=date_from, date_to=date_to, company=company), "top_products": top_products(date_from=date_from, date_to=date_to, limit=6), "sales_by_employee": sales_by_employee(date_from=date_from, date_to=date_to), "customer_balances": customer_balances(as_of=date_to), "supplier_balances": supplier_balances(as_of=date_to)}

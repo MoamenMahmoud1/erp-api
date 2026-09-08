@@ -1,8 +1,8 @@
 from django.utils.dateparse import parse_date
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounting.permissions import AccountingReportPermission
 from accounting.services.analytics import (
     dashboard_overview,
     inventory_dashboard,
@@ -11,10 +11,6 @@ from accounting.services.analytics import (
     sales_dashboard,
     top_products,
 )
-
-
-def _can_view_reports(request):
-    return request.user.is_superuser or request.user.has_perm("accounting.view_financial_reports")
 
 
 def _date_range(request):
@@ -43,10 +39,8 @@ def _positive_int(request, name, default, maximum):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def dashboard_overview_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     date_from, date_to, error = _date_range(request)
     if error:
         return error
@@ -59,10 +53,8 @@ def dashboard_overview_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def sales_dashboard_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     date_from, date_to, error = _date_range(request)
     if error:
         return error
@@ -70,10 +62,8 @@ def sales_dashboard_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def purchase_dashboard_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     date_from, date_to, error = _date_range(request)
     if error:
         return error
@@ -81,10 +71,8 @@ def purchase_dashboard_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def inventory_dashboard_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     threshold, error = _positive_int(request, "low_stock_threshold", 10, 1000000)
     if error:
         return error
@@ -92,10 +80,8 @@ def inventory_dashboard_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def top_products_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     date_from, date_to, error = _date_range(request)
     if error:
         return error
@@ -106,10 +92,8 @@ def top_products_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AccountingReportPermission])
 def sales_by_employee_view(request):
-    if not _can_view_reports(request):
-        return Response({"detail": "You do not have permission to view financial reports."}, status=403)
     date_from, date_to, error = _date_range(request)
     if error:
         return error

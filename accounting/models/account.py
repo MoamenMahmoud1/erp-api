@@ -9,15 +9,11 @@ class Account(models.Model):
         REVENUE = "revenue", "Revenue"
         EXPENSE = "expense", "Expense"
 
-    company = models.ForeignKey(
-        "organization.Company", on_delete=models.PROTECT, related_name="accounts"
-    )
+    company = models.ForeignKey("organization.Company", on_delete=models.PROTECT, related_name="accounts")
     code = models.CharField(max_length=32)
     name = models.CharField(max_length=200)
     account_type = models.CharField(max_length=20, choices=AccountType.choices)
-    parent = models.ForeignKey(
-        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="children"
-    )
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="children")
     is_active = models.BooleanField(default=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

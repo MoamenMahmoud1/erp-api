@@ -14,19 +14,21 @@ class StockLocationSerializer(serializers.ModelSerializer):
 class StockBalanceSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     location_name = serializers.CharField(source="location.name", read_only=True)
+    average_unit_cost = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = StockBalance
-        fields = ("id", "product", "product_name", "location", "location_name", "quantity", "updated_at")
+        fields = ("id", "product", "product_name", "location", "location_name", "quantity", "total_cost", "average_unit_cost", "updated_at")
         read_only_fields = fields
 
 
 class StockMovementItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    total_cost = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
 
     class Meta:
         model = StockMovementItem
-        fields = ("id", "product", "product_name", "quantity")
+        fields = ("id", "product", "product_name", "quantity", "unit_cost", "total_cost")
         read_only_fields = fields
 
 
@@ -35,10 +37,7 @@ class StockMovementSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockMovement
-        fields = (
-            "id", "movement_type", "source_location", "destination_location",
-            "created_by", "created_at", "reference", "items",
-        )
+        fields = ("id", "movement_type", "source_location", "destination_location", "created_by", "created_at", "reference", "items")
         read_only_fields = fields
 
 

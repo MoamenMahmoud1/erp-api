@@ -50,16 +50,26 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
     )
     for line, quantity in cleaned:
         try:
-            StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
+            balance = StockBalanceService.decrease(
+                location=warehouse,
+                product=line.product,
+                quantity=quantity,
+            )
         except ValueError as exc:
             raise InsufficientStock(f"Insufficient stock for {line.product.name} in {warehouse.name}.") from exc
+        unit_cost = getattr(balance, "_removed_unit_cost", line.unit_purchase_price)
         PurchaseReturnItem.objects.create(
             purchase_return=purchase_return,
             purchase_item=line,
             quantity=quantity,
             unit_price=line.unit_purchase_price,
         )
-        StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=line.product,
+            quantity=quantity,
+            unit_cost=unit_cost,
+        )
 
     post_purchase_return(purchase_return=purchase_return, actor_id=created_by_id, company=get_default_company())
     record_event(

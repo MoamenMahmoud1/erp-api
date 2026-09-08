@@ -1,30 +1,4 @@
-"""Translate ERP business events into accounting journal entries.
-
-This module is the bridge between business-domain applications and the
-accounting engine in ``journal.py``.
-
-Architecture::
-
-    Invoice / Purchase / Payment / Return
-                    |
-                    v
-              automation.py
-                    |
-                    v
-                journal.py
-                    |
-                    v
-             Posted Journal
-
-Responsibilities:
-    - Map business events to debit/credit lines.
-    - Ensure required default accounts exist.
-    - Prevent duplicate posting for the same source operation.
-    - Create reversals without deleting posted history.
-
-The business model remains the source of truth for the operational event;
-the journal records its accounting effect.
-"""
+"""Translate ERP business events into accounting journal entries."""
 
 from decimal import Decimal
 
@@ -33,6 +7,7 @@ from django.utils import timezone
 
 from accounting.models import Account, JournalEntry
 from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
+from inventory.models import StockMovement
 
 
 DEFAULT_ACCOUNTS = {
@@ -44,11 +19,11 @@ DEFAULT_ACCOUNTS = {
     "sales_revenue": ("4100", "Sales Revenue", Account.AccountType.REVENUE),
     "sales_returns": ("4200", "Sales Returns", Account.AccountType.REVENUE),
     "cost_of_goods_sold": ("5100", "Cost of Goods Sold", Account.AccountType.EXPENSE),
+    "inventory_cost_variance": ("5300", "Inventory Cost Variance", Account.AccountType.EXPENSE),
 }
 
 
 def ensure_default_accounts(company=None):
-    """Create missing standard accounts and return them by semantic name."""
     company = company or get_default_company()
     with transaction.atomic():
         for code, name, account_type in DEFAULT_ACCOUNTS.values():
@@ -57,17 +32,10 @@ def ensure_default_accounts(company=None):
 
 
 def _source_entry(company, source_type, source_id):
-    """Return an existing posted entry for a business source, if any."""
     return JournalEntry.objects.filter(company=company, source_type=source_type, source_id=source_id, status=JournalEntry.Status.POSTED).prefetch_related("lines").first()
 
 
 def post_sales_invoice(*, invoice, actor_id, company=None):
-    """Post the revenue, receivable, COGS, and inventory effects of a sale.
-
-    The sale uses the invoice selling value. COGS uses the item's captured
-    historical cost when available, falling back to the product purchase price.
-    Repeated calls return the existing posted entry for the invoice.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "invoice.sale", invoice.pk)
     if existing:
@@ -89,11 +57,6 @@ def post_sales_invoice(*, invoice, actor_id, company=None):
 
 
 def post_purchase(*, purchase, actor_id, company=None):
-    """Post the inventory and accounts-payable effects of a purchase.
-
-    Accounting effect: Dr Inventory / Cr Accounts Payable.
-    Repeated calls return the existing posted entry for the purchase.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "purchase.confirmation", purchase.pk)
     if existing:
@@ -108,11 +71,6 @@ def post_purchase(*, purchase, actor_id, company=None):
 
 
 def post_customer_collection(*, payment, actor_id, company=None):
-    """Post customer cash/bank collection against Accounts Receivable.
-
-    Cash collections debit Cash; transfer collections debit Bank.  The full
-    payment amount credits Accounts Receivable.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "payment.collection", payment.pk)
     if existing:
@@ -129,11 +87,6 @@ def post_customer_collection(*, payment, actor_id, company=None):
 
 
 def post_payment_refund(*, refund, actor_id, company=None):
-    """Post a refund of previously collected customer money.
-
-    The refund restores Accounts Receivable and credits the cash or bank
-    account from which the money is returned.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "payment.refund", refund.pk)
     if existing:
@@ -155,11 +108,6 @@ def post_payment_refund(*, refund, actor_id, company=None):
 
 
 def post_sales_return(*, sales_return, actor_id, company=None):
-    """Post the financial effect of goods returned by a customer.
-
-    The return reverses sales value against Accounts Receivable and restores the
-    returned historical cost from COGS back into Inventory.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "invoice.return", sales_return.pk)
     if existing:
@@ -181,25 +129,37 @@ def post_sales_return(*, sales_return, actor_id, company=None):
 
 
 def post_purchase_return(*, purchase_return, actor_id, company=None):
-    """Post a purchase return to reduce both inventory and supplier payable."""
     company = company or get_default_company()
     existing = _source_entry(company, "purchase.return", purchase_return.pk)
     if existing:
         return existing
     accounts = ensure_default_accounts(company)
     total = purchase_return.total_amount
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(purchase_return.created_at), description=f"Purchase return for purchase #{purchase_return.purchase_id}", reference=f"Purchase Return #{purchase_return.pk}", source_type="purchase.return", source_id=purchase_return.pk, lines=[
-        {"account_id": accounts["accounts_payable"].pk, "debit": total, "credit": 0},
-        {"account_id": accounts["inventory"].pk, "debit": 0, "credit": total},
-    ], company=company)
+    movement = (
+        StockMovement.objects.filter(reference=f"Return Purchase #{purchase_return.purchase_id}", movement_type=StockMovement.MovementType.PURCHASE_RETURN)
+        .order_by("-id")
+        .first()
+    )
+    inventory_cost = total
+    if movement is not None:
+        movement_cost = sum((item.total_cost for item in movement.items.all() if item.unit_cost is not None), Decimal("0.00"))
+        if movement_cost > 0:
+            inventory_cost = movement_cost
+
+    lines = [{"account_id": accounts["accounts_payable"].pk, "debit": total, "credit": 0}]
+    if inventory_cost > 0:
+        lines.append({"account_id": accounts["inventory"].pk, "debit": 0, "credit": inventory_cost})
+    variance = total - inventory_cost
+    if variance > 0:
+        lines.append({"account_id": accounts["inventory_cost_variance"].pk, "debit": variance, "credit": 0})
+    elif variance < 0:
+        lines.append({"account_id": accounts["inventory_cost_variance"].pk, "debit": 0, "credit": -variance})
+
+    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(purchase_return.created_at), description=f"Purchase return for purchase #{purchase_return.purchase_id}", reference=f"Purchase Return #{purchase_return.pk}", source_type="purchase.return", source_id=purchase_return.pk, lines=lines, company=company)
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
 def post_supplier_payment(*, payment, actor_id, company=None):
-    """Post a supplier payment against Accounts Payable.
-
-    Accounting effect: Dr Accounts Payable / Cr Cash and/or Bank.
-    """
     company = company or get_default_company()
     existing = _source_entry(company, "payment.supplier", payment.pk)
     if existing:
@@ -215,11 +175,6 @@ def post_supplier_payment(*, payment, actor_id, company=None):
 
 
 def reverse_source_entry(*, source_entry, actor_id, source_type, source_id, company=None):
-    """Post the exact debit/credit inverse of an existing journal entry.
-
-    Posted history is preserved: the original entry remains intact and the
-    reversal is recorded as a separate compensating entry.
-    """
     company = company or get_default_company()
     reverse_type = f"{source_type}.reversal"
     existing = _source_entry(company, reverse_type, source_id)

@@ -1,30 +1,4 @@
-"""Operational Accounts Receivable and Accounts Payable reports.
-
-Unlike ``statements.py``, these services currently calculate balances from
-business-domain records rather than directly from the general ledger.
-
-Architecture::
-
-    Customer:
-        Invoice + Payment - Return + Refund
-                    |
-                    v
-             Customer Balance
-                    |
-                    v
-                AR Aging
-
-    Supplier:
-        Purchase - Supplier Payment - Return
-                    |
-                    v
-             Supplier Balance
-                    |
-                    v
-                AP Aging
-
-Aging buckets: 0-30 | 31-60 | 61-90 | 90+
-"""
+"""Operational AR/AP detail with the posted GL as the canonical balance."""
 
 from collections import defaultdict
 from datetime import date
@@ -32,6 +6,7 @@ from decimal import Decimal
 
 from django.db.models import Q
 
+from accounting.services.ledger_balances import owner_ledger_balances
 from invoices.models import Invoice
 from purchases.models import Purchase
 
@@ -39,14 +14,7 @@ ZERO = Decimal("0.00")
 
 
 def customer_balances(*, as_of=None, customer_id=None):
-    """Return outstanding customer receivables as of an optional date.
-
-    Formula:
-        Invoice total - Returns - Allocated payments + Refunds
-
-    Returns:
-        list[dict]: One balance summary per customer.
-    """
+    """Return AR detail; ``balance`` is the canonical posted-GL amount."""
     invoice_filter = Q()
     if as_of:
         invoice_filter &= Q(created_at__date__lte=as_of)
@@ -75,6 +43,8 @@ def customer_balances(*, as_of=None, customer_id=None):
                 "paid": ZERO,
                 "refunded": ZERO,
                 "returns": ZERO,
+                "operational_balance": ZERO,
+                "ledger_balance": ZERO,
                 "balance": ZERO,
             },
         )
@@ -82,19 +52,19 @@ def customer_balances(*, as_of=None, customer_id=None):
         row["paid"] += paid
         row["refunded"] += refunded
         row["returns"] += returned
-        row["balance"] += total - returned - paid + refunded
+        row["operational_balance"] += total - returned - paid + refunded
+
+    ledger = owner_ledger_balances(owner_kind="customer", as_of=as_of)
+    owner_ids = set(customer_rows) | set(ledger)
+    for owner_id in owner_ids:
+        row = customer_rows.setdefault(owner_id, {"customer_id": owner_id, "customer_name": "", "invoiced": ZERO, "paid": ZERO, "refunded": ZERO, "returns": ZERO, "operational_balance": ZERO, "ledger_balance": ZERO, "balance": ZERO})
+        row["ledger_balance"] = ledger.get(owner_id, ZERO)
+        row["balance"] = row["ledger_balance"]
     return list(customer_rows.values())
 
 
 def supplier_balances(*, as_of=None, supplier_id=None):
-    """Return outstanding supplier payables as of an optional date.
-
-    Formula:
-        Purchase total - Returns - Supplier payment allocations
-
-    Returns:
-        list[dict]: One balance summary per supplier.
-    """
+    """Return AP detail; ``balance`` is the canonical posted-GL amount."""
     purchase_filter = Q(status=Purchase.Status.CONFIRMED)
     if as_of:
         purchase_filter &= Q(created_at__date__lte=as_of)
@@ -110,23 +80,8 @@ def supplier_balances(*, as_of=None, supplier_id=None):
     supplier_rows = {}
     for purchase in purchases:
         total = purchase.total_amount
-        returned = sum(
-            (
-                item.unit_price * item.quantity
-                for ret in purchase.returns.all()
-                if not as_of or ret.created_at.date() <= as_of
-                for item in ret.items.all()
-            ),
-            ZERO,
-        )
-        paid = sum(
-            (
-                allocation.total_amount
-                for allocation in purchase.supplier_payment_allocations.all()
-                if not as_of or allocation.created_at.date() <= as_of
-            ),
-            ZERO,
-        )
+        returned = sum((item.unit_price * item.quantity for ret in purchase.returns.all() if not as_of or ret.created_at.date() <= as_of for item in ret.items.all()), ZERO)
+        paid = sum((allocation.total_amount for allocation in purchase.supplier_payment_allocations.all() if not as_of or allocation.created_at.date() <= as_of), ZERO)
         row = supplier_rows.setdefault(
             purchase.supplier_id,
             {
@@ -135,18 +90,26 @@ def supplier_balances(*, as_of=None, supplier_id=None):
                 "purchased": ZERO,
                 "paid": ZERO,
                 "returns": ZERO,
+                "operational_balance": ZERO,
+                "ledger_balance": ZERO,
                 "balance": ZERO,
             },
         )
         row["purchased"] += total
         row["paid"] += paid
         row["returns"] += returned
-        row["balance"] += total - returned - paid
+        row["operational_balance"] += total - returned - paid
+
+    ledger = owner_ledger_balances(owner_kind="supplier", as_of=as_of)
+    owner_ids = set(supplier_rows) | set(ledger)
+    for owner_id in owner_ids:
+        row = supplier_rows.setdefault(owner_id, {"supplier_id": owner_id, "supplier_name": "", "purchased": ZERO, "paid": ZERO, "returns": ZERO, "operational_balance": ZERO, "ledger_balance": ZERO, "balance": ZERO})
+        row["ledger_balance"] = ledger.get(owner_id, ZERO)
+        row["balance"] = row["ledger_balance"]
     return list(supplier_rows.values())
 
 
 def _age_bucket(days):
-    """Return the aging bucket key for an age in days."""
     if days <= 30:
         return "0_30"
     if days <= 60:
@@ -157,30 +120,15 @@ def _age_bucket(days):
 
 
 def _empty_aging():
-    """Return a zeroed mapping for the supported aging buckets."""
     return {"0_30": ZERO, "31_60": ZERO, "61_90": ZERO, "90_plus": ZERO}
 
 
 def customer_aging(*, as_of=None, customer_id=None):
-    """Return outstanding customer balances grouped by invoice age.
-
-    Only invoices with an outstanding amount contribute to an aging bucket.
-    The age is measured from invoice creation date to ``as_of``.
-    """
     as_of = as_of or date.today()
-    invoice_filter = Q(
-        created_at__date__lte=as_of,
-        status__in=(Invoice.Status.CONFIRMED, Invoice.Status.PAID, Invoice.Status.RETURNED),
-    )
+    invoice_filter = Q(created_at__date__lte=as_of, status__in=(Invoice.Status.CONFIRMED, Invoice.Status.PAID, Invoice.Status.RETURNED))
     if customer_id is not None:
         invoice_filter &= Q(customer_id=customer_id)
-
-    invoices = (
-        Invoice.objects.filter(invoice_filter)
-        .select_related("customer")
-        .prefetch_related("items", "payment_allocations", "payment_refunds", "returns")
-        .order_by("customer_id", "created_at", "id")
-    )
+    invoices = Invoice.objects.filter(invoice_filter).select_related("customer").prefetch_related("items", "payment_allocations", "payment_refunds", "returns").order_by("customer_id", "created_at", "id")
     by_customer = defaultdict(_empty_aging)
     names = {}
     for invoice in invoices:
@@ -190,66 +138,24 @@ def customer_aging(*, as_of=None, customer_id=None):
         refunded = sum((r.total_amount for r in invoice.payment_refunds.all() if r.created_at.date() <= as_of), ZERO)
         returned = sum((r.refund_amount for r in invoice.returns.all() if r.created_at.date() <= as_of), ZERO)
         outstanding = total - paid - returned + refunded
-        if outstanding <= ZERO:
-            continue
-        by_customer[invoice.customer_id][_age_bucket((as_of - invoice.created_at.date()).days)] += outstanding
-
-    return [
-        {
-            "customer_id": cid,
-            "customer_name": names[cid],
-            **buckets,
-            "total": sum(buckets.values(), ZERO),
-        }
-        for cid, buckets in sorted(by_customer.items())
-    ]
+        if outstanding > ZERO:
+            by_customer[invoice.customer_id][_age_bucket((as_of - invoice.created_at.date()).days)] += outstanding
+    return [{"customer_id": cid, "customer_name": names[cid], **buckets, "total": sum(buckets.values(), ZERO)} for cid, buckets in sorted(by_customer.items())]
 
 
 def supplier_aging(*, as_of=None, supplier_id=None):
-    """Return outstanding supplier balances grouped by purchase age.
-
-    Only purchases with an outstanding payable contribute to an aging bucket.
-    The age is measured from purchase creation date to ``as_of``.
-    """
     as_of = as_of or date.today()
     purchase_filter = Q(status=Purchase.Status.CONFIRMED, created_at__date__lte=as_of)
     if supplier_id is not None:
         purchase_filter &= Q(supplier_id=supplier_id)
-
-    purchases = (
-        Purchase.objects.filter(purchase_filter)
-        .select_related("supplier")
-        .prefetch_related("items", "returns__items", "supplier_payment_allocations")
-        .order_by("supplier_id", "created_at", "id")
-    )
+    purchases = Purchase.objects.filter(purchase_filter).select_related("supplier").prefetch_related("items", "returns__items", "supplier_payment_allocations").order_by("supplier_id", "created_at", "id")
     by_supplier = defaultdict(_empty_aging)
     names = {}
     for purchase in purchases:
         names[purchase.supplier_id] = purchase.supplier.name
-        returned = sum(
-            (
-                item.unit_price * item.quantity
-                for ret in purchase.returns.all()
-                if ret.created_at.date() <= as_of
-                for item in ret.items.all()
-            ),
-            ZERO,
-        )
-        paid = sum(
-            (allocation.total_amount for allocation in purchase.supplier_payment_allocations.all() if allocation.created_at.date() <= as_of),
-            ZERO,
-        )
+        returned = sum((item.unit_price * item.quantity for ret in purchase.returns.all() if ret.created_at.date() <= as_of for item in ret.items.all()), ZERO)
+        paid = sum((allocation.total_amount for allocation in purchase.supplier_payment_allocations.all() if allocation.created_at.date() <= as_of), ZERO)
         outstanding = purchase.total_amount - returned - paid
-        if outstanding <= ZERO:
-            continue
-        by_supplier[purchase.supplier_id][_age_bucket((as_of - purchase.created_at.date()).days)] += outstanding
-
-    return [
-        {
-            "supplier_id": sid,
-            "supplier_name": names[sid],
-            **buckets,
-            "total": sum(buckets.values(), ZERO),
-        }
-        for sid, buckets in sorted(by_supplier.items())
-    ]
+        if outstanding > ZERO:
+            by_supplier[purchase.supplier_id][_age_bucket((as_of - purchase.created_at.date()).days)] += outstanding
+    return [{"supplier_id": sid, "supplier_name": names[sid], **buckets, "total": sum(buckets.values(), ZERO)} for sid, buckets in sorted(by_supplier.items())]

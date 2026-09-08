@@ -9,26 +9,13 @@ from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config(
-    "SECRET_KEY",
-    default="dev-only-insecure-secret-key-change-me-0123456789abcdef",
-)
-
+SECRET_KEY = config("SECRET_KEY", default="dev-only-insecure-secret-key-change-me-0123456789abcdef")
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@apihigh.local")
-EMAIL_VERIFICATION_TIMEOUT = config(
-    "EMAIL_VERIFICATION_TIMEOUT",
-    default=60 * 60 * 24,
-    cast=int,
-)
-EMAIL_CHANGE_TIMEOUT = config(
-    "EMAIL_CHANGE_TIMEOUT",
-    default=60 * 60,
-    cast=int,
-)
+EMAIL_VERIFICATION_TIMEOUT = config("EMAIL_VERIFICATION_TIMEOUT", default=60 * 60 * 24, cast=int)
+EMAIL_CHANGE_TIMEOUT = config("EMAIL_CHANGE_TIMEOUT", default=60 * 60, cast=int)
 
 AUTH_USER_MODEL = "accounts.CustomUserModel"
-
 AUTHENTICATION_BACKENDS = [
     "authentication.email.EmailBackend",
     "django.contrib.auth.backends.ModelBackend",
@@ -42,7 +29,6 @@ DJANGO_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 ]
-
 THIRD_PARTY_APPS = [
     "corsheaders",
     "rest_framework",
@@ -50,7 +36,6 @@ THIRD_PARTY_APPS = [
     "phonenumber_field",
     "django_filters",
 ]
-
 PROJECT_APPS = [
     "auditlog.apps.AuditlogConfig",
     "accounts.apps.AccountsConfig",
@@ -66,9 +51,7 @@ PROJECT_APPS = [
     "suppliers.apps.SuppliersConfig",
     "accounting.apps.AccountingConfig",
 ]
-
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
-
 MIDDLEWARE = [
     "core.middleware.RequestCorrelationMiddleware",
     "core.middleware.TrustedProxyHeadersMiddleware",
@@ -81,52 +64,36 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-
 ROOT_URLCONF = "core.urls"
 WSGI_APPLICATION = "core.wsgi.application"
-
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
-
+TEMPLATES = [{
+    "BACKEND": "django.template.backends.django.DjangoTemplates",
+    "DIRS": [BASE_DIR / "templates"],
+    "APP_DIRS": True,
+    "OPTIONS": {"context_processors": [
+        "django.template.context_processors.request",
+        "django.contrib.auth.context_processors.auth",
+        "django.contrib.messages.context_processors.messages",
+    ]},
+}]
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
-
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "authentication.redis_session.RedisSessionAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
-    "DEFAULT_FILTER_BACKENDS": [
-        "django_filters.rest_framework.DjangoFilterBackend",
-    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": ("authentication.redis_session.RedisSessionAuthentication",),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardPagination",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_CLASSES": (
@@ -145,39 +112,22 @@ REST_FRAMEWORK = {
         "sensitive_action": "10/min",
     },
 }
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
-    "SIGNING_KEY": config(
-        "JWT_SIGNING_KEY",
-        default="dev-only-jwt-signing-key-change-me-0123456789abcdef",
-    ),
+    "SIGNING_KEY": config("JWT_SIGNING_KEY", default="dev-only-jwt-signing-key-change-me-0123456789abcdef"),
     "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
-
-IDEMPOTENCY_RETENTION_DAYS = config(
-    "IDEMPOTENCY_RETENTION_DAYS",
-    default=90,
-    cast=int,
-)
+IDEMPOTENCY_RETENTION_DAYS = config("IDEMPOTENCY_RETENTION_DAYS", default=90, cast=int)
 if IDEMPOTENCY_RETENTION_DAYS < 1:
     raise ValueError("IDEMPOTENCY_RETENTION_DAYS must be >= 1")
-
-AUTH_SESSION_MIN_AGE = timedelta(
-    hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int)
-)
-AUTH_SESSION_VERIFICATION_TTL = timedelta(
-    minutes=config("AUTH_SESSION_VERIFICATION_MINUTES", default=15, cast=int)
-)
+AUTH_SESSION_MIN_AGE = timedelta(hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int))
+AUTH_SESSION_VERIFICATION_TTL = timedelta(minutes=config("AUTH_SESSION_VERIFICATION_MINUTES", default=15, cast=int))
 CORS_ALLOW_CREDENTIALS = True
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
 LOG_LEVEL = config("LOG_LEVEL", default="INFO").upper()
 DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="WARNING").upper()
-
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -189,19 +139,16 @@ LOGGING = {
         "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
         "accounts": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
         "erp.operations": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "erp.metrics": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
 }
-
 INTERNAL_IPS = ["127.0.0.1"]
-
+REPORT_CACHE_TTL = config("REPORT_CACHE_TTL", default=30, cast=int)
+if REPORT_CACHE_TTL < 1:
+    raise ValueError("REPORT_CACHE_TTL must be >= 1")
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
-    "DESCRIPTION": (
-        "Backend API for the Sales ERP suite. "
-        "Authentication uses short-lived JWT access tokens backed by an "
-        "active server-side Redis session; include the access token in the "
-        "Authorization header as `Bearer <token>`."
-    ),
+    "DESCRIPTION": "Backend API for the Sales ERP suite. Authentication uses short-lived JWT access tokens backed by an active server-side Redis session; include the access token in the Authorization header as `Bearer <token>`. ",
     "VERSION": __import__("core.version", fromlist=["API_VERSION"]).API_VERSION,
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
