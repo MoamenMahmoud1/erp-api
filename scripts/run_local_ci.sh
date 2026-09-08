@@ -65,7 +65,10 @@ fi
 run_step "P0/P1 focused tests" "$PYTHON" manage.py test \
     accounting.tests.test_permissions \
     accounting.tests.test_reconciliation \
+    inventory.tests.test_permissions \
     inventory.tests.test_valuation \
+    authsession.tests.test_permission_invalidation \
+    accounts.tests.test_current_user_permissions \
     auditlog \
     --verbosity 2
 
