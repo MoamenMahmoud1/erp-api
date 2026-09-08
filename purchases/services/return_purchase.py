@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from accounting.services import get_default_company, post_purchase_return
+from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
@@ -61,6 +62,13 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
         StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity)
 
     post_purchase_return(purchase_return=purchase_return, actor_id=created_by_id, company=get_default_company())
+    record_event(
+        action="purchase.return",
+        entity_type="PurchaseReturn",
+        entity_id=purchase_return.pk,
+        actor_id=created_by_id,
+        metadata={"purchase_id": purchase.pk, "stock_movement_id": movement.pk, "reason": reason},
+    )
     return purchase_return
 
 
