@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from accounting.services import get_default_company, post_payment_refund
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from invoices.models import Invoice
@@ -42,4 +43,11 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
         created_by_id=created_by_id,
     )
     post_payment_refund(refund=refund, actor_id=created_by_id, company=get_default_company())
+    record_event(
+        action="payment.refund",
+        entity_type="PaymentRefund",
+        entity_id=refund.pk,
+        actor_id=created_by_id,
+        metadata={"invoice_id": invoice.pk, "transaction_id": transaction_id, "reason": reason},
+    )
     return invoice
