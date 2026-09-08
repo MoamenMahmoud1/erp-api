@@ -142,22 +142,8 @@ export function EmployeesPage() {
             return [manager.first_name, manager.last_name].filter(Boolean).join(' ') || String(manager.username || '—');
           },
         },
-        {
-          key: 'work_site_name',
-          label: 'Work site',
-          render: (_value, row) => {
-            const id = String(row.work_site ?? '');
-            return siteOptions.find((option) => option.value === id)?.label || '—';
-          },
-        },
-        {
-          key: 'department_name',
-          label: 'Department',
-          render: (_value, row) => {
-            const id = String(row.department ?? '');
-            return departmentOptions.find((option) => option.value === id)?.label || '—';
-          },
-        },
+        { key: 'work_site_name', label: 'Work site' },
+        { key: 'department_name', label: 'Department' },
         {
           key: 'status',
           label: 'Status',
