@@ -181,6 +181,7 @@ export const api = {
   },
 
   accounting: {
+    dashboardOverview: (query = '') => request<DashboardOverview>(`/accounting/analytics/overview/${query}`),
     accounts: (query = '') => request<Paginated>(`/accounting/accounts/${query}`),
     createAccount: (body: Json) => jsonRequest('/accounting/accounts/', 'POST', body),
     updateAccount: (id: number, body: Json) => jsonRequest(`/accounting/accounts/${id}/`, 'PATCH', body),
@@ -214,6 +215,17 @@ export const api = {
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
 export type UserProfile = { id: number; username: string; email: string; first_name: string; last_name: string; is_staff: boolean; is_superuser: boolean };
+export type DashboardOverview = {
+  sales: { gross_sales: number | string; units_sold: number; invoice_count: number; trend: { date: string; value: number | string }[] };
+  purchases: { purchase_value: number | string; units_purchased: number; purchase_count: number; trend: { date: string; value: number | string }[] };
+  inventory: { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock: { product_id: number; product_name: string; stock: number }[] };
+  pnl: { total_revenue: number | string; total_expenses: number | string; net_income: number | string };
+  cash_flow: { opening_cash: number | string; total_inflows: number | string; total_outflows: number | string; net_change: number | string; ending_cash: number | string };
+  top_products: { product_id: number; 'product__name': string; quantity: number; revenue: number | string }[];
+  sales_by_employee: { invoice__created_by_id: number; invoice__created_by__email: string; invoice__created_by__first_name: string; invoice__created_by__last_name: string; employee_name: string; quantity: number; revenue: number | string }[];
+  customer_balances: { customer_id: number; customer_name: string; balance: number | string }[];
+  supplier_balances: { supplier_id: number; supplier_name: string; balance: number | string }[];
+};
 
 export function query(params: Record<string, string | number | undefined>) {
   const search = new URLSearchParams();
