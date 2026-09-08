@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -17,6 +18,11 @@ class CartonPricingAPITests(TestCase):
             password="StrongPass123!",
             is_staff=True,
         )
+        carton_permissions = Permission.objects.filter(
+            content_type__app_label="products",
+            content_type__model="cartonpricing",
+        )
+        self.staff.user_permissions.add(*carton_permissions)
         self.product = Product.objects.create(
             name="Boxed Product",
             purchase_price=Decimal("50"),
