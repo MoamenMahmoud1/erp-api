@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
 import { Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 
-import { CrudPage } from '../components/CrudPage';
+import { CrudPage, type CrudOption } from '../components/CrudPage';
 import { RecordsPage } from '../components/RecordsPage';
-import { api, query } from '../lib/api';
+import { api, query, type Paginated } from '../lib/api';
 
 const money = (value: unknown) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const accountTypeOptions = [{ value: 'asset', label: 'Asset' }, { value: 'liability', label: 'Liability' }, { value: 'equity', label: 'Equity' }, { value: 'revenue', label: 'Revenue' }, { value: 'expense', label: 'Expense' }];
@@ -25,8 +25,27 @@ export function AccountingHomePage() {
   return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Financial command center</Title><Text c="dimmed" mt={4}>The accounting layer is driven by posted journals and business transactions.</Text></div><SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }}><Card className="glass bento-card" radius="lg" withBorder><Text c="dimmed" size="xs" tt="uppercase" fw={800}>Revenue</Text><Text fw={900} size="2rem" mt={6}>{money(pnl?.total_revenue)}</Text></Card><Card className="glass bento-card" radius="lg" withBorder><Text c="dimmed" size="xs" tt="uppercase" fw={800}>Expenses</Text><Text fw={900} size="2rem" mt={6}>{money(pnl?.total_expenses)}</Text></Card><Card className="glass bento-card" radius="lg" withBorder><Text c="dimmed" size="xs" tt="uppercase" fw={800}>Net income</Text><Text fw={900} size="2rem" mt={6}>{money(pnl?.net_income)}</Text></Card><Card className="glass bento-card" radius="lg" withBorder><Group justify="space-between"><div><Text c="dimmed" size="xs" tt="uppercase" fw={800}>Assets</Text><Text fw={900} size="2rem" mt={6}>{money(bs?.total_assets)}</Text></div><Badge color={bs?.balanced ? 'teal' : 'red'}>{bs?.balanced ? 'Balanced' : 'Check'}</Badge></Group></Card></SimpleGrid></Stack>;
 }
 
+type AccountOptions = { accounts: Paginated };
+
 export function AccountsPage() {
-  return <CrudPage title="Accounts" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={api.accounting.createAccount} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account ID', type: 'number' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
+  const [data, setData] = useState<AccountOptions | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.accounting.accounts('?page_size=50')
+      .then((accounts) => setData({ accounts }))
+      .catch((requestError) => setError(requestError instanceof Error ? requestError.message : 'Unable to load account options.'));
+  }, []);
+
+  const options = useMemo<CrudOption[]>(() => (data?.accounts.results || []).map((account) => ({
+    value: String(account.id),
+    label: `${account.code || 'No code'} · ${account.name || 'Unnamed account'}`,
+  })), [data]);
+
+  if (error) return <Card className="glass" radius="xl" p="xl" withBorder><Text fw={800}>Accounts unavailable</Text><Text c="dimmed" mt="xs">{error}</Text></Card>;
+  if (!data) return <Card className="glass" radius="xl" p={56} withBorder><Group justify="center"><Loader size="sm" /></Group><Text ta="center" size="sm" c="dimmed" mt="md">Loading account hierarchy…</Text></Card>;
+
+  return <CrudPage title="Accounts" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={api.accounting.createAccount} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account', type: 'select', options, clearable: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
 export function JournalsPage() {
