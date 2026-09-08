@@ -68,7 +68,10 @@ run_step "Sales suite" "$PYTHON" manage.py test invoices payments inventory --ve
 run_step "Purchasing suite" "$PYTHON" manage.py test purchases --verbosity 1
 run_step "Accounting suite" "$PYTHON" manage.py test accounting auditlog --verbosity 1
 
-if [[ "${CHECK_PRODUCTION:-1}" == "1" ]]; then
+# Production settings use the real PostgreSQL connection pool and may require
+# a real production-style database/Redis environment. Keep this opt-in for
+# local development instead of hanging against a destroyed Django test DB.
+if [[ "${CHECK_PRODUCTION:-0}" == "1" ]]; then
     export DJANGO_SETTINGS_MODULE="core.settings.settings_prod"
     export SECRET_KEY="${SECRET_KEY_PROD_CHECK:-local-production-check-secret}"
     export JWT_SIGNING_KEY="${JWT_SIGNING_KEY_PROD_CHECK:-local-production-jwt-signing-key-0123456789abcdef0123456789abcdef}"
@@ -85,6 +88,8 @@ if [[ "${CHECK_PRODUCTION:-1}" == "1" ]]; then
     export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
     export AWS_STORAGE_BUCKET_NAME="${AWS_STORAGE_BUCKET_NAME:-}"
     run_step "Production Django deploy checks" "$PYTHON" manage.py check --deploy --fail-level ERROR
+else
+    printf '\n[SKIP] Production Django deploy checks (set CHECK_PRODUCTION=1 to run).\n' | tee -a "$LOG_FILE"
 fi
 
 if [[ "${CHECK_FRONTEND:-1}" == "1" && -f frontend/package.json ]]; then
