@@ -12,3 +12,56 @@ export function CustomersPage() {
 export function SuppliersPage() {
   return <CrudPage title="Suppliers" subtitle="Supplier master data and purchasing contacts." list={api.suppliers.list} create={api.suppliers.create} update={api.suppliers.update} canDelete={false} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Supplier' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'is_active', label: 'Status' }]} />;
 }
+
+export function EmployeesPage() {
+  return (
+    <CrudPage
+      title="Employees"
+      subtitle="Staff directory, reporting structure and organizational assignment."
+      searchPlaceholder="Search by username, name or email"
+      list={api.employees.list}
+      create={api.employees.create}
+      update={api.employees.update}
+      remove={api.employees.delete}
+      fields={[
+        { key: 'user', label: 'User ID', type: 'number', required: true },
+        { key: 'manager', label: 'Manager employee ID', type: 'number' },
+        { key: 'work_site', label: 'Work site ID', type: 'number' },
+        { key: 'department', label: 'Department ID', type: 'number' },
+      ]}
+      columns={[
+        {
+          key: 'user_details',
+          label: 'Employee',
+          render: (value) => {
+            const user = value as Record<string, unknown> | null;
+            if (!user) return '—';
+            const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || String(user.username || '—');
+            return `${name} (@${user.username})`;
+          },
+        },
+        {
+          key: 'user_details',
+          label: 'Email',
+          render: (value) => String((value as Record<string, unknown> | null)?.email || '—'),
+        },
+        {
+          key: 'manager_details',
+          label: 'Manager',
+          render: (value) => {
+            const manager = value as Record<string, unknown> | null;
+            if (!manager) return '—';
+            return [manager.first_name, manager.last_name].filter(Boolean).join(' ') || String(manager.username || '—');
+          },
+        },
+        { key: 'work_site', label: 'Work site' },
+        { key: 'department', label: 'Department' },
+        {
+          key: 'user_details',
+          label: 'Status',
+          render: (value) => Boolean((value as Record<string, unknown> | null)?.is_active) ? 'Active' : 'Inactive',
+        },
+      ]}
+    />
+  );
+}
