@@ -26,15 +26,16 @@ FAILED=0
 run_step() {
     local label="$1"
     shift
+    local -a command=("$@")
+
     printf '\n%s\n' "============================================================" | tee -a "$LOG_FILE"
     printf ' %s\n' "$label" | tee -a "$LOG_FILE"
     printf '%s\n' "============================================================" | tee -a "$LOG_FILE"
-    printf '$ %q' "$1" | tee -a "$LOG_FILE"
-    shift || true
-    for arg in "$@"; do printf ' %q' "$arg" | tee -a "$LOG_FILE"; done
+    printf '$' | tee -a "$LOG_FILE"
+    for arg in "${command[@]}"; do printf ' %q' "$arg" | tee -a "$LOG_FILE"; done
     printf '\n' | tee -a "$LOG_FILE"
 
-    if "$@" 2>&1 | tee -a "$LOG_FILE"; then
+    if "${command[@]}" 2>&1 | tee -a "$LOG_FILE"; then
         printf '\n[PASS] %s\n' "$label" | tee -a "$LOG_FILE"
     else
         printf '\n[FAIL] %s\n' "$label" | tee -a "$LOG_FILE"
@@ -42,19 +43,10 @@ run_step() {
     fi
 }
 
-run_optional() {
-    local label="$1"
-    shift
-    if "$@" >/dev/null 2>&1; then
-        run_step "$label" "$@"
-    else
-        printf '\n[SKIP] %s\n' "$label" | tee -a "$LOG_FILE"
-    fi
-}
-
 printf 'ERP API local verification\n' | tee -a "$LOG_FILE"
 printf 'Working directory: %s\n' "$ROOT_DIR" | tee -a "$LOG_FILE"
 printf 'Django settings: %s\n' "$DJANGO_SETTINGS_MODULE" | tee -a "$LOG_FILE"
+printf 'Database: %s@%s:%s/%s\n' "$DB_USER" "$DB_HOST" "$DB_PORT" "$DB_NAME" | tee -a "$LOG_FILE"
 printf 'Log file: %s\n' "$LOG_FILE" | tee -a "$LOG_FILE"
 
 run_step "Python version" "$PYTHON" --version
@@ -97,7 +89,11 @@ fi
 
 if [[ "${CHECK_FRONTEND:-1}" == "1" && -f frontend/package.json ]]; then
     if command -v npm >/dev/null 2>&1; then
-        run_step "Frontend install" bash -lc 'cd frontend && npm install --no-audit --no-fund'
+        if [[ -f frontend/package-lock.json ]]; then
+            run_step "Frontend install" bash -lc 'cd frontend && npm ci --no-audit --no-fund'
+        else
+            run_step "Frontend install" bash -lc 'cd frontend && npm install --no-audit --no-fund'
+        fi
         run_step "Frontend build" bash -lc 'cd frontend && npm run build'
     else
         printf '\n[SKIP] Frontend checks: npm is not installed.\n' | tee -a "$LOG_FILE"
