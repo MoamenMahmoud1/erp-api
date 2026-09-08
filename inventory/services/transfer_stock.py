@@ -42,7 +42,7 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
         product = item["product"]
         quantity = item["quantity"]
         try:
-            StockBalanceService.decrease(
+            balance = StockBalanceService.decrease(
                 location=source,
                 product=product,
                 quantity=quantity,
@@ -51,15 +51,18 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
             raise InsufficientStock(
                 f"Insufficient stock for {product.name} in {source.name}."
             ) from exc
+        unit_cost = getattr(balance, "_removed_unit_cost", product.purchase_price)
         StockBalanceService.increase(
             location=destination,
             product=product,
             quantity=quantity,
+            unit_cost=unit_cost,
         )
         StockMovementItem.objects.create(
             movement=movement,
             product=product,
             quantity=quantity,
+            unit_cost=unit_cost,
         )
 
     log_operation(
