@@ -4,10 +4,20 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
-from accounting.services import customer_aging, customer_balances, supplier_aging, supplier_balances
+from accounting.services import (
+    customer_aging,
+    customer_balances,
+    post_customer_collection,
+    post_payment_refund,
+    post_purchase,
+    post_sales_invoice,
+    post_supplier_payment,
+    supplier_aging,
+    supplier_balances,
+)
 from accounts.models import CustomUserModel
 from customers.models import Customer
-from invoices.models import Invoice, InvoiceItem
+from invoices.models import Invoice, InvoiceItem, InvoiceReturn
 from organization.models import Company
 from payments.models import PaymentAllocation, PaymentRefund, PaymentTransaction
 from products.models import Product
@@ -54,6 +64,7 @@ class BalanceReportTests(TestCase):
 
     def test_customer_balance_accounts_for_collections_and_refunds(self):
         invoice = self._invoice(self.customer)
+        post_sales_invoice(invoice=invoice, actor_id=self.user.pk, company=self.company)
         payment = PaymentTransaction.objects.create(
             customer=self.customer,
             collected_by=self.user,
@@ -66,7 +77,8 @@ class BalanceReportTests(TestCase):
             cash_amount=Decimal("60"),
             transfer_amount=Decimal("0"),
         )
-        PaymentRefund.objects.create(
+        post_customer_collection(payment=payment, actor_id=self.user.pk, company=self.company)
+        refund = PaymentRefund.objects.create(
             transaction=payment,
             invoice=invoice,
             allocation=allocation,
@@ -74,6 +86,7 @@ class BalanceReportTests(TestCase):
             transfer_amount=Decimal("0"),
             created_by=self.user,
         )
+        post_payment_refund(refund=refund, actor_id=self.user.pk, company=self.company)
 
         result = customer_balances(as_of=timezone.localdate(), customer_id=self.customer.pk)
         self.assertEqual(len(result), 1)
@@ -84,6 +97,7 @@ class BalanceReportTests(TestCase):
 
     def test_supplier_balance_accounts_for_payment(self):
         purchase = self._purchase()
+        post_purchase(purchase=purchase, actor_id=self.user.pk, company=self.company)
         payment = SupplierPayment.objects.create(
             supplier=self.supplier,
             paid_by=self.user,
@@ -96,6 +110,7 @@ class BalanceReportTests(TestCase):
             cash_amount=Decimal("75"),
             transfer_amount=Decimal("0"),
         )
+        post_supplier_payment(payment=payment, actor_id=self.user.pk, company=self.company)
 
         result = supplier_balances(as_of=timezone.localdate(), supplier_id=self.supplier.pk)
         self.assertEqual(len(result), 1)
