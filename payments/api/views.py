@@ -80,3 +80,11 @@ class TransactionListView(generics.ListAPIView):
 
     def get_queryset(self):
         return PaymentTransaction.objects.visible_to(self.request.user).with_payment_data().order_by("-created_at")
+
+
+class TransactionDetailView(generics.RetrieveAPIView):
+    serializer_class = PaymentTransactionSerializer
+    permission_classes = (TransactionReadPermission,)
+
+    def get_queryset(self):
+        return PaymentTransaction.objects.visible_to(self.request.user).with_payment_data()
