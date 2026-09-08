@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 
 from accounting.services import get_default_company, post_customer_collection
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from common.observability import log_operation
@@ -68,6 +69,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     )
     cash_remaining, transfer_remaining = cash, transfer
 
+    allocated_invoices = 0
     for invoice, due in outstanding:
         cash_use = min(cash_remaining, due)
         transfer_use = min(transfer_remaining, due - cash_use)
@@ -80,6 +82,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
             cash_amount=cash_use,
             transfer_amount=transfer_use,
         )
+        allocated_invoices += 1
         cash_remaining -= cash_use
         transfer_remaining -= transfer_use
 
@@ -100,6 +103,18 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         "payment.collection",
         user=collected_by_id,
         customer=customer.pk,
-        invoices_allocated=len(outstanding),
+        invoices_allocated=allocated_invoices,
+    )
+    record_event(
+        action="payment.collection",
+        entity_type="PaymentTransaction",
+        entity_id=payment.pk,
+        actor_id=collected_by_id,
+        metadata={
+            "customer_id": customer.pk,
+            "invoices_allocated": allocated_invoices,
+            "cash": str(cash),
+            "transfer": str(transfer),
+        },
     )
     return payment
