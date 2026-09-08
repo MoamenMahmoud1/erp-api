@@ -5,11 +5,10 @@ import { Button, Card, Center, Stack, Text, Loader } from '@mantine/core';
 
 import { PermissionGuard } from './components/PermissionGuard';
 import { Shell } from './components/Shell';
-import { RecordsPage } from './components/RecordsPage';
 import { api, type UserProfile } from './lib/api';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
-import { ProductsPage, CustomersPage, SuppliersPage } from './pages/MasterDataPages';
+import { ProductsPage, CustomersPage, SuppliersPage, EmployeesPage } from './pages/MasterDataPages';
 import { CartonPricingPage, CouponsPage } from './pages/CommercialPages';
 import { SalesPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { InventoryLocationsPage, InventoryMovementsPage, InventoryTransferPage } from './pages/InventoryPages';
@@ -55,10 +54,6 @@ function Authenticated({ user, children }: { user: UserProfile; children: ReactN
 
 function ProtectedPage({ user, permission, children }: { user: UserProfile; permission: string; children: ReactNode }) {
   return <PermissionGuard user={user} permission={permission}>{children}</PermissionGuard>;
-}
-
-function EmployeesPage() {
-  return <RecordsPage eyebrow="MASTER DATA" title="Employees" subtitle="Staff directory and account access visibility." list={api.employees.list} columns={[{ key: 'id', label: '#' }, { key: 'username', label: 'Username' }, { key: 'email', label: 'Email' }, { key: 'first_name', label: 'First name' }, { key: 'last_name', label: 'Last name' }, { key: 'is_staff', label: 'Staff' }]} />;
 }
 
 function NotFound() {
