@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AreaChart, BarChart } from '@mantine/charts';
-import { Badge, Card, DatePickerInput, Group, Loader, Progress, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { Badge, Card, Group, Loader, Progress, SegmentedControl, SimpleGrid, Stack, Text, ThemeIcon, Title } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { IconArrowDownRight, IconArrowUpRight, IconBox, IconCash, IconChartLine, IconReceipt, IconShoppingCart, IconUsers } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
