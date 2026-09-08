@@ -1,4 +1,5 @@
-from common.observability import get_current_request_id
+from core.middleware import get_current_request_id
+
 from .models import AuditEvent
 
 
