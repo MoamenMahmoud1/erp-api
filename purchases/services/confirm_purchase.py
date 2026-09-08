@@ -1,6 +1,7 @@
 from django.db import transaction
 
 from accounting.services import get_default_company, post_purchase
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
@@ -63,4 +64,11 @@ class ConfirmPurchaseService:
         )
         purchase.status = Purchase.Status.CONFIRMED
         purchase.save(update_fields=("status", "updated_at"))
+        record_event(
+            action="purchase.confirm",
+            entity_type="Purchase",
+            entity_id=purchase.pk,
+            actor_id=actor.pk,
+            metadata={"warehouse_id": warehouse.pk, "stock_movement_id": movement.pk},
+        )
         return purchase
