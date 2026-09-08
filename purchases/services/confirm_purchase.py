@@ -42,7 +42,7 @@ class ConfirmPurchaseService:
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.PURCHASE,
             destination_location=warehouse,
-            created_by=actor,
+            created_by_id=actor.pk,
             reference=purchase.reference,
         )
         for item in sorted(items, key=lambda value: value.product_id):
