@@ -50,7 +50,12 @@ def dashboard_overview_view(request):
     date_from, date_to, error = _date_range(request)
     if error:
         return error
-    return Response(dashboard_overview(date_from=date_from, date_to=date_to))
+    return Response(
+        dashboard_overview(
+            date_from=parse_date(date_from) if date_from else None,
+            date_to=parse_date(date_to) if date_to else None,
+        )
+    )
 
 
 @api_view(["GET"])
