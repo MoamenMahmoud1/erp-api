@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django.conf import settings
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
 
@@ -114,6 +117,14 @@ class StockMovementItem(models.Model):
     movement = models.ForeignKey(StockMovement, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_movement_items")
     quantity = models.PositiveIntegerField()
+    unit_cost = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Historical inventory cost per unit captured at movement time.",
+    )
 
     class Meta:
         constraints = [
@@ -121,11 +132,21 @@ class StockMovementItem(models.Model):
                 condition=Q(quantity__gte=1),
                 name="stock_movement_item_quantity_positive",
             ),
+            models.CheckConstraint(
+                condition=Q(unit_cost__gte=0) | Q(unit_cost__isnull=True),
+                name="stock_movement_item_unit_cost_non_negative",
+            ),
         ]
         indexes = [
             models.Index(fields=("product", "movement"), name="stock_move_item_product_idx"),
         ]
         ordering = ("id",)
+
+    @property
+    def total_cost(self):
+        if self.unit_cost is None:
+            return Decimal("0.00")
+        return self.unit_cost * self.quantity
 
     def __str__(self):
         return f"{self.product} x {self.quantity}"
@@ -135,6 +156,12 @@ class StockBalance(models.Model):
     location = models.ForeignKey(StockLocation, on_delete=models.CASCADE, related_name="stock_balances")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_balances")
     quantity = models.PositiveIntegerField(default=0)
+    total_cost = models.DecimalField(
+        max_digits=16,
+        decimal_places=2,
+        default=Decimal("0.00"),
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -143,7 +170,17 @@ class StockBalance(models.Model):
                 fields=("location", "product"),
                 name="stock_balance_unique_location_product",
             ),
+            models.CheckConstraint(
+                condition=Q(total_cost__gte=Decimal("0")),
+                name="stock_balance_total_cost_non_negative",
+            ),
         ]
+
+    @property
+    def average_unit_cost(self):
+        if not self.quantity:
+            return Decimal("0.00")
+        return self.total_cost / Decimal(self.quantity)
 
     def __str__(self):
         return f"{self.location_id} - {self.product_id}: {self.quantity}"
