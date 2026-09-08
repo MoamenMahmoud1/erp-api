@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 
 from products.models import Product
 
@@ -16,6 +17,12 @@ class InventoryTestMixin:
             password="StrongPass123!",
             is_staff=True,
         )
+        transfer_permission = Permission.objects.get(
+            content_type__app_label="inventory",
+            content_type__model="stockmovement",
+            codename="transfer_stock",
+        )
+        self.user.user_permissions.add(transfer_permission)
         self.product = Product.objects.create(
             name="Widget",
             purchase_price=Decimal("50.00"),
