@@ -1,9 +1,14 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory
 
-from inventory.api.views import LocationListView, MovementListView, StockBalanceListView, TransferView
+from inventory.api.views import (
+    LocationListView,
+    MovementListView,
+    StockBalanceListView,
+    TransferView,
+)
 from inventory.permissions import InventoryReadPermission, InventoryTransferPermission
 
 
@@ -27,7 +32,7 @@ class InventoryPermissionTests(TestCase):
 
     def _request(self, method, path, view):
         request = getattr(self.factory, method)(path)
-        force_authenticate(request, user=self.user)
+        request.user = self.user
         return request, view
 
     def test_unauthenticated_inventory_read_is_denied(self):
