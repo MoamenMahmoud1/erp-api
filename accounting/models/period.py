@@ -39,6 +39,9 @@ class AccountingPeriod(models.Model):
                 name="acct_period_company_dates_idx",
             ),
         ]
+        permissions = [
+            ("close_accounting_period", "Can close an accounting period"),
+        ]
 
     def __str__(self):
         return self.name
