@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from common.observability import log_operation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
@@ -68,6 +69,18 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
         destination=destination.pk,
         item_count=len(items),
         movement=movement.pk,
+    )
+    record_event(
+        action="inventory.transfer",
+        entity_type="StockMovement",
+        entity_id=movement.pk,
+        actor_id=created_by.pk,
+        metadata={
+            "source_location_id": source.pk,
+            "destination_location_id": destination.pk,
+            "item_count": len(items),
+            "reference": reference,
+        },
     )
     return movement
 
