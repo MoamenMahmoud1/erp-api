@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from .models import Invoice, InvoiceItem
 
 
@@ -11,7 +9,7 @@ class InvoiceItemInline(admin.TabularInline):
 
 
 @admin.register(Invoice)
-class InvoiceAdmin(ModelAdmin):
+class InvoiceAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "customer",
