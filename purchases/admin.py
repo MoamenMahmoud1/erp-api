@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from .models import Purchase, PurchaseItem, SupplierPayment
 
 
@@ -11,7 +9,7 @@ class PurchaseItemInline(admin.TabularInline):
 
 
 @admin.register(Purchase)
-class PurchaseAdmin(ModelAdmin):
+class PurchaseAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "reference",
@@ -30,7 +28,7 @@ class PurchaseAdmin(ModelAdmin):
 
 
 @admin.register(SupplierPayment)
-class SupplierPaymentAdmin(ModelAdmin):
+class SupplierPaymentAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "supplier",
