@@ -50,12 +50,25 @@ def _record_sale_movement(invoice, source_location):
     )
     for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
         try:
-            StockBalanceService.decrease(location=source_location, product=item.product, quantity=item.quantity)
+            balance = StockBalanceService.decrease(
+                location=source_location,
+                product=item.product,
+                quantity=item.quantity,
+            )
         except ValueError as exc:
             raise InsufficientStock(
                 f"Insufficient stock for {item.product.name} in {source_location.name}."
             ) from exc
-        StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
+        unit_cost = getattr(balance, "_removed_unit_cost", item.product.purchase_price)
+        if item.cost_price != unit_cost:
+            item.cost_price = unit_cost
+            item.save(update_fields=("cost_price", "updated_at") if hasattr(item, "updated_at") else ("cost_price",))
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=item.product,
+            quantity=item.quantity,
+            unit_cost=unit_cost,
+        )
     return movement
 
 
@@ -105,10 +118,12 @@ def cancel_invoice(invoice_id, actor=None):
                 movement_type=StockMovement.MovementType.SALE,
             )
             .select_related("source_location")
+            .prefetch_related("items")
             .first()
         )
         if sale is None or sale.source_location is None:
             raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
+        sale_costs = {item.product_id: item.unit_cost for item in sale.items.all()}
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
@@ -116,8 +131,19 @@ def cancel_invoice(invoice_id, actor=None):
             reference=f"Cancel Invoice #{invoice.pk}",
         )
         for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
-            StockBalanceService.increase(location=sale.source_location, product=item.product, quantity=item.quantity)
-            StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity)
+            unit_cost = sale_costs.get(item.product_id) or item.cost_price or item.product.purchase_price
+            StockBalanceService.increase(
+                location=sale.source_location,
+                product=item.product,
+                quantity=item.quantity,
+                unit_cost=unit_cost,
+            )
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=item.product,
+                quantity=item.quantity,
+                unit_cost=unit_cost,
+            )
 
         original_entry = (
             JournalEntry.objects.filter(
