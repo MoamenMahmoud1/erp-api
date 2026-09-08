@@ -35,7 +35,7 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
         movement_type=StockMovement.MovementType.TRANSFER,
         source_location=source,
         destination_location=destination,
-        created_by=created_by,
+        created_by_id=created_by.pk,
         reference=reference,
     )
     for item in sorted(items, key=lambda value: value["product"].pk):
