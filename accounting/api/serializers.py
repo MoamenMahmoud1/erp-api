@@ -2,6 +2,9 @@ from rest_framework import serializers
 
 from accounting.models import Account, AccountingPeriod, Expense, JournalEntry, JournalLine
 from accounting.services import create_journal_entry
+from invoices.models import InvoiceReturn
+from payments.models import PaymentRefund
+from purchases.models import PurchaseReturn
 
 
 class AccountSerializer(serializers.ModelSerializer):
@@ -39,17 +42,20 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     posted_by_name = serializers.SerializerMethodField()
     posted_by_username = serializers.SerializerMethodField()
     source_label = serializers.SerializerMethodField()
+    source_entity_type = serializers.SerializerMethodField()
+    source_entity_id = serializers.SerializerMethodField()
 
     class Meta:
         model = JournalEntry
         fields = (
-            "id", "number", "entry_date", "description", "reference", "source_type", "source_id", "source_label", "status",
-            "created_by", "created_by_name", "created_by_username", "posted_by", "posted_by_name", "posted_by_username",
-            "posted_at", "created_at", "updated_at", "lines",
+            "id", "number", "entry_date", "description", "reference", "source_type", "source_id", "source_label",
+            "source_entity_type", "source_entity_id", "status", "created_by", "created_by_name", "created_by_username",
+            "posted_by", "posted_by_name", "posted_by_username", "posted_at", "created_at", "updated_at", "lines",
         )
         read_only_fields = (
             "id", "number", "status", "created_by", "created_by_name", "created_by_username", "posted_by", "posted_by_name",
             "posted_by_username", "posted_at", "created_at", "updated_at", "source_type", "source_id", "source_label",
+            "source_entity_type", "source_entity_id",
         )
 
     @staticmethod
@@ -83,6 +89,42 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "payment.supplier": "Supplier payment",
         }
         return labels.get(obj.source_type, obj.source_type or None)
+
+    def get_source_entity_type(self, obj):
+        mapping = {
+            "invoice.sale": "invoice",
+            "invoice.return": "invoice",
+            "invoice.sale.reversal": "invoice",
+            "purchase.confirmation": "purchase",
+            "purchase.return": "purchase",
+            "purchase.confirmation.reversal": "purchase",
+            "payment.collection": "payment_transaction",
+            "payment.refund": "payment_transaction",
+            "payment.supplier": "supplier_payment",
+        }
+        return mapping.get(obj.source_type) if obj.source_id is not None else None
+
+    def get_source_entity_id(self, obj):
+        if obj.source_id is None:
+            return None
+        try:
+            if obj.source_type in {"invoice.sale", "invoice.sale.reversal"}:
+                return obj.source_id
+            if obj.source_type == "invoice.return":
+                return InvoiceReturn.objects.only("invoice_id").get(pk=obj.source_id).invoice_id
+            if obj.source_type in {"purchase.confirmation", "purchase.confirmation.reversal"}:
+                return obj.source_id
+            if obj.source_type == "purchase.return":
+                return PurchaseReturn.objects.only("purchase_id").get(pk=obj.source_id).purchase_id
+            if obj.source_type == "payment.collection":
+                return obj.source_id
+            if obj.source_type == "payment.refund":
+                return PaymentRefund.objects.only("transaction_id").get(pk=obj.source_id).transaction_id
+            if obj.source_type == "payment.supplier":
+                return obj.source_id
+        except (InvoiceReturn.DoesNotExist, PurchaseReturn.DoesNotExist, PaymentRefund.DoesNotExist):
+            return None
+        return None
 
     def create(self, validated_data):
         raw_lines = validated_data.pop("lines")
