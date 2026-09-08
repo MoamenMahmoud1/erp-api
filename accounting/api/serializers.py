@@ -36,24 +36,20 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     lines = JournalLineSerializer(many=True)
     created_by_name = serializers.SerializerMethodField()
     created_by_username = serializers.SerializerMethodField()
-    created_by_employee_name = serializers.SerializerMethodField()
     posted_by_name = serializers.SerializerMethodField()
     posted_by_username = serializers.SerializerMethodField()
-    posted_by_employee_name = serializers.SerializerMethodField()
     source_label = serializers.SerializerMethodField()
 
     class Meta:
         model = JournalEntry
         fields = (
             "id", "number", "entry_date", "description", "reference", "source_type", "source_id", "source_label", "status",
-            "created_by", "created_by_name", "created_by_username", "created_by_employee_name",
-            "posted_by", "posted_by_name", "posted_by_username", "posted_by_employee_name", "posted_at",
-            "created_at", "updated_at", "lines",
+            "created_by", "created_by_name", "created_by_username", "posted_by", "posted_by_name", "posted_by_username",
+            "posted_at", "created_at", "updated_at", "lines",
         )
         read_only_fields = (
-            "id", "number", "status", "created_by", "created_by_name", "created_by_username", "created_by_employee_name",
-            "posted_by", "posted_by_name", "posted_by_username", "posted_by_employee_name", "posted_at",
-            "created_at", "updated_at", "source_type", "source_id", "source_label",
+            "id", "number", "status", "created_by", "created_by_name", "created_by_username", "posted_by", "posted_by_name",
+            "posted_by_username", "posted_at", "created_at", "updated_at", "source_type", "source_id", "source_label",
         )
 
     @staticmethod
@@ -68,21 +64,11 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     def get_created_by_username(self, obj):
         return obj.created_by.username
 
-    def get_created_by_employee_name(self, obj):
-        employee = getattr(obj.created_by, "employee", None)
-        return str(employee) if employee is not None else None
-
     def get_posted_by_name(self, obj):
         return self._user_name(obj.posted_by)
 
     def get_posted_by_username(self, obj):
         return obj.posted_by.username if obj.posted_by_id else None
-
-    def get_posted_by_employee_name(self, obj):
-        if not obj.posted_by_id:
-            return None
-        employee = getattr(obj.posted_by, "employee", None)
-        return str(employee) if employee is not None else None
 
     def get_source_label(self, obj):
         labels = {
