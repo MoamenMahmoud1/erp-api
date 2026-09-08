@@ -1,11 +1,12 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-from accounting.models import Account, Expense
+from accounting.models import Account
 from accounting.services import ensure_default_accounts
 from accounting.services.expenses import create_expense
 from accounting.services.journal import create_journal_entry, post_journal_entry
@@ -25,7 +26,6 @@ from purchases.services.confirm_purchase import ConfirmPurchaseService
 from purchases.services.return_purchase import return_purchase
 from purchases.services.supplier_payment import pay_supplier
 from suppliers.models import Supplier
-from django.contrib.auth import get_user_model
 
 
 class Command(BaseCommand):
@@ -35,28 +35,17 @@ class Command(BaseCommand):
     DEMO_ADMIN_EMAIL = "admin@niletradedemo.local"
     DEMO_PASSWORD = "DemoERP@2026!"
 
-    def add_arguments(self, parser):
-        parser.add_argument(
-            "--force",
-            action="store_true",
-            help="Abort and recreate is not supported; this only allows reseeding when the demo sentinel exists.",
-        )
-
     @transaction.atomic
     def handle(self, *args, **options):
         User = get_user_model()
 
         if User.objects.filter(username=self.DEMO_ADMIN_USERNAME).exists():
-            if not options["force"]:
-                self.stdout.write(
-                    self.style.WARNING(
-                        "Demo data already exists. Use --force only after resetting the demo database."
-                    )
+            self.stdout.write(
+                self.style.WARNING(
+                    "Demo data already exists. Reset the demo database or remove the demo sentinel before reseeding."
                 )
-                return
-            raise RuntimeError(
-                "Refusing to duplicate demo business data. Reset the database or remove the demo sentinel first."
             )
+            return
 
         now = timezone.now()
         dates = [now - timedelta(days=offset) for offset in (6, 5, 4, 3, 2, 1, 0)]
@@ -157,7 +146,7 @@ class Command(BaseCommand):
             name="Finance",
             description="Accounting, collections, and treasury.",
         )
-        warehouse_dept = Department.objects.create(
+        Department.objects.create(
             company=company,
             site=branch,
             code="WH",
@@ -165,91 +154,25 @@ class Command(BaseCommand):
             description="Stock receiving and distribution.",
         )
 
-        manager_employee = Employee.objects.create(
-            user=users["manager"],
-            work_site=branch,
-            department=sales_dept,
-        )
-        sales_1_employee = Employee.objects.create(
-            user=users["sales_1"],
-            manager=manager_employee,
-            work_site=branch,
-            department=sales_dept,
-        )
-        sales_2_employee = Employee.objects.create(
-            user=users["sales_2"],
-            manager=manager_employee,
-            work_site=branch,
-            department=sales_dept,
-        )
-        Employee.objects.create(
-            user=admin,
-            work_site=hq,
-            department=finance_dept,
-        )
-        manager_employee.save()
-        sales_1_employee.save()
-        sales_2_employee.save()
+        manager_employee = Employee.objects.create(user=users["manager"], work_site=branch, department=sales_dept)
+        Employee.objects.create(user=users["sales_1"], manager=manager_employee, work_site=branch, department=sales_dept)
+        Employee.objects.create(user=users["sales_2"], manager=manager_employee, work_site=branch, department=sales_dept)
+        Employee.objects.create(user=admin, work_site=hq, department=finance_dept)
 
         customers = {
-            "cairo_retail": Customer.objects.create(
-                name="Cairo Retail Hub",
-                phone="+201022345678",
-                address="Heliopolis, Cairo",
-            ),
-            "delta_market": Customer.objects.create(
-                name="Delta Market Chain",
-                phone="+201011223344",
-                address="Mansoura, Dakahlia",
-            ),
-            "nile_mini": Customer.objects.create(
-                name="Nile Mini Markets",
-                phone="+201099887766",
-                address="Nasr City, Cairo",
-            ),
-            "almanara": Customer.objects.create(
-                name="Al-Manara Hospitality",
-                phone="+201015551234",
-                address="New Cairo, Cairo",
-            ),
-            "fresh_corner": Customer.objects.create(
-                name="Fresh Corner Grocers",
-                phone="+201012009988",
-                address="Giza, Giza",
-            ),
-            "walk_in": Customer.objects.create(
-                name="Walk-in Retail Customer",
-                phone="+201000000111",
-                address="Cairo",
-            ),
+            "cairo_retail": Customer.objects.create(name="Cairo Retail Hub", phone="+201022345678", address="Heliopolis, Cairo"),
+            "delta_market": Customer.objects.create(name="Delta Market Chain", phone="+201011223344", address="Mansoura, Dakahlia"),
+            "nile_mini": Customer.objects.create(name="Nile Mini Markets", phone="+201099887766", address="Nasr City, Cairo"),
+            "almanara": Customer.objects.create(name="Al-Manara Hospitality", phone="+201015551234", address="New Cairo, Cairo"),
+            "fresh_corner": Customer.objects.create(name="Fresh Corner Grocers", phone="+201012009988", address="Giza, Giza"),
+            "walk_in": Customer.objects.create(name="Walk-in Retail Customer", phone="+201000000111", address="Cairo"),
         }
 
         suppliers = {
-            "delta_foods": Supplier.objects.create(
-                name="Delta Foods Wholesale",
-                phone="+20225184567",
-                email="orders@deltafoods.local",
-                address="10 El Gomhoria St., Mansoura",
-            ),
-            "nile_fmcg": Supplier.objects.create(
-                name="Nile FMCG Supply",
-                phone="+20233457891",
-                email="sales@nilefmcg.local",
-                address="45 Industrial Zone, Obour",
-            ),
-            "cairo_home": Supplier.objects.create(
-                name="Cairo Home & Hygiene",
-                phone="+20222673456",
-                email="accounts@cairohome.local",
-                address="18 El Salam City, Cairo",
-            ),
-            "inactive_supplier": Supplier.objects.create(
-                name="Old Alexandria Supplies",
-                phone="+2034872211",
-                email="legacy@alexsupplies.local",
-                address="Alexandria",
-                is_active=False,
-            ),
+            "delta_foods": Supplier.objects.create(name="Delta Foods Wholesale", phone="+20225184567", email="orders@deltafoods.local", address="10 El Gomhoria St., Mansoura"),
+            "nile_fmcg": Supplier.objects.create(name="Nile FMCG Supply", phone="+20233457891", email="sales@nilefmcg.local", address="45 Industrial Zone, Obour"),
+            "cairo_home": Supplier.objects.create(name="Cairo Home & Hygiene", phone="+20222673456", email="accounts@cairohome.local", address="18 El Salam City, Cairo"),
+            "inactive_supplier": Supplier.objects.create(name="Old Alexandria Supplies", phone="+2034872211", email="legacy@alexsupplies.local", address="Alexandria", is_active=False),
         }
 
         products = {}
@@ -279,12 +202,7 @@ class Command(BaseCommand):
             ("water", "Water Case", 6, "510.00"),
             ("tissues", "Tissues Carton", 24, "1380.00"),
         ):
-            CartonPricing.objects.create(
-                product=products[product_key],
-                name=name,
-                units_per_carton=units_per_carton,
-                carton_price=Decimal(carton_price),
-            )
+            CartonPricing.objects.create(product=products[product_key], name=name, units_per_carton=units_per_carton, carton_price=Decimal(carton_price))
 
         coupon = Coupon.objects.create(
             code="WELCOME10",
@@ -296,305 +214,53 @@ class Command(BaseCommand):
             valid_until=now + timedelta(days=30),
         )
 
-        warehouse = StockLocation.objects.create(
-            name="Main Warehouse - Nasr City",
-            location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
-            is_active=True,
-        )
+        warehouse = StockLocation.objects.create(name="Main Warehouse - Nasr City", location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True)
         sales_locations = {
-            "sales_1": StockLocation.objects.create(
-                name="Van 01 - Ahmed Fathy",
-                location_type=StockLocation.LocationType.SALES_VEHICLE,
-                employee=users["sales_1"],
-                is_active=True,
-            ),
-            "sales_2": StockLocation.objects.create(
-                name="Van 02 - Mariam Adel",
-                location_type=StockLocation.LocationType.SALES_VEHICLE,
-                employee=users["sales_2"],
-                is_active=True,
-            ),
-            "manager": StockLocation.objects.create(
-                name="Van 03 - Sara Elmasry",
-                location_type=StockLocation.LocationType.SALES_VEHICLE,
-                employee=users["manager"],
-                is_active=True,
-            ),
+            "sales_1": StockLocation.objects.create(name="Van 01 - Ahmed Fathy", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_1"], is_active=True),
+            "sales_2": StockLocation.objects.create(name="Van 02 - Mariam Adel", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_2"], is_active=True),
+            "manager": StockLocation.objects.create(name="Van 03 - Sara Elmasry", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["manager"], is_active=True),
         }
 
         accounts = ensure_default_accounts(company)
-        equity_account, _ = Account.objects.get_or_create(
-            company=company,
-            code="3000",
-            defaults={"name": "Owner Equity", "account_type": Account.AccountType.EQUITY},
-        )
-        operating_expense, _ = Account.objects.get_or_create(
-            company=company,
-            code="5200",
-            defaults={"name": "Operating Expenses", "account_type": Account.AccountType.EXPENSE},
-        )
+        equity_account, _ = Account.objects.get_or_create(company=company, code="3000", defaults={"name": "Owner Equity", "account_type": Account.AccountType.EQUITY})
+        operating_expense, _ = Account.objects.get_or_create(company=company, code="5200", defaults={"name": "Operating Expenses", "account_type": Account.AccountType.EXPENSE})
+        self._post_opening_balance(company=company, actor_id=admin.pk, cash_account=accounts["cash"], bank_account=accounts["bank"], equity_account=equity_account, entry_date=timezone.localdate(dates[0]))
 
-        self._post_opening_balance(
-            company=company,
-            actor_id=admin.pk,
-            cash_account=accounts["cash"],
-            bank_account=accounts["bank"],
-            equity_account=equity_account,
-            entry_date=timezone.localdate(dates[0]),
-        )
+        purchases = [
+            self._create_purchase(supplier=suppliers["delta_foods"], actor=admin, when=dates[0], reference="PO-2026-0901", items=[(products["basmati_rice"], 100, "70.00"), (products["sunflower_oil"], 80, "60.00"), (products["detergent"], 50, "100.00")]),
+            self._create_purchase(supplier=suppliers["nile_fmcg"], actor=admin, when=dates[1], reference="PO-2026-0902", items=[(products["tissues"], 100, "45.00"), (products["water"], 150, "55.00"), (products["coffee"], 60, "120.00")]),
+            self._create_purchase(supplier=suppliers["cairo_home"], actor=admin, when=dates[2], reference="PO-2026-0903", items=[(products["tomato"], 100, "35.00"), (products["dishwash"], 80, "50.00"), (products["basmati_rice"], 50, "72.00"), (products["sunflower_oil"], 40, "62.00")]),
+        ]
 
-        purchases = []
-        purchases.append(
-            self._create_purchase(
-                supplier=suppliers["delta_foods"],
-                actor=admin,
-                when=dates[0],
-                reference="PO-2026-0901",
-                items=[
-                    (products["basmati_rice"], 100, "70.00"),
-                    (products["sunflower_oil"], 80, "60.00"),
-                    (products["detergent"], 50, "100.00"),
-                ],
-            )
-        )
-        purchases.append(
-            self._create_purchase(
-                supplier=suppliers["nile_fmcg"],
-                actor=admin,
-                when=dates[1],
-                reference="PO-2026-0902",
-                items=[
-                    (products["tissues"], 100, "45.00"),
-                    (products["water"], 150, "55.00"),
-                    (products["coffee"], 60, "120.00"),
-                ],
-            )
-        )
-        purchases.append(
-            self._create_purchase(
-                supplier=suppliers["cairo_home"],
-                actor=admin,
-                when=dates[2],
-                reference="PO-2026-0903",
-                items=[
-                    (products["tomato"], 100, "35.00"),
-                    (products["dishwash"], 80, "50.00"),
-                    (products["basmati_rice"], 50, "72.00"),
-                    (products["sunflower_oil"], 40, "62.00"),
-                ],
-            )
-        )
+        return_purchase(purchase_id=purchases[0].pk, created_by_id=admin.pk, actor=admin, reason="Packaging damage identified during receiving inspection", items=[{"purchase_item": purchases[0].items.get(product=products["basmati_rice"]), "quantity": 5}])
+        pay_supplier(supplier=suppliers["delta_foods"], cash_amount=Decimal("3000.00"), transfer_amount=Decimal("0.00"), paid_by_id=admin.pk, actor=admin, reference="SUP-PAY-0903")
+        pay_supplier(supplier=suppliers["nile_fmcg"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("6000.00"), paid_by_id=admin.pk, actor=admin, reference="SUP-PAY-0906")
 
-        return_purchase(
-            purchase_id=purchases[0].pk,
-            created_by_id=admin.pk,
-            actor=admin,
-            reason="Packaging damage identified during receiving inspection",
-            items=[
-                {"purchase_item": purchases[0].items.get(product=products["basmati_rice"]), "quantity": 5}
-            ],
-        )
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_1"].pk, created_by=admin, reference="LOAD-0904-AHMED", items=[{"product": products["basmati_rice"], "quantity": 30}, {"product": products["sunflower_oil"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["dishwash"], "quantity": 15}])
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_2"].pk, created_by=admin, reference="LOAD-0904-MARIAM", items=[{"product": products["water"], "quantity": 60}, {"product": products["coffee"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["tissues"], "quantity": 20}])
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["manager"].pk, created_by=admin, reference="LOAD-0904-SARA", items=[{"product": products["basmati_rice"], "quantity": 25}, {"product": products["water"], "quantity": 60}, {"product": products["tomato"], "quantity": 25}, {"product": products["dishwash"], "quantity": 20}, {"product": products["coffee"], "quantity": 20}])
 
-        pay_supplier(
-            supplier=suppliers["delta_foods"],
-            cash_amount=Decimal("3000.00"),
-            transfer_amount=Decimal("0.00"),
-            paid_by_id=admin.pk,
-            actor=admin,
-            reference="SUP-PAY-0903",
-        )
-        pay_supplier(
-            supplier=suppliers["nile_fmcg"],
-            cash_amount=Decimal("0.00"),
-            transfer_amount=Decimal("6000.00"),
-            paid_by_id=admin.pk,
-            actor=admin,
-            reference="SUP-PAY-0906",
-        )
+        invoices = [
+            self._create_invoice(customer=customers["cairo_retail"], actor=admin, created_by=users["sales_1"], when=dates[2], items=[(products["basmati_rice"], 12), (products["sunflower_oil"], 8), (products["detergent"], 3)], coupon=coupon, discount=Decimal("218.40")),
+            self._create_invoice(customer=customers["delta_market"], actor=admin, created_by=users["sales_2"], when=dates[2], items=[(products["coffee"], 6), (products["tissues"], 10)]),
+            self._create_invoice(customer=customers["nile_mini"], actor=admin, created_by=users["manager"], when=dates[1], items=[(products["water"], 20), (products["tomato"], 12)]),
+            self._create_invoice(customer=customers["almanara"], actor=admin, created_by=users["sales_1"], when=dates[1], items=[(products["detergent"], 8), (products["dishwash"], 10), (products["basmati_rice"], 5)]),
+            self._create_invoice(customer=customers["fresh_corner"], actor=admin, created_by=users["sales_2"], when=dates[0], items=[(products["coffee"], 4), (products["water"], 12)]),
+            self._create_invoice(customer=customers["walk_in"], actor=admin, created_by=users["manager"], when=dates[0], items=[(products["basmati_rice"], 15), (products["water"], 10)]),
+        ]
 
-        transfer_stock(
-            source_id=warehouse.pk,
-            destination_id=sales_locations["sales_1"].pk,
-            created_by=admin,
-            reference="LOAD-0904-AHMED",
-            items=[
-                {"product": products["basmati_rice"], "quantity": 30},
-                {"product": products["sunflower_oil"], "quantity": 25},
-                {"product": products["detergent"], "quantity": 20},
-                {"product": products["dishwash"], "quantity": 15},
-            ],
-        )
-        transfer_stock(
-            source_id=warehouse.pk,
-            destination_id=sales_locations["sales_2"].pk,
-            created_by=admin,
-            reference="LOAD-0904-MARIAM",
-            items=[
-                {"product": products["water"], "quantity": 60},
-                {"product": products["coffee"], "quantity": 25},
-                {"product": products["detergent"], "quantity": 20},
-                {"product": products["tissues"], "quantity": 20},
-            ],
-        )
-        transfer_stock(
-            source_id=warehouse.pk,
-            destination_id=sales_locations["manager"].pk,
-            created_by=admin,
-            reference="LOAD-0904-SARA",
-            items=[
-                {"product": products["basmati_rice"], "quantity": 25},
-                {"product": products["water"], "quantity": 60},
-                {"product": products["tomato"], "quantity": 25},
-                {"product": products["dishwash"], "quantity": 20},
-                {"product": products["coffee"], "quantity": 20},
-            ],
-        )
+        collect(customer=customers["cairo_retail"], cash_amount=invoices[0].total, transfer_amount=Decimal("0.00"), collected_by_id=admin.pk, actor=admin)
+        collect(customer=customers["delta_market"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("800.00"), collected_by_id=admin.pk, actor=admin)
+        collect(customer=customers["almanara"], cash_amount=Decimal("0.00"), transfer_amount=invoices[3].total, collected_by_id=admin.pk, actor=admin)
+        create_sales_return(invoice_id=invoices[3].pk, created_by_id=admin.pk, actor=admin, reason="Customer returned two unopened rice units", items=[{"invoice_item": invoices[3].items.get(product=products["basmati_rice"]), "quantity": 2}])
 
-        invoices = []
-        invoices.append(
-            self._create_invoice(
-                customer=customers["cairo_retail"],
-                actor=admin,
-                created_by=users["sales_1"],
-                when=dates[2],
-                items=[
-                    (products["basmati_rice"], 12),
-                    (products["sunflower_oil"], 8),
-                    (products["detergent"], 3),
-                ],
-                coupon=coupon,
-                discount=Decimal("218.40"),
-            )
-        )
-        invoices.append(
-            self._create_invoice(
-                customer=customers["delta_market"],
-                actor=admin,
-                created_by=users["sales_2"],
-                when=dates[2],
-                items=[
-                    (products["coffee"], 6),
-                    (products["tissues"], 10),
-                ],
-            )
-        )
-        invoices.append(
-            self._create_invoice(
-                customer=customers["nile_mini"],
-                actor=admin,
-                created_by=users["manager"],
-                when=dates[1],
-                items=[
-                    (products["water"], 20),
-                    (products["tomato"], 12),
-                ],
-            )
-        )
-        invoices.append(
-            self._create_invoice(
-                customer=customers["almanara"],
-                actor=admin,
-                created_by=users["sales_1"],
-                when=dates[1],
-                items=[
-                    (products["detergent"], 8),
-                    (products["dishwash"], 10),
-                    (products["basmati_rice"], 5),
-                ],
-            )
-        )
-        invoices.append(
-            self._create_invoice(
-                customer=customers["fresh_corner"],
-                actor=admin,
-                created_by=users["sales_2"],
-                when=dates[0],
-                items=[
-                    (products["coffee"], 4),
-                    (products["water"], 12),
-                ],
-            )
-        )
-        invoices.append(
-            self._create_invoice(
-                customer=customers["walk_in"],
-                actor=admin,
-                created_by=users["manager"],
-                when=dates[0],
-                items=[
-                    (products["basmati_rice"], 15),
-                    (products["water"], 10),
-                ],
-            )
-        )
+        create_expense(amount=Decimal("2500.00"), expense_account=operating_expense.pk, payment_account=accounts["cash"].pk, expense_date=timezone.localdate(dates[0]), description="Warehouse utilities and local delivery fuel", reference="EXP-2026-0907", created_by_id=admin.pk, company=company)
 
-        collect(
-            customer=customers["cairo_retail"],
-            cash_amount=invoices[0].total,
-            transfer_amount=Decimal("0.00"),
-            collected_by_id=admin.pk,
-            actor=admin,
-        )
-        collect(
-            customer=customers["delta_market"],
-            cash_amount=Decimal("0.00"),
-            transfer_amount=Decimal("800.00"),
-            collected_by_id=admin.pk,
-            actor=admin,
-        )
-        collect(
-            customer=customers["almanara"],
-            cash_amount=Decimal("0.00"),
-            transfer_amount=invoices[3].total,
-            collected_by_id=admin.pk,
-            actor=admin,
-        )
+        draft_purchase = Purchase.objects.create(supplier=suppliers["delta_foods"], created_by=admin, reference="PO-DRAFT-2026-0910")
+        PurchaseItem.objects.create(purchase=draft_purchase, product=products["coffee"], quantity=20, unit_purchase_price=Decimal("122.00"))
 
-        create_sales_return(
-            invoice_id=invoices[3].pk,
-            created_by_id=admin.pk,
-            actor=admin,
-            reason="Customer returned two unopened rice units",
-            items=[
-                {"invoice_item": invoices[3].items.get(product=products["basmati_rice"]), "quantity": 2}
-            ],
-        )
-
-        create_expense(
-            amount=Decimal("2500.00"),
-            expense_account=operating_expense.pk,
-            payment_account=accounts["cash"].pk,
-            expense_date=timezone.localdate(dates[0]),
-            description="Warehouse utilities and local delivery fuel",
-            reference="EXP-2026-0907",
-            created_by_id=admin.pk,
-            company=company,
-        )
-
-        draft_purchase = Purchase.objects.create(
-            supplier=suppliers["delta_foods"],
-            created_by=admin,
-            reference="PO-DRAFT-2026-0910",
-        )
-        PurchaseItem.objects.create(
-            purchase=draft_purchase,
-            product=products["coffee"],
-            quantity=20,
-            unit_purchase_price=Decimal("122.00"),
-        )
-
-        draft_invoice = Invoice.objects.create(
-            customer=customers["walk_in"],
-            created_by=users["sales_2"],
-            status=Invoice.Status.DRAFT,
-        )
-        InvoiceItem.objects.create(
-            invoice=draft_invoice,
-            product=products["dishwash"],
-            quantity=4,
-            unit_price=products["dishwash"].selling_price,
-            cost_price=products["dishwash"].purchase_price,
-        )
+        draft_invoice = Invoice.objects.create(customer=customers["walk_in"], created_by=users["sales_2"], status=Invoice.Status.DRAFT)
+        InvoiceItem.objects.create(invoice=draft_invoice, product=products["coffee"], quantity=4, unit_price=products["coffee"].selling_price, cost_price=products["coffee"].purchase_price)
 
         self.stdout.write(self.style.SUCCESS("Realistic ERP demo data created successfully."))
         self.stdout.write("")
@@ -609,35 +275,18 @@ class Command(BaseCommand):
         self.stdout.write("  - Purchases, purchase return, supplier payments")
         self.stdout.write("  - Sales across 3 employees, full + partial collections")
         self.stdout.write("  - Sales return + refund, operating expense, opening balance")
-        self.stdout.write("  - Draft purchase and draft invoice for lifecycle screens")
+        self.stdout.write("  - Draft purchase and confirmable draft invoice for lifecycle screens")
         self.stdout.write("  - Posted accounting entries feeding P&L / BS / CF / AR / AP / analytics")
 
     @staticmethod
     def _create_user(User, username, email, first_name, last_name):
-        return User.objects.create_user(
-            username=username,
-            email=email,
-            password="DemoERP@2026!",
-            first_name=first_name,
-            last_name=last_name,
-            is_active=True,
-            is_verified=True,
-        )
+        return User.objects.create_user(username=username, email=email, password="DemoERP@2026!", first_name=first_name, last_name=last_name, is_active=True, is_verified=True)
 
     @staticmethod
     def _create_purchase(*, supplier, actor, when, reference, items):
-        purchase = Purchase.objects.create(
-            supplier=supplier,
-            created_by=actor,
-            reference=reference,
-        )
+        purchase = Purchase.objects.create(supplier=supplier, created_by=actor, reference=reference)
         for product, quantity, unit_price in items:
-            PurchaseItem.objects.create(
-                purchase=purchase,
-                product=product,
-                quantity=quantity,
-                unit_purchase_price=Decimal(unit_price),
-            )
+            PurchaseItem.objects.create(purchase=purchase, product=product, quantity=quantity, unit_purchase_price=Decimal(unit_price))
         Purchase.objects.filter(pk=purchase.pk).update(created_at=when)
         purchase.refresh_from_db()
         ConfirmPurchaseService.execute(purchase_id=purchase.pk, actor=actor)
@@ -645,20 +294,9 @@ class Command(BaseCommand):
 
     @staticmethod
     def _create_invoice(*, customer, actor, created_by, when, items, coupon=None, discount=Decimal("0")):
-        invoice = Invoice.objects.create(
-            customer=customer,
-            created_by=created_by,
-            coupon=coupon,
-            coupon_discount=discount,
-        )
+        invoice = Invoice.objects.create(customer=customer, created_by=created_by, coupon=coupon, coupon_discount=discount)
         for product, quantity in items:
-            InvoiceItem.objects.create(
-                invoice=invoice,
-                product=product,
-                quantity=quantity,
-                unit_price=product.selling_price,
-                cost_price=product.purchase_price,
-            )
+            InvoiceItem.objects.create(invoice=invoice, product=product, quantity=quantity, unit_price=product.selling_price, cost_price=product.purchase_price)
         Invoice.objects.filter(pk=invoice.pk).update(created_at=when)
         invoice.refresh_from_db()
         confirm_invoice(invoice.pk, actor=actor)
