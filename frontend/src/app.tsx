@@ -3,6 +3,7 @@ import { Component, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Center, Stack, Text, Loader } from '@mantine/core';
 
+import { PermissionGuard } from './components/PermissionGuard';
 import { Shell } from './components/Shell';
 import { RecordsPage } from './components/RecordsPage';
 import { api, type UserProfile } from './lib/api';
@@ -52,6 +53,10 @@ function Authenticated({ user, children }: { user: UserProfile; children: ReactN
   return <Shell user={user}>{children}</Shell>;
 }
 
+function ProtectedPage({ user, permission, children }: { user: UserProfile; permission: string; children: ReactNode }) {
+  return <PermissionGuard user={user} permission={permission}>{children}</PermissionGuard>;
+}
+
 function EmployeesPage() {
   return <RecordsPage eyebrow="MASTER DATA" title="Employees" subtitle="Staff directory and account access visibility." list={api.employees.list} columns={[{ key: 'id', label: '#' }, { key: 'username', label: 'Username' }, { key: 'email', label: 'Email' }, { key: 'first_name', label: 'First name' }, { key: 'last_name', label: 'Last name' }, { key: 'is_staff', label: 'Staff' }]} />;
 }
@@ -88,49 +93,47 @@ export function App() {
   if (!user && location.pathname !== '/login') return null;
   if (location.pathname === '/login') return user ? <Navigate to="/" replace /> : <LoginPage />;
 
+  const securedRoutes = [
+    { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
+    { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage /> },
+    { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage /> },
+    { path: '/purchases', permission: 'purchases.view_purchase', element: <PurchasesPage /> },
+    { path: '/purchases/new', permission: 'purchases.add_purchase', element: <CreatePurchasePage /> },
+    { path: '/products', permission: 'products.view_product', element: <ProductsPage /> },
+    { path: '/products/cartons', permission: 'products.view_cartonpricing', element: <CartonPricingPage /> },
+    { path: '/customers', permission: 'customers.view_customer', element: <CustomersPage /> },
+    { path: '/suppliers', permission: 'suppliers.view_supplier', element: <SuppliersPage /> },
+    { path: '/employees', permission: 'accounts.view_employee', element: <EmployeesPage /> },
+    { path: '/organization/company', permission: 'organization.view_company', element: <CompanyPage /> },
+    { path: '/organization/sites', permission: 'organization.view_site', element: <SitesPage /> },
+    { path: '/organization/departments', permission: 'organization.view_department', element: <DepartmentsPage /> },
+    { path: '/inventory', permission: 'inventory.view_stockbalance', element: <InventoryPage /> },
+    { path: '/inventory/locations', permission: 'inventory.view_stocklocation', element: <InventoryLocationsPage /> },
+    { path: '/inventory/movements', permission: 'inventory.view_stockmovement', element: <InventoryMovementsPage /> },
+    { path: '/inventory/transfer', permission: 'inventory.transfer_stock', element: <InventoryTransferPage /> },
+    { path: '/payments', permission: 'payments.view_paymenttransaction', element: <PaymentsPage /> },
+    { path: '/payments/collect', permission: 'payments.process_collection', element: <CollectPaymentPage /> },
+    { path: '/payments/supplier', permission: 'purchases.process_supplier_payment', element: <SupplierPaymentPage /> },
+    { path: '/accounting', permission: 'accounting.view_financial_reports', element: <AccountingHomePage /> },
+    { path: '/accounting/accounts', permission: 'accounting.view_account', element: <AccountsPage /> },
+    { path: '/accounting/journals', permission: 'accounting.view_journalentry', element: <JournalsPage /> },
+    { path: '/accounting/ledger', permission: 'accounting.view_financial_reports', element: <GeneralLedgerPage /> },
+    { path: '/accounting/trial-balance', permission: 'accounting.view_financial_reports', element: <TrialBalancePage /> },
+    { path: '/accounting/statements', permission: 'accounting.view_financial_reports', element: <StatementsPage /> },
+    { path: '/accounting/balances', permission: 'accounting.view_financial_reports', element: <BalancesPage /> },
+    { path: '/accounting/expenses', permission: 'accounting.view_expense', element: <ExpensesPage /> },
+    { path: '/accounting/periods', permission: 'accounting.view_accountingperiod', element: <PeriodsPage /> },
+    { path: '/accounting/opening-balance', permission: 'accounting.manage_chart_of_accounts', element: <OpeningBalancePage /> },
+    { path: '/accounting/manual-journal', permission: 'accounting.add_journalentry', element: <ManualJournalPage /> },
+  ];
+
   return (
     <AppErrorBoundary>
       <Authenticated user={user!}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-
-          <Route path="/sales" element={<SalesPage />} />
-          <Route path="/sales/new" element={<CreateInvoicePage />} />
-          <Route path="/purchases" element={<PurchasesPage />} />
-          <Route path="/purchases/new" element={<CreatePurchasePage />} />
-
-          <Route path="/products" element={<ProductsPage />} />
-          <Route path="/products/cartons" element={<CartonPricingPage />} />
-          <Route path="/customers" element={<CustomersPage />} />
-          <Route path="/suppliers" element={<SuppliersPage />} />
-          <Route path="/coupons" element={<CouponsPage />} />
-          <Route path="/employees" element={<EmployeesPage />} />
-
-          <Route path="/organization/company" element={<CompanyPage />} />
-          <Route path="/organization/sites" element={<SitesPage />} />
-          <Route path="/organization/departments" element={<DepartmentsPage />} />
-
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/inventory/locations" element={<InventoryLocationsPage />} />
-          <Route path="/inventory/movements" element={<InventoryMovementsPage />} />
-          <Route path="/inventory/transfer" element={<InventoryTransferPage />} />
-
-          <Route path="/payments" element={<PaymentsPage />} />
-          <Route path="/payments/collect" element={<CollectPaymentPage />} />
-          <Route path="/payments/supplier" element={<SupplierPaymentPage />} />
-
-          <Route path="/accounting" element={<AccountingHomePage />} />
-          <Route path="/accounting/accounts" element={<AccountsPage />} />
-          <Route path="/accounting/journals" element={<JournalsPage />} />
-          <Route path="/accounting/ledger" element={<GeneralLedgerPage />} />
-          <Route path="/accounting/trial-balance" element={<TrialBalancePage />} />
-          <Route path="/accounting/statements" element={<StatementsPage />} />
-          <Route path="/accounting/balances" element={<BalancesPage />} />
-          <Route path="/accounting/expenses" element={<ExpensesPage />} />
-          <Route path="/accounting/periods" element={<PeriodsPage />} />
-          <Route path="/accounting/opening-balance" element={<OpeningBalancePage />} />
-          <Route path="/accounting/manual-journal" element={<ManualJournalPage />} />
-
+          {securedRoutes.map(({ path, permission, element }) => (
+            <Route key={path} path={path} element={<ProtectedPage user={user!} permission={permission}>{element}</ProtectedPage>} />
+          ))}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Authenticated>
