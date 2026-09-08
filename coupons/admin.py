@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from unfold.admin import ModelAdmin
+
 from coupons.models import Coupon
 
 
 @admin.register(Coupon)
-class CouponAdmin(admin.ModelAdmin):
+class CouponAdmin(ModelAdmin):
     list_display = (
         "code",
         "discount_type",
@@ -15,3 +17,4 @@ class CouponAdmin(admin.ModelAdmin):
     )
     list_filter = ("discount_type", "is_active")
     search_fields = ("code",)
+    ordering = ("code",)
