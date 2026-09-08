@@ -35,6 +35,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 DJANGO_APPS = [
+    "unfold",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -93,6 +94,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
         },
@@ -154,6 +156,17 @@ SIMPLE_JWT = {
     ),
     "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
+}
+
+UNFOLD = {
+    "SITE_TITLE": "ERP Command Center",
+    "SITE_HEADER": "ERP Command Center",
+    "SITE_SUBHEADER": "Administration",
+    "SITE_URL": "/",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": False,
+    "SHOW_BACK_BUTTON": False,
+    "BORDER_RADIUS": "10px",
 }
 
 IDEMPOTENCY_RETENTION_DAYS = config(
