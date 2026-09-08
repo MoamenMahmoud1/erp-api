@@ -49,11 +49,12 @@ class AnalyticsTests(TestCase):
             location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
         )
 
-    def _invoice(self, actor, *, product, quantity, price):
+    def _invoice(self, user, *, product, quantity, price, days_ago=0, discount=Decimal("0")):
         invoice = Invoice.objects.create(
             customer=self.customer,
-            created_by=actor,
-            status=Invoice.Status.CONFIRMED,
+            created_by=user,
+            status=Invoice.Status.PAID,
+            coupon_discount=discount,
         )
         InvoiceItem.objects.create(
             invoice=invoice,
@@ -61,9 +62,11 @@ class AnalyticsTests(TestCase):
             quantity=quantity,
             unit_price=Decimal(price),
         )
+        created_at = timezone.now() - timedelta(days=days_ago)
+        Invoice.objects.filter(pk=invoice.pk).update(created_at=created_at)
         return invoice
 
-    def _purchase(self, *, product, quantity, price):
+    def _purchase(self, *, product, quantity, price, days_ago=0):
         purchase = Purchase.objects.create(
             supplier=self.supplier,
             created_by=self.user,
@@ -75,10 +78,25 @@ class AnalyticsTests(TestCase):
             quantity=quantity,
             unit_purchase_price=Decimal(price),
         )
+        created_at = timezone.now() - timedelta(days=days_ago)
+        Purchase.objects.filter(pk=purchase.pk).update(created_at=created_at)
         return purchase
 
-    def test_sales_dashboard(self):
-        self._invoice(self.user, product=self.product_a, quantity=3, price="100")
+    def test_sales_dashboard_respects_date_range_and_discount(self):
+        self._invoice(
+            self.user,
+            product=self.product_a,
+            quantity=3,
+            price="100",
+            discount=Decimal("20"),
+        )
+        self._invoice(
+            self.user,
+            product=self.product_b,
+            quantity=2,
+            price="50",
+            days_ago=10,
+        )
         result = sales_dashboard(
             date_from=timezone.localdate() - timedelta(days=2),
             date_to=timezone.localdate(),
