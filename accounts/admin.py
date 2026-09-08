@@ -1,16 +1,30 @@
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.contrib.auth.admin import UserAdmin
-from django.utils.html import format_html
+from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import Group
 from django.urls import reverse
+from django.utils.html import format_html
+
+from unfold.admin import ModelAdmin
+from unfold.forms import AdminPasswordChangeForm, UserChangeForm, UserCreationForm
 
 from .models import Employee, Role
 
 User = get_user_model()
 
+try:
+    admin.site.unregister(Group)
+except admin.sites.NotRegistered:
+    pass
+
 
 @admin.register(User)
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
+    form = UserChangeForm
+    add_form = UserCreationForm
+    change_password_form = AdminPasswordChangeForm
+
     list_display = (
         "id",
         "username",
@@ -39,7 +53,7 @@ class CustomUserAdmin(UserAdmin):
 
     ordering = ("-date_joined",)
 
-    fieldsets = UserAdmin.fieldsets + (
+    fieldsets = BaseUserAdmin.fieldsets + (
         (
             "Additional Information",
             {
@@ -54,7 +68,7 @@ class CustomUserAdmin(UserAdmin):
         ),
     )
 
-    add_fieldsets = UserAdmin.add_fieldsets + (
+    add_fieldsets = BaseUserAdmin.add_fieldsets + (
         (
             "Additional Information",
             {
@@ -71,22 +85,23 @@ class CustomUserAdmin(UserAdmin):
 
     readonly_fields = ("updated_at", "password_changed_at")
 
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin, ModelAdmin):
+    search_fields = ("name",)
+    ordering = ("name",)
+
+
 @admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
+class EmployeeAdmin(ModelAdmin):
     list_display = (
         "id",
         "user_link",
         "manager",
+        "department",
+        "work_site",
         "created_at",
-        "updated_at",
     )
-    @admin.display(description="User", ordering="user__username")
-    def user_link(self, obj):
-        url = reverse(
-            "admin:accounts_customusermodel_change",
-            args=[obj.user_id],
-        )
-        return format_html('<a href="{}">{}</a>', url, obj.user)
 
     search_fields = (
         "user__username",
@@ -96,6 +111,8 @@ class EmployeeAdmin(admin.ModelAdmin):
     )
 
     list_filter = (
+        "department",
+        "work_site",
         "created_at",
     )
 
@@ -105,11 +122,15 @@ class EmployeeAdmin(admin.ModelAdmin):
         "user",
         "manager",
         "manager__user",
+        "department",
+        "work_site",
     )
 
     autocomplete_fields = (
         "user",
         "manager",
+        "department",
+        "work_site",
     )
 
     readonly_fields = (
@@ -117,9 +138,17 @@ class EmployeeAdmin(admin.ModelAdmin):
         "updated_at",
     )
 
+    @admin.display(description="User", ordering="user__username")
+    def user_link(self, obj):
+        url = reverse(
+            "admin:accounts_customusermodel_change",
+            args=[obj.user_id],
+        )
+        return format_html('<a href="{}">{}</a>', url, obj.user)
+
 
 @admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+class RoleAdmin(ModelAdmin):
     list_display = (
         "id",
         "code",
@@ -139,6 +168,8 @@ class RoleAdmin(admin.ModelAdmin):
         "-level",
         "code",
     )
+    list_select_related = ("group",)
+    autocomplete_fields = ("group",)
     readonly_fields = (
         "created_at",
         "updated_at",
