@@ -10,7 +10,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
 import { ProductsPage, CustomersPage, SuppliersPage, EmployeesPage } from './pages/MasterDataPages';
 import { CartonPricingPage, CouponsPage } from './pages/CommercialPages';
-import { SalesPage, InvoiceDetailsPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
+import { SalesPage, InvoiceDetailsPage, PurchaseDetailsPage, PaymentDetailsPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { InventoryLocationsPage, InventoryMovementsPage, InventoryTransferPage } from './pages/InventoryPages';
 import { CreateInvoicePage, CreatePurchasePage, CollectPaymentPage, SupplierPaymentPage } from './pages/TransactionPages';
 import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage } from './pages/AccountingPages';
@@ -94,6 +94,7 @@ export function App() {
     { path: '/sales/:id', permission: 'invoices.view_invoice', element: <InvoiceDetailsPage /> },
     { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage /> },
     { path: '/purchases', permission: 'purchases.view_purchase', element: <PurchasesPage /> },
+    { path: '/purchases/:id', permission: 'purchases.view_purchase', element: <PurchaseDetailsPage /> },
     { path: '/purchases/new', permission: 'purchases.add_purchase', element: <CreatePurchasePage /> },
     { path: '/products', permission: 'products.view_product', element: <ProductsPage /> },
     { path: '/products/cartons', permission: 'products.view_cartonpricing', element: <CartonPricingPage /> },
@@ -108,6 +109,7 @@ export function App() {
     { path: '/inventory/movements', permission: 'inventory.view_stockmovement', element: <InventoryMovementsPage /> },
     { path: '/inventory/transfer', permission: 'inventory.transfer_stock', element: <InventoryTransferPage /> },
     { path: '/payments', permission: 'payments.view_paymenttransaction', element: <PaymentsPage /> },
+    { path: '/payments/:id', permission: 'payments.view_paymenttransaction', element: <PaymentDetailsPage /> },
     { path: '/payments/collect', permission: 'payments.process_collection', element: <CollectPaymentPage /> },
     { path: '/payments/supplier', permission: 'purchases.process_supplier_payment', element: <SupplierPaymentPage /> },
     { path: '/accounting', permission: 'accounting.view_financial_reports', element: <AccountingHomePage /> },
