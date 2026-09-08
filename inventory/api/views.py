@@ -19,6 +19,7 @@ from inventory.services.transfer_stock import TransferStock
 class LocationListView(generics.ListAPIView):
     serializer_class = StockLocationSerializer
     permission_classes = (InventoryReadPermission,)
+    permission_codename = "inventory.view_stocklocation"
     pagination_class = StandardPagination
 
     def get_queryset(self):
@@ -28,6 +29,7 @@ class LocationListView(generics.ListAPIView):
 class StockBalanceListView(generics.ListAPIView):
     serializer_class = StockBalanceSerializer
     permission_classes = (InventoryReadPermission,)
+    permission_codename = "inventory.view_stockbalance"
     pagination_class = StandardPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = StockBalanceFilter
@@ -43,6 +45,7 @@ class StockBalanceListView(generics.ListAPIView):
 class MovementListView(generics.ListAPIView):
     serializer_class = StockMovementSerializer
     permission_classes = (InventoryReadPermission,)
+    permission_codename = "inventory.view_stockmovement"
     pagination_class = StandardPagination
     filter_backends = (DjangoFilterBackend,)
     filterset_class = StockMovementFilter
