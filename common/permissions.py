@@ -14,16 +14,30 @@ class ModelAccessPermission(DjangoModelPermissions):
 
 
 class ReadAuthenticatedWriteStaffPermission(BasePermission):
-    """Allow any authenticated user to read; restrict writes to staff.
-
-    This is a pragmatic, coarse authorization rule used by the transactional
-    domains (customers/products/coupons/invoices/payments) until full role-
-    based authorization is implemented in a later phase.
-    """
+    """Compatibility permission with explicit model permissions for writes."""
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        user = request.user
+        if not user or not user.is_authenticated:
             return False
+        if user.is_superuser:
+            return True
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return True
-        return request.user.is_staff or request.user.is_superuser
+
+        model = view.get_queryset().model
+        action = getattr(view, "action", None)
+        permission_map = {
+            "create": f"{model._meta.app_label}.add_{model._meta.model_name}",
+            "acreate": f"{model._meta.app_label}.add_{model._meta.model_name}",
+            "update": f"{model._meta.app_label}.change_{model._meta.model_name}",
+            "aupdate": f"{model._meta.app_label}.change_{model._meta.model_name}",
+            "partial_update": f"{model._meta.app_label}.change_{model._meta.model_name}",
+            "partial_aupdate": f"{model._meta.app_label}.change_{model._meta.model_name}",
+            "destroy": f"{model._meta.app_label}.delete_{model._meta.model_name}",
+            "adestroy": f"{model._meta.app_label}.delete_{model._meta.model_name}",
+        }
+        codename = permission_map.get(action)
+        if codename is None:
+            return False
+        return user.has_perm(codename)
