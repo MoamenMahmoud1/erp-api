@@ -44,6 +44,10 @@ class JournalLineSerializer(serializers.ModelSerializer):
 
 class JournalEntrySerializer(serializers.ModelSerializer):
     lines = JournalLineSerializer(many=True)
+    created_by_name = serializers.SerializerMethodField()
+    created_by_username = serializers.SerializerMethodField()
+    posted_by_name = serializers.SerializerMethodField()
+    posted_by_username = serializers.SerializerMethodField()
 
     class Meta:
         model = JournalEntry
@@ -57,7 +61,11 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "source_id",
             "status",
             "created_by",
+            "created_by_name",
+            "created_by_username",
             "posted_by",
+            "posted_by_name",
+            "posted_by_username",
             "posted_at",
             "created_at",
             "updated_at",
@@ -68,13 +76,33 @@ class JournalEntrySerializer(serializers.ModelSerializer):
             "number",
             "status",
             "created_by",
+            "created_by_name",
+            "created_by_username",
             "posted_by",
+            "posted_by_name",
+            "posted_by_username",
             "posted_at",
             "created_at",
             "updated_at",
             "source_type",
             "source_id",
         )
+
+    def get_created_by_name(self, obj):
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_created_by_username(self, obj):
+        return obj.created_by.username
+
+    def get_posted_by_name(self, obj):
+        if not obj.posted_by_id:
+            return None
+        return obj.posted_by.get_full_name() or obj.posted_by.username
+
+    def get_posted_by_username(self, obj):
+        if not obj.posted_by_id:
+            return None
+        return obj.posted_by.username
 
     def create(self, validated_data):
         raw_lines = validated_data.pop("lines")
