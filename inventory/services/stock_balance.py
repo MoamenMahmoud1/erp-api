@@ -76,6 +76,8 @@ class StockBalanceService:
         if balance.quantity == 0:
             balance.total_cost = Decimal("0.00")
         balance.save(update_fields=["quantity", "total_cost", "updated_at"])
+        balance._removed_unit_cost = average_unit_cost
+        balance._removed_cost = removed_cost
         return balance
 
     @staticmethod
