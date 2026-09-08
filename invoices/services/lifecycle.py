@@ -4,6 +4,7 @@ from django.db import transaction
 
 from accounting.models import JournalEntry
 from accounting.services import get_default_company, post_sales_invoice, reverse_source_entry
+from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
 from inventory.models import StockLocation, StockMovement, StockMovementItem
@@ -79,6 +80,13 @@ def confirm_invoice(invoice_id, actor=None):
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
+    record_event(
+        action="invoice.confirm",
+        entity_type="Invoice",
+        entity_id=invoice.pk,
+        actor_id=invoice.created_by_id,
+        metadata={"status": invoice.status, "stock_location_id": source.pk},
+    )
     return invoice
 
 
@@ -134,6 +142,13 @@ def cancel_invoice(invoice_id, actor=None):
     invoice.status = Invoice.Status.CANCELLED
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
+    record_event(
+        action="invoice.cancel",
+        entity_type="Invoice",
+        entity_id=invoice.pk,
+        actor_id=invoice.created_by_id,
+        metadata={"status": invoice.status},
+    )
     return invoice
 
 
