@@ -35,6 +35,11 @@ class InventoryPermissionTests(TestCase):
         request.user = None
         self.assertFalse(InventoryReadPermission().has_permission(request, StockBalanceListView()))
 
+    def test_request_without_user_attribute_is_denied(self):
+        request = self.factory.get("/api/v1/inventory/stock/")
+        self.assertFalse(InventoryReadPermission().has_permission(request, StockBalanceListView()))
+        self.assertFalse(InventoryTransferPermission().has_permission(request, TransferView()))
+
     def test_location_read_requires_explicit_permission(self):
         request, view = self._request("get", "/api/v1/inventory/locations/", LocationListView())
         self.assertFalse(InventoryReadPermission().has_permission(request, view))
