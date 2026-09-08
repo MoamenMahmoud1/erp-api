@@ -23,6 +23,8 @@ class PermissionPolicyTests(TestCase):
             content_type__app_label=app_label,
         )
         self.user.user_permissions.add(permission)
+        for cache_name in ("_perm_cache", "_user_perm_cache", "_group_perm_cache"):
+            self.user.__dict__.pop(cache_name, None)
 
     def test_product_requires_view_permission(self):
         request = self.factory.get("/api/v1/products/")
