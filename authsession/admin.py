@@ -1,12 +1,10 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from authsession.models import AuthSession
 
 
 @admin.register(AuthSession)
-class AuthSessionAdmin(ModelAdmin):
+class AuthSessionAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
