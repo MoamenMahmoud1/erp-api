@@ -32,6 +32,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
         source="manager.user",
         read_only=True,
     )
+    work_site_name = serializers.CharField(
+        source="work_site.name",
+        read_only=True,
+        allow_null=True,
+    )
+    department_name = serializers.CharField(
+        source="department.name",
+        read_only=True,
+        allow_null=True,
+    )
 
     class Meta:
         model = Employee
@@ -42,7 +52,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "manager",
             "manager_details",
             "work_site",
+            "work_site_name",
             "department",
+            "department_name",
             "created_at",
             "updated_at",
         )
