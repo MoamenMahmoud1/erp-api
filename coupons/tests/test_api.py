@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -22,6 +23,12 @@ class CouponAPITests(TestCase):
             password="StrongPass123!",
             is_staff=True,
         )
+        coupon_permissions = Permission.objects.filter(
+            content_type__app_label="coupons",
+            content_type__model="coupon",
+        )
+        self.user.user_permissions.add(coupon_permissions.get(codename="view_coupon"))
+        self.staff_user.user_permissions.add(*coupon_permissions)
         self.coupon = Coupon.objects.create(
             code="SAVE10",
             discount_type=Coupon.DiscountType.PERCENTAGE,
