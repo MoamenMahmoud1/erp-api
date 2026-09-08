@@ -1,3 +1,20 @@
 from django.contrib import admin
 
-# Register your models here.
+from unfold.admin import ModelAdmin
+
+from .models import Supplier
+
+
+@admin.register(Supplier)
+class SupplierAdmin(ModelAdmin):
+    list_display = (
+        "name",
+        "phone",
+        "email",
+        "is_active",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = ("is_active",)
+    search_fields = ("name", "phone", "email")
+    ordering = ("name",)
