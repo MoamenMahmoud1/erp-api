@@ -1,7 +1,5 @@
 from django.contrib import admin
 
-from unfold.admin import ModelAdmin
-
 from .models import StockBalance, StockLocation, StockMovement, StockMovementItem
 
 
@@ -11,7 +9,7 @@ class StockMovementItemInline(admin.TabularInline):
 
 
 @admin.register(StockLocation)
-class StockLocationAdmin(ModelAdmin):
+class StockLocationAdmin(admin.ModelAdmin):
     list_display = ("name", "location_type", "employee", "is_active", "created_at")
     list_filter = ("location_type", "is_active")
     search_fields = ("name", "employee__username", "employee__email")
@@ -22,7 +20,7 @@ class StockLocationAdmin(ModelAdmin):
 
 
 @admin.register(StockMovement)
-class StockMovementAdmin(ModelAdmin):
+class StockMovementAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "movement_type",
@@ -42,7 +40,7 @@ class StockMovementAdmin(ModelAdmin):
 
 
 @admin.register(StockBalance)
-class StockBalanceAdmin(ModelAdmin):
+class StockBalanceAdmin(admin.ModelAdmin):
     list_display = ("location", "product", "quantity", "updated_at")
     list_filter = ("location",)
     search_fields = ("location__name", "product__name")
@@ -50,4 +48,3 @@ class StockBalanceAdmin(ModelAdmin):
     list_select_related = ("location", "product")
     autocomplete_fields = ("location", "product")
     readonly_fields = ("updated_at",)
-
