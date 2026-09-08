@@ -17,7 +17,7 @@ from accounting.services import (
 )
 from accounts.models import CustomUserModel
 from customers.models import Customer
-from invoices.models import Invoice, InvoiceItem, InvoiceReturn
+from invoices.models import Invoice, InvoiceItem
 from organization.models import Company
 from payments.models import PaymentAllocation, PaymentRefund, PaymentTransaction
 from products.models import Product
