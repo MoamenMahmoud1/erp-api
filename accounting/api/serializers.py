@@ -10,15 +10,7 @@ class AccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = Account
         fields = (
-            "id",
-            "code",
-            "name",
-            "account_type",
-            "parent",
-            "is_active",
-            "normal_side",
-            "created_at",
-            "updated_at",
+            "id", "code", "name", "account_type", "parent", "is_active", "normal_side", "created_at", "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
 
@@ -26,9 +18,7 @@ class AccountSerializer(serializers.ModelSerializer):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         account_type = attrs.get("account_type", getattr(self.instance, "account_type", None))
         if parent and parent.account_type != account_type:
-            raise serializers.ValidationError(
-                {"parent": "A child account must use the same account type as its parent."}
-            )
+            raise serializers.ValidationError({"parent": "A child account must use the same account type as its parent."})
         return attrs
 
 
@@ -46,63 +36,67 @@ class JournalEntrySerializer(serializers.ModelSerializer):
     lines = JournalLineSerializer(many=True)
     created_by_name = serializers.SerializerMethodField()
     created_by_username = serializers.SerializerMethodField()
+    created_by_employee_name = serializers.SerializerMethodField()
     posted_by_name = serializers.SerializerMethodField()
     posted_by_username = serializers.SerializerMethodField()
+    posted_by_employee_name = serializers.SerializerMethodField()
+    source_label = serializers.SerializerMethodField()
 
     class Meta:
         model = JournalEntry
         fields = (
-            "id",
-            "number",
-            "entry_date",
-            "description",
-            "reference",
-            "source_type",
-            "source_id",
-            "status",
-            "created_by",
-            "created_by_name",
-            "created_by_username",
-            "posted_by",
-            "posted_by_name",
-            "posted_by_username",
-            "posted_at",
-            "created_at",
-            "updated_at",
-            "lines",
+            "id", "number", "entry_date", "description", "reference", "source_type", "source_id", "source_label", "status",
+            "created_by", "created_by_name", "created_by_username", "created_by_employee_name",
+            "posted_by", "posted_by_name", "posted_by_username", "posted_by_employee_name", "posted_at",
+            "created_at", "updated_at", "lines",
         )
         read_only_fields = (
-            "id",
-            "number",
-            "status",
-            "created_by",
-            "created_by_name",
-            "created_by_username",
-            "posted_by",
-            "posted_by_name",
-            "posted_by_username",
-            "posted_at",
-            "created_at",
-            "updated_at",
-            "source_type",
-            "source_id",
+            "id", "number", "status", "created_by", "created_by_name", "created_by_username", "created_by_employee_name",
+            "posted_by", "posted_by_name", "posted_by_username", "posted_by_employee_name", "posted_at",
+            "created_at", "updated_at", "source_type", "source_id", "source_label",
         )
 
+    @staticmethod
+    def _user_name(user):
+        if user is None:
+            return None
+        return user.get_full_name() or user.username
+
     def get_created_by_name(self, obj):
-        return obj.created_by.get_full_name() or obj.created_by.username
+        return self._user_name(obj.created_by)
 
     def get_created_by_username(self, obj):
         return obj.created_by.username
 
+    def get_created_by_employee_name(self, obj):
+        employee = getattr(obj.created_by, "employee", None)
+        return str(employee) if employee is not None else None
+
     def get_posted_by_name(self, obj):
-        if not obj.posted_by_id:
-            return None
-        return obj.posted_by.get_full_name() or obj.posted_by.username
+        return self._user_name(obj.posted_by)
 
     def get_posted_by_username(self, obj):
+        return obj.posted_by.username if obj.posted_by_id else None
+
+    def get_posted_by_employee_name(self, obj):
         if not obj.posted_by_id:
             return None
-        return obj.posted_by.username
+        employee = getattr(obj.posted_by, "employee", None)
+        return str(employee) if employee is not None else None
+
+    def get_source_label(self, obj):
+        labels = {
+            "invoice.sale": "Sales invoice",
+            "invoice.return": "Sales return",
+            "invoice.sale.reversal": "Sales invoice reversal",
+            "purchase.confirmation": "Purchase",
+            "purchase.return": "Purchase return",
+            "purchase.confirmation.reversal": "Purchase reversal",
+            "payment.collection": "Customer collection",
+            "payment.refund": "Customer payment refund",
+            "payment.supplier": "Supplier payment",
+        }
+        return labels.get(obj.source_type, obj.source_type or None)
 
     def create(self, validated_data):
         raw_lines = validated_data.pop("lines")
@@ -144,16 +138,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
     class Meta:
         model = Expense
         fields = (
-            "id",
-            "expense_account",
-            "payment_account",
-            "amount",
-            "expense_date",
-            "description",
-            "reference",
-            "created_by",
-            "created_at",
-            "updated_at",
+            "id", "expense_account", "payment_account", "amount", "expense_date", "description", "reference",
+            "created_by", "created_at", "updated_at",
         )
         read_only_fields = ("id", "created_by", "created_at", "updated_at")
 
@@ -167,24 +153,9 @@ class AccountingPeriodSerializer(serializers.ModelSerializer):
     class Meta:
         model = AccountingPeriod
         fields = (
-            "id",
-            "name",
-            "start_date",
-            "end_date",
-            "is_closed",
-            "closed_by",
-            "closed_at",
-            "created_at",
-            "updated_at",
+            "id", "name", "start_date", "end_date", "is_closed", "closed_by", "closed_at", "created_at", "updated_at",
         )
-        read_only_fields = (
-            "id",
-            "is_closed",
-            "closed_by",
-            "closed_at",
-            "created_at",
-            "updated_at",
-        )
+        read_only_fields = ("id", "is_closed", "closed_by", "closed_at", "created_at", "updated_at")
 
     def validate(self, attrs):
         if attrs["start_date"] > attrs["end_date"]:
