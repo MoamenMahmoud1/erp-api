@@ -31,6 +31,7 @@ export type CrudField = {
   options?: CrudOption[];
   required?: boolean;
   createOnly?: boolean;
+  clearable?: boolean;
 };
 export type CrudColumn = {
   key: string;
@@ -313,7 +314,8 @@ export function CrudPage({
                     value={String(form[field.key] ?? '')}
                     onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
                     required={field.required}
-                    allowDeselect={false}
+                    allowDeselect={field.clearable === true}
+                    clearable={field.clearable === true}
                     radius="lg"
                   />
                 );
