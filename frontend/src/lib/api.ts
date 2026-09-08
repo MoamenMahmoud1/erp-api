@@ -137,6 +137,7 @@ export const api = {
   employees: {
     list: (query = '') => request<Paginated>(`/employees/${query}`),
     get: (id: number) => request(`/employees/${id}/`),
+    options: (query = '') => request<Paginated>(`/employees/options/${query}`),
     create: (body: Json) => jsonRequest('/employees/', 'POST', body),
     update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body),
     delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
