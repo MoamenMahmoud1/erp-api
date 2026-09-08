@@ -113,8 +113,6 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         metadata={
             "customer_id": customer.pk,
             "invoices_allocated": allocated_invoices,
-            "cash": str(cash),
-            "transfer": str(transfer),
         },
     )
     return payment
