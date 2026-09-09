@@ -9,7 +9,7 @@ class CollectionPermission(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and (user.is_staff or user.is_superuser or user.has_perm("payments.process_collection"))
+            and (user.is_superuser or user.has_perm("payments.process_collection"))
         )
 
 
@@ -19,7 +19,7 @@ class RefundPermission(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and (user.is_staff or user.is_superuser or user.has_perm("payments.refund_payment"))
+            and (user.is_superuser or user.has_perm("payments.refund_payment"))
         )
 
 
@@ -29,5 +29,5 @@ class TransactionReadPermission(BasePermission):
         return bool(
             user
             and user.is_authenticated
-            and (user.is_staff or user.is_superuser or user.has_perm("payments.view_paymenttransaction"))
+            and (user.is_superuser or user.has_perm("payments.view_paymenttransaction"))
         )

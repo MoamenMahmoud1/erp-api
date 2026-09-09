@@ -1,1 +1,1 @@
-"""Product business services."""
+"""Product domain services."""

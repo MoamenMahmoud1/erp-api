@@ -22,9 +22,9 @@ class InvoicePermission(BasePermission):
         user = request.user
         if not user or not user.is_authenticated:
             return False
+        if user.is_superuser:
+            return True
         if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        if user.is_staff or user.is_superuser:
-            return True
+            return user.has_perm("invoices.view_invoice")
         codename = self.ACTION_PERMISSIONS.get(getattr(view, "action", None))
         return bool(codename and user.has_perm(codename))

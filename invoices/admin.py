@@ -19,4 +19,8 @@ class InvoiceAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("status", "created_at")
+    search_fields = ("customer__name", "created_by__username")
+    ordering = ("-created_at", "-id")
+    list_select_related = ("customer", "created_by")
+    autocomplete_fields = ("customer", "created_by")
     inlines = (InvoiceItemInline,)

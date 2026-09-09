@@ -2,6 +2,12 @@ from .settings_base import *
 
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
+AUTH_COOKIE_SECURE = False
+
+# The React/Vite development server runs on port 5173.
+FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 
 INSTALLED_APPS += [
     'django_extensions',
@@ -41,30 +47,42 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 30
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
-
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+# Keep the required local development origins even when the .env file
+# provides a custom origin list. This prevents local frontend ports from
+# silently replacing the safe development defaults.
+def _origins_from_env(name):
+    value = config(name, default="")
+    return [origin.strip() for origin in value.split(',') if origin.strip()]
 
 
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://127.0.0.1:5500,http://localhost:5500,http://localhost:3000',
-    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
-)
-CSRF_TRUSTED_ORIGINS = config(
-    'CSRF_TRUSTED_ORIGINS',
-    default='http://127.0.0.1:5500,http://localhost:5500,http://localhost:3000',
-    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
-)
+DEV_FRONTEND_ORIGINS = [
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://localhost:3000",
+]
+
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys([
+    *DEV_FRONTEND_ORIGINS,
+    *_origins_from_env('CORS_ALLOWED_ORIGINS'),
+]))
+
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys([
+    *DEV_FRONTEND_ORIGINS,
+    *_origins_from_env('CSRF_TRUSTED_ORIGINS'),
+]))
 
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'apihigh-erp-dev',
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+        'TIMEOUT': 300,
     },
 }
 
 TRUSTED_PROXY_IPS = ()
-
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'

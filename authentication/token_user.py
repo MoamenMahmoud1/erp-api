@@ -2,25 +2,49 @@ from rest_framework_simplejwt.models import TokenUser
 
 
 class ERPTokenUser(TokenUser):
-    """Stateless user backed only by trusted JWT claims."""
+    """TokenUser hydrated from the active server-side Redis session snapshot."""
+
+    def __init__(self, token, *, snapshot):
+        super().__init__(token)
+        self._snapshot = snapshot
+
+    @property
+    def username(self):
+        return self._snapshot.get("username", "")
+
+    @property
+    def email(self):
+        return self._snapshot.get("email", "")
+
+    @property
+    def first_name(self):
+        return self._snapshot.get("first_name", "")
+
+    @property
+    def last_name(self):
+        return self._snapshot.get("last_name", "")
+
+    @property
+    def is_active(self):
+        return bool(self._snapshot.get("is_active", True))
 
     @property
     def is_staff(self):
-        return bool(self.token.get("is_staff", False))
+        return bool(self._snapshot.get("is_staff", False))
 
     @property
     def is_superuser(self):
-        return bool(self.token.get("is_superuser", False))
+        return bool(self._snapshot.get("is_superuser", False))
 
     @property
     def role_level(self):
         try:
-            return int(self.token.get("role_level", 0))
+            return int(self._snapshot.get("role_level", 0))
         except (TypeError, ValueError):
             return 0
 
     def get_all_permissions(self, obj=None):
-        permissions = self.token.get("permissions", ())
+        permissions = self._snapshot.get("permissions", ())
         if not isinstance(permissions, (list, tuple, set)):
             return set()
         return set(permissions)
@@ -47,3 +71,7 @@ class ERPTokenUser(TokenUser):
             permission.startswith(prefix)
             for permission in self.get_all_permissions()
         )
+
+    @property
+    def auth_session_snapshot(self):
+        return self._snapshot

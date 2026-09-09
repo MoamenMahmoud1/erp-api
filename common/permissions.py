@@ -2,6 +2,8 @@ from rest_framework.permissions import BasePermission, DjangoModelPermissions
 
 
 class ModelAccessPermission(DjangoModelPermissions):
+    """Require the Django model permission for every API operation."""
+
     perms_map = {
         **DjangoModelPermissions.perms_map,
         "GET": [
@@ -14,16 +16,7 @@ class ModelAccessPermission(DjangoModelPermissions):
 
 
 class ReadAuthenticatedWriteStaffPermission(BasePermission):
-    """Allow any authenticated user to read; restrict writes to staff.
-
-    This is a pragmatic, coarse authorization rule used by the transactional
-    domains (customers/products/coupons/invoices/payments) until full role-
-    based authorization is implemented in a later phase.
-    """
+    """Backward-compatible name for the strict model-permission policy."""
 
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
-            return False
-        if request.method in ("GET", "HEAD", "OPTIONS"):
-            return True
-        return request.user.is_staff or request.user.is_superuser
+        return ModelAccessPermission().has_permission(request, view)

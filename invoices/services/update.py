@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from accounts.services.employee_shift import require_open_shift
 from common.exceptions import InvalidBusinessOperation
 from invoices.models import Invoice, InvoiceItem
 
@@ -13,8 +14,15 @@ def update_invoice(*, invoice_id, validated_data, actor=None):
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidBusinessOperation("Only draft invoices can be edited.")
 
+    if actor is not None:
+        current_shift = require_open_shift(actor)
+        if current_shift is not None and invoice.site_id != current_shift.site_id:
+            raise InvalidBusinessOperation("The invoice belongs to a different site than the current shift.")
+
     data = validated_data.copy()
     items = data.pop("items", None)
+    data.pop("site", None)
+    data.pop("shift", None)
     if items is not None:
         if not items:
             raise InvalidBusinessOperation("An invoice must contain at least one item.")
@@ -25,17 +33,29 @@ def update_invoice(*, invoice_id, validated_data, actor=None):
             raise InvalidBusinessOperation("Inactive products cannot be added to an invoice.")
         invoice.items.all().delete()
         InvoiceItem.objects.bulk_create(
-            [InvoiceItem(invoice=invoice, product=item["product"], quantity=item["quantity"], unit_price=item["product"].selling_price) for item in items]
+            [
+                InvoiceItem(
+                    invoice=invoice,
+                    product=item["product"],
+                    quantity=item["quantity"],
+                    unit_price=item["product"].selling_price,
+                )
+                for item in items
+            ]
         )
 
+    changed_fields = {"updated_at"}
     for field, value in data.items():
-        setattr(invoice, field, value)
+        if field not in {"site", "shift"}:
+            setattr(invoice, field, value)
+            changed_fields.add(field)
 
     if invoice.coupon_id:
         _validate_coupon(invoice.coupon, invoice)
         invoice.coupon_discount = _calculator.coupon_discount_value(invoice.coupon, _calculator.subtotal(invoice))
+        changed_fields.add("coupon_discount")
 
-    invoice.save(update_fields=("customer", "coupon_discount", "updated_at"))
+    invoice.save(update_fields=changed_fields)
     return invoice
 
 

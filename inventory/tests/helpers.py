@@ -1,10 +1,10 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-
-from products.models import Product
+from django.contrib.auth.models import Permission
 
 from inventory.models import StockLocation
+from products.models import Product
 
 
 class InventoryTestMixin:
@@ -16,6 +16,16 @@ class InventoryTestMixin:
             password="StrongPass123!",
             is_staff=True,
         )
+        permissions = Permission.objects.filter(
+            content_type__app_label="inventory",
+            codename__in=(
+                "view_stocklocation",
+                "view_stockbalance",
+                "view_stockmovement",
+                "transfer_stock",
+            ),
+        )
+        self.user.user_permissions.set(permissions)
         self.product = Product.objects.create(
             name="Widget",
             purchase_price=Decimal("50.00"),

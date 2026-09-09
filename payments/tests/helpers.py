@@ -1,9 +1,11 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
+from organization.models import Company
 from products.models import Product
 
 
@@ -15,6 +17,11 @@ class PaymentTestMixin:
             password="StrongPass123!",
             is_staff=True,
         )
+        payment_permissions = Permission.objects.filter(
+            content_type__app_label="payments",
+        )
+        self.user.user_permissions.add(*payment_permissions)
+        self.company = Company.objects.create(name="Payment Test Company")
         self.customer = Customer.objects.create(name="Acme")
         self.product = Product.objects.create(
             name="Widget",

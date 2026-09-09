@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
 from accounts.models.role import Role
+from authsession.cache import cache_active_session, delete_auth_session_cache, delete_auth_session_caches
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 
@@ -38,14 +39,6 @@ class AuthSessionTooNew(Exception):
         self.eligible_at = eligible_at
 
 
-def _set_authorization_claims(token, user):
-    """Populate only the authorization claims needed by stateless requests."""
-    token["is_staff"] = bool(user.is_staff)
-    token["is_superuser"] = bool(user.is_superuser)
-    token["role_level"] = Role.level_for_user(user)
-    token["permissions"] = sorted(user.get_all_permissions())
-
-
 def _presented_session(refresh_token, access_token):
     try:
         refresh = RefreshToken(refresh_token)
@@ -67,8 +60,6 @@ def _session_matches(*, auth_session, refresh_jti, user_id, device_id):
     return (
         auth_session.revoked_at is None
         and auth_session.expires_at > timezone.now()
-        # Simple JWT 5.5.1 stringifies the user_id claim for stateless users.
-        # Normalize both sides before comparing with the integer DB FK.
         and str(auth_session.user_id) == str(user_id)
         and auth_session.device_id == device_id
         and auth_session.current_refresh_jti == refresh_jti
@@ -136,6 +127,13 @@ def verify_current_auth_session(
 
         auth_session.verified_at = now
         auth_session.save(update_fields=("verified_at",))
+        transaction.on_commit(
+            lambda: cache_active_session(
+                auth_session=auth_session,
+                user=user,
+                access_token=access_token,
+            )
+        )
 
     return auth_session
 
@@ -152,20 +150,28 @@ def start_auth_session(*, user, client_context: ClientContext):
 
         refresh = RefreshToken.for_user(locked_user)
         refresh["sid"] = str(session_id)
-        _set_authorization_claims(refresh, locked_user)
         access = refresh.access_token
         expires_at = datetime.fromtimestamp(
             refresh["exp"],
             tz=datetime_timezone.utc,
         )
 
-        AuthSession.objects.filter(
-            user_id=locked_user.pk,
-            device_id=client_context.device_id,
-            revoked_at__isnull=True,
-        ).update(revoked_at=timezone.now())
+        revoked_session_ids = tuple(
+            AuthSession.objects.filter(
+                user_id=locked_user.pk,
+                device_id=client_context.device_id,
+                revoked_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+        if revoked_session_ids:
+            AuthSession.objects.filter(pk__in=revoked_session_ids).update(
+                revoked_at=timezone.now()
+            )
+            transaction.on_commit(
+                lambda ids=revoked_session_ids: delete_auth_session_caches(ids)
+            )
 
-        AuthSession.objects.create(
+        auth_session = AuthSession.objects.create(
             id=session_id,
             user_id=locked_user.pk,
             device_id=client_context.device_id,
@@ -174,6 +180,13 @@ def start_auth_session(*, user, client_context: ClientContext):
             ip_address=client_context.ip_address,
             current_refresh_jti=uuid.UUID(refresh["jti"]),
             expires_at=expires_at,
+        )
+        transaction.on_commit(
+            lambda: cache_active_session(
+                auth_session=auth_session,
+                user=locked_user,
+                access_token=access,
+            )
         )
 
     return AuthSessionResult(
@@ -234,7 +247,6 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
                 )
                 new_refresh = RefreshToken.for_user(auth_session.user)
                 new_refresh["sid"] = str(auth_session.id)
-                _set_authorization_claims(new_refresh, auth_session.user)
                 new_refresh["exp"] = int(auth_session.expires_at.timestamp())
 
                 new_access = new_refresh.access_token
@@ -258,10 +270,21 @@ def refresh_auth_session(*, refresh_token, client_context: ClientContext):
                         "verified_at",
                     )
                 )
+                transaction.on_commit(
+                    lambda: cache_active_session(
+                        auth_session=auth_session,
+                        user=auth_session.user,
+                        access_token=new_access,
+                    )
+                )
     except AuthSession.DoesNotExist as error:
+        delete_auth_session_cache(session_id)
         raise InvalidAuthSession from error
 
     if invalid_session:
+        transaction.on_commit(
+            lambda: delete_auth_session_cache(session_id)
+        )
         raise InvalidAuthSession
 
     return RefreshSessionResult(
@@ -285,16 +308,30 @@ def revoke_auth_session(*, user_id, refresh_token, device_id):
     if str(user_id) != token_user_id:
         return
 
-    AuthSession.objects.filter(
-        id=session_id,
-        user_id=user_id,
-        device_id=device_id,
-        revoked_at__isnull=True,
-    ).update(revoked_at=timezone.now())
+    with transaction.atomic():
+        updated = AuthSession.objects.filter(
+            id=session_id,
+            user_id=user_id,
+            device_id=device_id,
+            revoked_at__isnull=True,
+        ).update(revoked_at=timezone.now())
+        if updated:
+            transaction.on_commit(lambda: delete_auth_session_cache(session_id))
 
 
 def revoke_all_sessions(*, user_id):
-    return AuthSession.objects.filter(
-        user_id=user_id,
-        revoked_at__isnull=True,
-    ).update(revoked_at=timezone.now())
+    with transaction.atomic():
+        session_ids = tuple(
+            AuthSession.objects.filter(
+                user_id=user_id,
+                revoked_at__isnull=True,
+            ).values_list("pk", flat=True)
+        )
+        updated = AuthSession.objects.filter(
+            pk__in=session_ids,
+        ).update(revoked_at=timezone.now())
+        if updated:
+            transaction.on_commit(
+                lambda ids=session_ids: delete_auth_session_caches(ids)
+            )
+        return updated

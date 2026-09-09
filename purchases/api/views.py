@@ -11,13 +11,15 @@ from purchases.api.serializers import (
     PurchaseReturnInputSerializer,
     PurchaseReturnSerializer,
     PurchaseSerializer,
+    SupplierPaymentSerializer,
 )
-from purchases.models import Purchase
+from purchases.models import Purchase, SupplierPayment
 from purchases.permissions.purchase import PurchaseAccessPermission
 from purchases.services.cancel_purchase import CancelPurchaseService
 from purchases.services.confirm_purchase import ConfirmPurchaseService
 from purchases.services.draft import CreatePurchase, DeletePurchase, UpdatePurchase
 from purchases.services.return_purchase import ReturnPurchase
+from purchases.services.supplier_payment import PaySupplier
 
 
 def _purchase_error(exc):
@@ -146,3 +148,33 @@ class PurchaseReturnView(generics.GenericAPIView):
         except InvalidBusinessOperation as exc:
             return _purchase_error(exc)
         return Response(PurchaseReturnSerializer(result).data, status=status.HTTP_201_CREATED)
+
+
+class SupplierPaymentView(generics.CreateAPIView):
+    permission_classes = (PurchaseAccessPermission,)
+    permission_codename = "purchases.process_supplier_payment"
+    throttle_classes = (SensitiveActionThrottle,)
+    serializer_class = SupplierPaymentSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        try:
+            payment = PaySupplier()(
+                supplier=data["supplier"],
+                cash_amount=data["cash_amount"],
+                transfer_amount=data["transfer_amount"],
+                paid_by_id=request.user.pk,
+                reference=data.get("reference", ""),
+                actor=request.user,
+            )
+        except InvalidBusinessOperation as exc:
+            return _purchase_error(exc)
+        payment = (
+            SupplierPayment.objects
+            .select_related("supplier", "paid_by")
+            .prefetch_related("allocations__purchase")
+            .get(pk=payment.pk)
+        )
+        return Response(self.get_serializer(payment).data, status=status.HTTP_201_CREATED)

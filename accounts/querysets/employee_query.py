@@ -1,37 +1,31 @@
 from django.db import models
-from django.db.models.expressions import RawSQL
+from django.db.models import Q, Subquery
 
-from accounts.models.role import GLOBAL_EMPLOYEE_VISIBILITY_LEVEL, Role
+from accounts.models.role import Role
 
 
 class EmployeeQuerySet(models.QuerySet):
     def visible_to(self, user, *, role_level=None):
         if not user or not user.is_authenticated:
             return self.none()
-
         if user.is_superuser:
             return self
 
-        if role_level is None:
-            role_level = Role.level_for_user(user)
-
-        if role_level >= GLOBAL_EMPLOYEE_VISIBILITY_LEVEL:
+        role_scope = Role.scope_for_user(user)
+        if role_scope == Role.Scope.COMPANY:
             return self
 
-        visible_employee_ids = RawSQL(
-            """
-            WITH RECURSIVE visible_employees(id) AS (
-                SELECT id
-                FROM accounts_employee
-                WHERE user_id = %s
-                UNION
-                SELECT employee.id
-                FROM accounts_employee AS employee
-                INNER JOIN visible_employees AS visible
-                    ON employee.manager_id = visible.id
+        employee = getattr(user, "employee", None)
+        if employee is None or employee.work_site_id is None:
+            return self.filter(user_id=user.pk)
+
+        if role_scope == Role.Scope.BRANCH:
+            return self.filter(
+                Q(work_site_id=employee.work_site_id)
+                | Q(work_site__parent_id=employee.work_site_id)
             )
-            SELECT id FROM visible_employees
-            """,
-            (user.pk,),
+
+        employee_ids = Subquery(
+            self.model.objects.filter(user_id=user.pk).values("pk")
         )
-        return self.filter(pk__in=visible_employee_ids)
+        return self.filter(pk=employee_ids)

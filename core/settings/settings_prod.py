@@ -95,16 +95,11 @@ AWS_S3_FILE_OVERWRITE = False
 AWS_DEFAULT_ACL = None
 AWS_QUERYSTRING_AUTH = config("AWS_QUERYSTRING_AUTH", default=True, cast=bool)
 
+# Redis is a cache layer, not the source of truth for AuthSession history.
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
         "LOCATION": config("REDIS_URL"),
-        "KEY_PREFIX": "apihigh",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SOCKET_CONNECT_TIMEOUT": 2,
-            "SOCKET_TIMEOUT": 2,
-            "IGNORE_EXCEPTIONS": True,
-        },
+        "TIMEOUT": 300,
     },
 }

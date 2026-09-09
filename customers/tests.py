@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -21,6 +22,12 @@ class CustomerAPITests(TestCase):
             password="test-password",
             is_staff=True,
         )
+        customer_permissions = Permission.objects.filter(
+            content_type__app_label="customers",
+            content_type__model="customer",
+        )
+        self.user.user_permissions.add(customer_permissions.get(codename="view_customer"))
+        self.staff.user_permissions.add(*customer_permissions)
         self.customer = Customer.objects.create(name="Acme")
         self.client = APIClient()
 

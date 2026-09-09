@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 
 from products.models import Product
 from purchases.querysets.purchase import PurchaseQuerySet
@@ -16,6 +16,8 @@ class Purchase(models.Model):
         CANCELLED = "CANCELLED", "Cancelled"
 
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="purchases")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="purchases")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="purchases")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     reference = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchases")
@@ -25,10 +27,15 @@ class Purchase(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="purchase_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="purchase_shift_created_idx"),
+        ]
         permissions = [
             ("confirm_purchase", "Can confirm purchase"),
             ("cancel_purchase", "Can cancel purchase"),
             ("return_purchase", "Can return items from a purchase"),
+            ("process_supplier_payment", "Can process a supplier payment"),
         ]
 
     def __str__(self):
@@ -43,17 +50,18 @@ class PurchaseItem(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="purchase_items")
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    unit_purchase_price = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal("0"))],
-    )
+    unit_purchase_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    batch_number = models.CharField(max_length=100, null=True, blank=True)
+    manufactured_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    batch = models.ForeignKey("inventory.InventoryBatch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_items")
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("purchase", "product"), name="purchase_item_unique_product"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="purchase_item_quantity_positive"),
             models.CheckConstraint(condition=Q(unit_purchase_price__gte=0), name="purchase_item_price_non_negative"),
+            models.CheckConstraint(condition=Q(expiry_date__isnull=True) | Q(manufactured_date__isnull=True) | Q(expiry_date__gte=F("manufactured_date")), name="purchase_item_dates_ordered"),
         ]
         ordering = ("id",)
 
@@ -64,12 +72,18 @@ class PurchaseItem(models.Model):
 
 class PurchaseReturn(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, related_name="returns")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_returns")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_returns")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchase_returns")
     reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="purchase_return_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="purchase_return_shift_created_idx"),
+        ]
 
     @property
     def total_amount(self):
@@ -92,3 +106,58 @@ class PurchaseReturnItem(models.Model):
     @property
     def line_total(self):
         return self.unit_price * self.quantity
+
+
+class SupplierPayment(models.Model):
+    supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="supplier_payments")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="supplier_payments")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="supplier_payments")
+    paid_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="supplier_payments_made")
+    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    reference = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("supplier", "created_at"), name="suppay_supplier_created_idx"),
+            models.Index(fields=("site", "created_at"), name="suppay_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="suppay_shift_created_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_cash_non_negative"),
+            models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_transfer_non_negative"),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="supplier_payment_amount_positive"),
+        ]
+
+    @property
+    def total_amount(self):
+        return self.cash_amount + self.transfer_amount
+
+    def __str__(self):
+        return f"Supplier Payment #{self.pk}"
+
+
+class SupplierPaymentAllocation(models.Model):
+    payment = models.ForeignKey(SupplierPayment, on_delete=models.CASCADE, related_name="allocations")
+    purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, related_name="supplier_payment_allocations")
+    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("payment", "purchase"), name="supplier_payment_alloc_payment_purchase_unique"),
+            models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_alloc_cash_non_negative"),
+            models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_alloc_transfer_non_negative"),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="supplier_payment_alloc_amount_positive"),
+        ]
+
+    @property
+    def total_amount(self):
+        return self.cash_amount + self.transfer_amount
+
+    def __str__(self):
+        return f"Supplier Payment Allocation #{self.pk}"

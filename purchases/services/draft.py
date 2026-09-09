@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from accounts.services.employee_shift import operation_context
 from common.exceptions import InvalidBusinessOperation
 from purchases.models import Purchase, PurchaseItem
 
@@ -12,6 +13,11 @@ def _validate_items(items):
         raise InvalidBusinessOperation("A product cannot appear more than once.")
     if any(not item["product"].is_active for item in items):
         raise InvalidBusinessOperation("Inactive products cannot be added to a purchase.")
+    for item in items:
+        manufactured_date = item.get("manufactured_date")
+        expiry_date = item.get("expiry_date")
+        if manufactured_date and expiry_date and expiry_date < manufactured_date:
+            raise InvalidBusinessOperation("Expiry date cannot be before manufactured date.")
 
 
 def _scoped_purchase(purchase_id, actor, *, for_update=True):
@@ -28,10 +34,22 @@ def _scoped_purchase(purchase_id, actor, *, for_update=True):
 def create_purchase(*, created_by, validated_data):
     data = validated_data.copy()
     items = data.pop("items")
+    requested_site = data.pop("site", None)
+    data.pop("shift", None)
     _validate_items(items)
     if not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
-    purchase = Purchase.objects.create(created_by=created_by, **data)
+
+    _employee, site, shift = operation_context(created_by, requested_site=requested_site)
+    if site is None:
+        raise InvalidBusinessOperation("A site is required before creating a purchase.")
+
+    purchase = Purchase.objects.create(
+        created_by_id=created_by.pk,
+        site=site,
+        shift_id=shift.pk if shift else None,
+        **data,
+    )
     PurchaseItem.objects.bulk_create([PurchaseItem(purchase=purchase, **item) for item in items])
     return purchase
 
@@ -43,6 +61,8 @@ def update_purchase(*, purchase_id, validated_data, actor):
         raise InvalidBusinessOperation("Only draft purchases can be edited.")
     data = validated_data.copy()
     items = data.pop("items", None)
+    data.pop("site", None)
+    data.pop("shift", None)
     if "supplier" in data and not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
     if items is not None:

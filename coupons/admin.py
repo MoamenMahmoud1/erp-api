@@ -15,3 +15,4 @@ class CouponAdmin(admin.ModelAdmin):
     )
     list_filter = ("discount_type", "is_active")
     search_fields = ("code",)
+    ordering = ("code",)

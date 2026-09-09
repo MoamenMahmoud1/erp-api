@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import AuthenticationFailed
@@ -10,6 +11,7 @@ from authsession.api.serializers import (
     AuthSessionSerializer,
     AuthSessionVerificationSerializer,
 )
+from authsession.cache import delete_auth_session_cache
 from authsession.http import NoStoreResponseMixin, clear_login_cookies, get_device_id
 from authsession.models import AuthSession
 from authsession.permissions import CurrentAuthSessionPermission
@@ -106,10 +108,16 @@ class AuthSessionViewSet(
     def destroy(self, request, *args, **kwargs):
         auth_session = self.get_object()
         is_current = get_device_id(request) == auth_session.device_id
-        AuthSession.objects.filter(
-            pk=auth_session.pk,
-            revoked_at__isnull=True,
-        ).update(revoked_at=timezone.now())
+
+        with transaction.atomic():
+            updated = AuthSession.objects.filter(
+                pk=auth_session.pk,
+                revoked_at__isnull=True,
+            ).update(revoked_at=timezone.now())
+            if updated:
+                transaction.on_commit(
+                    lambda: delete_auth_session_cache(auth_session.pk)
+                )
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         if is_current:

@@ -23,6 +23,7 @@ urlpatterns = [
     path("api/v1/purchases/", include("purchases.urls")),
     path("api/v1/suppliers/", include("suppliers.urls")),
     path("api/v1/inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
+    path("api/v1/accounting/", include(("accounting.urls", "accounting"), namespace="accounting")),
     path("admin/", admin.site.urls),
 ]
 

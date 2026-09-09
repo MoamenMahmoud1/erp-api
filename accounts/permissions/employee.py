@@ -9,6 +9,8 @@ class EmployeeAccessPermission(BasePermission):
         "alist": "accounts.view_employee",
         "retrieve": "accounts.view_employee",
         "aretrieve": "accounts.view_employee",
+        "options": "accounts.add_employee",
+        "aoptions": "accounts.add_employee",
         "create": "accounts.add_employee",
         "acreate": "accounts.add_employee",
         "update": "accounts.change_employee",

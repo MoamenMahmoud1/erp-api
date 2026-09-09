@@ -7,3 +7,4 @@ from .models import Customer
 class CustomerAdmin(admin.ModelAdmin):
     list_display = ("name", "phone", "created_at")
     search_fields = ("name", "phone")
+    ordering = ("name",)

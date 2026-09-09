@@ -1,5 +1,7 @@
+from django.urls import path
 from rest_framework.routers import SimpleRouter
 
+from .api.intelligence import product_intelligence_view
 from .api.views import CartonPricingViewSet, ProductViewSet
 
 app_name = "products"
@@ -8,4 +10,7 @@ router = SimpleRouter()
 router.register("products", ProductViewSet, basename="product")
 router.register("carton-pricings", CartonPricingViewSet, basename="cartonpricing")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("intelligence/", product_intelligence_view, name="product-intelligence"),
+    *router.urls,
+]
