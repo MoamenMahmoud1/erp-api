@@ -26,7 +26,7 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
 
     def test_create_uses_server_product_price(self):
         invoice = CreateInvoice()(
-            created_by_id=self.user.pk,
+            created_by=self.user,
             validated_data={
                 "customer": self.customer,
                 "items": [{"product": self.product, "quantity": 2, "unit_price": Decimal("1.00")}],
