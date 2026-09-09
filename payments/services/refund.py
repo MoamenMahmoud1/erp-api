@@ -4,6 +4,7 @@ from accounting.services import get_default_company, post_payment_refund
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
+from common.report_events import schedule_report_refresh
 from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentRefund
 
@@ -50,4 +51,5 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
         actor_id=created_by_id,
         metadata={"invoice_id": invoice.pk, "transaction_id": transaction_id, "reason": reason},
     )
+    schedule_report_refresh(refresh_product_intelligence=True)
     return invoice
