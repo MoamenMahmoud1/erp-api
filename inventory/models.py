@@ -110,8 +110,8 @@ class StockBatchBalance(models.Model):
             models.CheckConstraint(condition=Q(total_cost__gte=Decimal("0")), name="stock_batch_balance_total_cost_non_negative"),
         ]
         indexes = [
-            models.Index(fields=("location", "quantity"), name="stock_batch_balance_location_qty_idx"),
-            models.Index(fields=("batch", "location"), name="stock_batch_balance_batch_loc_idx"),
+            models.Index(fields=("location", "quantity"), name="sbb_loc_qty_idx"),
+            models.Index(fields=("batch", "location"), name="sbb_batch_loc_idx"),
         ]
 
     @property

@@ -1,7 +1,8 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Coalesce, Sum
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from auditlog.services import record_event
@@ -153,7 +154,12 @@ def _shift_payment_totals(shift):
 def close_shift(*, user, closing_cash, closing_transfer, notes=""):
     employee = employee_for_user(user)
     try:
-        shift = EmployeeShift.objects.select_for_update().select_related("site", "vehicle").get(employee=employee, status=EmployeeShift.Status.OPEN)
+        shift = (
+            EmployeeShift.objects
+            .select_for_update(of=("self",))
+            .select_related("site", "vehicle")
+            .get(employee=employee, status=EmployeeShift.Status.OPEN)
+        )
     except EmployeeShift.DoesNotExist as exc:
         raise ShiftError("There is no open shift for this employee.") from exc
 

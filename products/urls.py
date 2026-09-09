@@ -11,6 +11,7 @@ router.register("products", ProductViewSet, basename="product")
 router.register("carton-pricings", CartonPricingViewSet, basename="cartonpricing")
 
 urlpatterns = [
-    path("intelligence/", product_intelligence_view, name="product-intelligence"),
+    path("products/intelligence/", product_intelligence_view, name="product-intelligence"),
+    path("intelligence/", product_intelligence_view, name="product-intelligence-legacy"),
     *router.urls,
 ]

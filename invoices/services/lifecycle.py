@@ -10,7 +10,7 @@ from accounting.services import get_default_company, post_sales_invoice, reverse
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
-from inventory.models import StockLocation, StockMovement, StockMovementItem
+from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice
 
@@ -114,6 +114,29 @@ def confirm_invoice(invoice_id, actor=None):
     return invoice
 
 
+def _validate_cancellation_stock_position(*, invoice_id, sale, source_location):
+    """Prevent cancelling a sale after its recorded source stock has moved away."""
+    for sale_item in sale.items.all():
+        if sale_item.batch_id:
+            available = (
+                StockBatchBalance.objects
+                .filter(location=source_location, batch_id=sale_item.batch_id)
+                .values_list("quantity", flat=True)
+                .first()
+            ) or 0
+        else:
+            available = (
+                StockBalance.objects
+                .filter(location=source_location, product=sale_item.product)
+                .values_list("quantity", flat=True)
+                .first()
+            ) or 0
+        if available < sale_item.quantity:
+            raise InvalidBusinessOperation(
+                f"Cannot cancel invoice #{invoice_id}: the sold stock is no longer available at the original location."
+            )
+
+
 @transaction.atomic
 def cancel_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
@@ -132,6 +155,9 @@ def cancel_invoice(invoice_id, actor=None):
         )
         if sale is None or sale.source_location is None:
             raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
+
+        _validate_cancellation_stock_position(invoice_id=invoice.pk, sale=sale, source_location=sale.source_location)
+
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
@@ -163,6 +189,12 @@ def cancel_invoice(invoice_id, actor=None):
     log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
     record_event(action="invoice.cancel", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "site_id": invoice.site_id, "shift_id": (shift.pk if shift else invoice.shift_id)})
     return invoice
+
+
+# Kept for compatibility with older internal callers/tests. It intentionally
+# bypasses actor/shift checks and is only suitable for trusted service code.
+def _cancel_invoice_sync(invoice_id):
+    return cancel_invoice(invoice_id, actor=None)
 
 
 class ConfirmInvoice:

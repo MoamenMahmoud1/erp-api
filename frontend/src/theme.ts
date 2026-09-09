@@ -1,7 +1,7 @@
 import { createTheme, rem } from '@mantine/core';
 
 export const theme = createTheme({
-  primaryColor: 'indigo',
+  primaryColor: 'blue',
   primaryShade: { light: 6, dark: 5 },
   defaultRadius: 'md',
   fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -9,18 +9,17 @@ export const theme = createTheme({
     fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
     fontWeight: '700',
   },
-  defaultGradient: { from: 'indigo', to: 'cyan', deg: 120 },
   spacing: {
-    xs: rem(8),
-    sm: rem(12),
-    md: rem(16),
-    lg: rem(24),
-    xl: rem(32),
+    xs: rem(6),
+    sm: rem(10),
+    md: rem(14),
+    lg: rem(20),
+    xl: rem(28),
   },
   shadows: {
-    sm: '0 6px 20px rgba(0, 0, 0, 0.16)',
-    md: '0 14px 45px rgba(0, 0, 0, 0.20)',
-    lg: '0 24px 70px rgba(0, 0, 0, 0.28)',
+    xs: '0 1px 2px rgba(15, 23, 42, 0.04)',
+    sm: '0 4px 12px rgba(15, 23, 42, 0.06)',
+    md: '0 10px 24px rgba(15, 23, 42, 0.08)',
   },
   focusClassName: 'erp-focus',
   cursorType: 'pointer',

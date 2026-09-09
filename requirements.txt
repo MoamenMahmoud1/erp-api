@@ -1,6 +1,4 @@
-# Runtime dependencies
-
-# Core framework
+# Core
 Django==6.0.8
 djangorestframework==3.17.2
 django-filter==26.1
@@ -11,13 +9,9 @@ drf-spectacular==0.30.0
 celery[redis]==5.6.2
 
 # Database
-# The pool extra enables psycopg 3 connection pooling.
 psycopg[binary,pool]==3.3.4
 
-# Production server
-gunicorn==26.0.0
-
-# Authentication / sessions / email / uploads
+# API / application services
 django-cors-headers==4.9.0
 django-phonenumber-field[phonenumbers]==8.5.0
 Pillow==12.3.0
@@ -26,6 +20,9 @@ Pillow==12.3.0
 django-storages==1.14.6
 boto3==1.43.55
 redis==8.0.1
+
+# Production
+Gunicorn==26.0.0
 
 # Configuration
 python-decouple==3.8

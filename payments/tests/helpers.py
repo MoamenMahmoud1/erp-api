@@ -3,9 +3,10 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 
+from accounts.models import Employee
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
-from organization.models import Company
+from organization.models import Company, Site
 from products.models import Product
 
 
@@ -22,6 +23,16 @@ class PaymentTestMixin:
         )
         self.user.user_permissions.add(*payment_permissions)
         self.company = Company.objects.create(name="Payment Test Company")
+        self.site = Site.objects.create(
+            company=self.company,
+            code="PAY-BR",
+            name="Payment Test Branch",
+            site_type=Site.Type.BRANCH,
+            address_line_1="Test address",
+            city="Cairo",
+            country_code="EG",
+        )
+        Employee.objects.create(user=self.user, work_site=self.site)
         self.customer = Customer.objects.create(name="Acme")
         self.product = Product.objects.create(
             name="Widget",
@@ -32,6 +43,7 @@ class PaymentTestMixin:
     def create_invoice(self, *, total="100.00", status=Invoice.Status.CONFIRMED):
         invoice = Invoice.objects.create(
             customer=self.customer,
+            site=self.site,
             created_by=self.user,
             status=status,
         )

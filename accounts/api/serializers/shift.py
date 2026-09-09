@@ -22,6 +22,15 @@ class EmployeeShiftSerializer(serializers.ModelSerializer):
         return str(obj.employee)
 
 
+class EmployeeShiftVehicleOptionSerializer(serializers.ModelSerializer):
+    """Compact serializer for the sales vehicles available to the current employee."""
+
+    class Meta:
+        model = StockLocation
+        fields = ("id", "name")
+        read_only_fields = fields
+
+
 class StartEmployeeShiftSerializer(serializers.Serializer):
     opening_cash = serializers.DecimalField(max_digits=14, decimal_places=2, min_value=0, required=False, default="0.00")
     vehicle = serializers.PrimaryKeyRelatedField(

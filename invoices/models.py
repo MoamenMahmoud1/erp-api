@@ -126,8 +126,8 @@ class InvoiceReturn(models.Model):
     class Meta:
         ordering = ("-created_at",)
         indexes = [
-            models.Index(fields=("site", "created_at"), name="invoice_return_site_created_idx"),
-            models.Index(fields=("shift", "created_at"), name="invoice_return_shift_created_idx"),
+            models.Index(fields=("site", "created_at"), name="iret_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="iret_shift_created_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=Q(refund_amount__gte=Decimal("0")), name="invoice_return_refund_amount_non_negative"),

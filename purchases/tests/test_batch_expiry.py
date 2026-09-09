@@ -3,13 +3,13 @@ from decimal import Decimal
 
 from django.test import TestCase
 
-from inventory.models import InventoryBatch, StockBatchBalance
+from accounts.models import CustomUserModel
+from inventory.models import InventoryBatch, StockBatchBalance, StockLocation
 from organization.models import Company
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.confirm_purchase import ConfirmPurchaseService
 from suppliers.models import Supplier
-from accounts.models import CustomUserModel
 
 
 class PurchaseBatchExpiryTests(TestCase):
@@ -26,6 +26,10 @@ class PurchaseBatchExpiryTests(TestCase):
             name="Milk",
             purchase_price=Decimal("20.00"),
             selling_price=Decimal("30.00"),
+        )
+        self.warehouse = StockLocation.objects.create(
+            name="Main Warehouse",
+            location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
         )
 
     def test_confirm_creates_batch_with_purchase_dates(self):
