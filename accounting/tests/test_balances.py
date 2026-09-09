@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.utils import timezone
 
+from accounting.models import Account, JournalEntry, JournalLine
 from accounting.services import (
     customer_aging,
     customer_balances,
@@ -15,6 +16,7 @@ from accounting.services import (
     supplier_aging,
     supplier_balances,
 )
+from accounting.services.ledger_balances import owner_ledger_balances
 from accounts.models import CustomUserModel
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
@@ -117,6 +119,39 @@ class BalanceReportTests(TestCase):
         self.assertEqual(result[0]["purchased"], Decimal("200"))
         self.assertEqual(result[0]["paid"], Decimal("75"))
         self.assertEqual(result[0]["balance"], Decimal("125"))
+
+    def test_owner_ledger_balances_query_count_is_bounded(self):
+        account = Account.objects.create(
+            company=self.company,
+            code="1200",
+            name="Accounts Receivable",
+            account_type=Account.AccountType.ASSET,
+        )
+        invoice = self._invoice(self.customer)
+        entry = JournalEntry.objects.create(
+            company=self.company,
+            number=1,
+            entry_date=timezone.localdate(),
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            created_by=self.user,
+            status=JournalEntry.Status.POSTED,
+        )
+        JournalLine.objects.create(
+            entry=entry,
+            account=account,
+            debit=Decimal("100"),
+            credit=Decimal("0"),
+        )
+
+        with self.assertNumQueries(5):
+            result = owner_ledger_balances(
+                owner_kind="customer",
+                as_of=timezone.localdate(),
+                company=self.company,
+            )
+
+        self.assertEqual(result[self.customer.pk], Decimal("100"))
 
     def test_customer_aging_places_open_invoice_in_correct_bucket(self):
         as_of = timezone.localdate()
