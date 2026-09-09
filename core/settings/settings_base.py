@@ -5,7 +5,6 @@ Base settings shared between development & production.
 from datetime import timedelta
 from pathlib import Path
 
-from celery.schedules import crontab
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -150,8 +149,8 @@ REPORT_CACHE_TTL = config("REPORT_CACHE_TTL", default=30, cast=int)
 if REPORT_CACHE_TTL < 1:
     raise ValueError("REPORT_CACHE_TTL must be >= 1")
 
-# Celery uses the configured Redis infrastructure by default. Production can
-# override the broker independently with CELERY_BROKER_URL.
+# Celery infrastructure is configured now but intentionally has no active Beat
+# schedule. Long-running analytics jobs will use it in a later phase.
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -164,16 +163,6 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
-CELERY_BEAT_SCHEDULE = {
-    "warm-analytics-reports": {
-        "task": "accounting.tasks.warm_analytics_reports",
-        "schedule": crontab(minute="*/15"),
-    },
-    "refresh-product-intelligence": {
-        "task": "products.tasks.refresh_product_intelligence",
-        "schedule": crontab(minute=0),
-    },
-}
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
