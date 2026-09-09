@@ -4,6 +4,7 @@ from common.exceptions import InvalidBusinessOperation
 from invoices.models import Invoice, InvoiceItem
 
 from .coupon import _calculator, _validate_coupon
+from .create import _resolve_site
 from .lifecycle import load_invoice_for_update
 
 
@@ -20,22 +21,38 @@ def update_invoice(*, invoice_id, validated_data, actor=None):
             raise InvalidBusinessOperation("An invoice must contain at least one item.")
         product_ids = [item["product"].pk for item in items]
         if len(product_ids) != len(set(product_ids)):
-            raise InvalidBusinessOperation("A product cannot appear more than once in an invoice.")
+            raise InvalidBusinessOperation("A product cannot appear more than once.")
         if any(not item["product"].is_active for item in items):
             raise InvalidBusinessOperation("Inactive products cannot be added to an invoice.")
         invoice.items.all().delete()
         InvoiceItem.objects.bulk_create(
-            [InvoiceItem(invoice=invoice, product=item["product"], quantity=item["quantity"], unit_price=item["product"].selling_price) for item in items]
+            [
+                InvoiceItem(
+                    invoice=invoice,
+                    product=item["product"],
+                    quantity=item["quantity"],
+                    unit_price=item["product"].selling_price,
+                )
+                for item in items
+            ]
         )
 
+    if "site" in data:
+        if actor is None:
+            raise InvalidBusinessOperation("An actor is required to change an invoice site.")
+        data["site"] = _resolve_site(created_by_id=actor.pk, site=data["site"])
+
+    changed_fields = {"updated_at"}
     for field, value in data.items():
         setattr(invoice, field, value)
+        changed_fields.add(field)
 
     if invoice.coupon_id:
         _validate_coupon(invoice.coupon, invoice)
         invoice.coupon_discount = _calculator.coupon_discount_value(invoice.coupon, _calculator.subtotal(invoice))
+        changed_fields.add("coupon_discount")
 
-    invoice.save(update_fields=("customer", "coupon_discount", "updated_at"))
+    invoice.save(update_fields=changed_fields)
     return invoice
 
 
