@@ -6,7 +6,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from common.money import quantize_money
-from inventory.models import InventoryBatch, StockBalance, StockBatchBalance
+from inventory.models import StockBalance, StockBatchBalance
 
 
 class StockBalanceService:
@@ -26,26 +26,14 @@ class StockBalanceService:
         updated = (
             StockBalance.objects
             .filter(location=location, product=product)
-            .update(
-                quantity=F("quantity") + quantity,
-                total_cost=F("total_cost") + added_cost,
-            )
+            .update(quantity=F("quantity") + quantity, total_cost=F("total_cost") + added_cost)
         )
-
         if updated == 0:
             try:
                 with transaction.atomic():
-                    StockBalance.objects.create(
-                        location=location,
-                        product=product,
-                        quantity=quantity,
-                        total_cost=added_cost,
-                    )
+                    StockBalance.objects.create(location=location, product=product, quantity=quantity, total_cost=added_cost)
             except IntegrityError:
-                StockBalance.objects.filter(
-                    location=location,
-                    product=product,
-                ).update(
+                StockBalance.objects.filter(location=location, product=product).update(
                     quantity=F("quantity") + quantity,
                     total_cost=F("total_cost") + added_cost,
                 )
@@ -54,10 +42,7 @@ class StockBalanceService:
             batch_updated = (
                 StockBatchBalance.objects
                 .filter(location=location, batch=batch)
-                .update(
-                    quantity=F("quantity") + quantity,
-                    total_cost=F("total_cost") + added_cost,
-                )
+                .update(quantity=F("quantity") + quantity, total_cost=F("total_cost") + added_cost)
             )
             if batch_updated == 0:
                 try:
@@ -69,10 +54,7 @@ class StockBalanceService:
                             total_cost=added_cost,
                         )
                 except IntegrityError:
-                    StockBatchBalance.objects.filter(
-                        location=location,
-                        batch=batch,
-                    ).update(
+                    StockBatchBalance.objects.filter(location=location, batch=batch).update(
                         quantity=F("quantity") + quantity,
                         total_cost=F("total_cost") + added_cost,
                     )
@@ -107,7 +89,10 @@ class StockBalanceService:
         if batch_balance is None or batch_balance.quantity < quantity:
             raise ValueError("Insufficient batch stock.")
 
-        average_unit_cost, removed_cost = StockBalanceService._decrease_batch_locked(balance=batch_balance, quantity=quantity)
+        average_unit_cost, removed_cost = StockBalanceService._decrease_batch_locked(
+            balance=batch_balance,
+            quantity=quantity,
+        )
         aggregate = StockBalance.objects.select_for_update().get(location=location, product=batch.product)
         if aggregate.quantity < quantity:
             raise ValueError("Aggregate stock is inconsistent with batch stock.")
@@ -141,25 +126,19 @@ class StockBalanceService:
             .select_for_update()
             .select_related("batch__product")
             .filter(location=location, batch__product=product, quantity__gt=0)
-            .filter(batch__expiry_date__isnull=True) | StockBatchBalance.objects.none()
+            .filter(batch__expiry_date__isnull=True)
         )
-        batch_rows = list(
+        batch_rows += list(
             StockBatchBalance.objects
             .select_for_update()
             .select_related("batch__product")
-            .filter(location=location, batch__product=product, quantity__gt=0)
-            .filter(batch__expiry_date__isnull=True)
-            | StockBatchBalance.objects.select_for_update().select_related("batch__product").filter(
+            .filter(
                 location=location,
                 batch__product=product,
                 quantity__gt=0,
                 batch__expiry_date__gte=today,
             )
         )
-        batch_rows.sort(key=lambda row: (row.batch.expiry_date is None, row.batch.expiry_date or timezone.localdate().max if False else row.batch.expiry_date, row.batch_id))
-
-        # The sort above is intentionally replaced by a deterministic Python key below;
-        # None-expiry batches are always used after dated, non-expired batches.
         batch_rows.sort(key=lambda row: (row.batch.expiry_date is None, row.batch.expiry_date or today, row.batch_id))
 
         for batch_balance in batch_rows:
@@ -167,6 +146,8 @@ class StockBalanceService:
                 break
             take = min(remaining, batch_balance.quantity)
             unit_cost, removed_cost = StockBalanceService._decrease_batch_locked(balance=batch_balance, quantity=take)
+            aggregate.quantity -= take
+            aggregate.total_cost = max(Decimal("0.00"), aggregate.total_cost - removed_cost)
             allocations.append({"batch": batch_balance.batch, "quantity": take, "unit_cost": unit_cost, "cost": removed_cost})
             remaining -= take
 
@@ -190,16 +171,14 @@ class StockBalanceService:
             allocations.append({"batch": None, "quantity": remaining, "unit_cost": average_unit_cost, "cost": removed_cost})
             remaining = 0
 
-        removed_quantity = sum(item["quantity"] for item in allocations)
-        if removed_quantity != quantity:
+        if sum(item["quantity"] for item in allocations) != quantity:
             raise ValueError("Stock allocation failed to cover requested quantity.")
         if aggregate.quantity == 0:
             aggregate.total_cost = Decimal("0.00")
         aggregate.save(update_fields=("quantity", "total_cost", "updated_at"))
         aggregate._stock_allocations = allocations
-        total_removed_cost = sum((item["cost"] for item in allocations), Decimal("0.00"))
-        aggregate._removed_cost = total_removed_cost
-        aggregate._removed_unit_cost = quantize_money(total_removed_cost / Decimal(quantity)) if quantity else Decimal("0.00")
+        aggregate._removed_cost = sum((item["cost"] for item in allocations), Decimal("0.00"))
+        aggregate._removed_unit_cost = quantize_money(aggregate._removed_cost / Decimal(quantity))
         return aggregate
 
     @staticmethod
