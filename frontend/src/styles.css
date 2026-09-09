@@ -48,7 +48,6 @@ a { color: inherit; text-decoration: none; }
   background: var(--erp-bg);
 }
 
-.glass,
 .surface-panel,
 .bento-card {
   background: var(--erp-surface);
@@ -282,7 +281,6 @@ a { color: inherit; text-decoration: none; }
 
 [data-mantine-color-scheme="light"] body { background: var(--erp-bg); color: var(--erp-text); }
 
-[data-mantine-color-scheme="light"] .glass,
 [data-mantine-color-scheme="light"] .surface-panel,
 [data-mantine-color-scheme="light"] .bento-card {
   background: var(--erp-surface);
