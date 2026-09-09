@@ -19,6 +19,14 @@ class Company(models.Model):
         editable=False,
     )
 
+    # Transactional counters used for cheap master-data dashboard metrics.
+    # They are maintained on writes and reconciled by a daily background job.
+    product_count = models.PositiveBigIntegerField(default=0)
+    invoice_count = models.PositiveBigIntegerField(default=0)
+    customer_count = models.PositiveBigIntegerField(default=0)
+    supplier_count = models.PositiveBigIntegerField(default=0)
+    counters_reconciled_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
