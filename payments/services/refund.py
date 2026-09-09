@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from accounts.services.employee_shift import employee_for_user, require_open_shift
+from accounts.services.employee_shift import operation_context
 from accounting.services import get_default_company, post_payment_refund
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
@@ -28,9 +28,11 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise RefundError("Only confirmed or paid invoices can be refunded.")
 
-    shift = require_open_shift(actor) if actor is not None else None
-    employee = employee_for_user(actor) if actor is not None else None
-    site_id = shift.site_id if shift else (employee.work_site_id if employee else invoice.site_id)
+    shift = None
+    site = None
+    if actor is not None:
+        _employee, site, shift = operation_context(actor)
+    site_id = site.pk if site else invoice.site_id
     if shift is not None and invoice.site_id != shift.site_id:
         raise RefundError("The invoice belongs to a different site than the current shift.")
 
