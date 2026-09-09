@@ -6,11 +6,14 @@ from products.models import Product
 
 class StockLocationSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
+    site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
 
     class Meta:
         model = StockLocation
         fields = (
             "id",
+            "site",
+            "site_name",
             "name",
             "location_type",
             "employee",
@@ -29,11 +32,12 @@ class StockLocationSerializer(serializers.ModelSerializer):
 class StockBalanceSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     location_name = serializers.CharField(source="location.name", read_only=True)
+    site_name = serializers.CharField(source="location.site.name", read_only=True, allow_null=True)
     average_unit_cost = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = StockBalance
-        fields = ("id", "product", "product_name", "location", "location_name", "quantity", "total_cost", "average_unit_cost", "updated_at")
+        fields = ("id", "product", "product_name", "location", "location_name", "site_name", "quantity", "total_cost", "average_unit_cost", "updated_at")
         read_only_fields = fields
 
 
@@ -50,23 +54,17 @@ class StockMovementItemSerializer(serializers.ModelSerializer):
 class StockMovementSerializer(serializers.ModelSerializer):
     source_location_name = serializers.CharField(source="source_location.name", read_only=True, allow_null=True)
     destination_location_name = serializers.CharField(source="destination_location.name", read_only=True, allow_null=True)
+    source_site_name = serializers.CharField(source="source_location.site.name", read_only=True, allow_null=True)
+    destination_site_name = serializers.CharField(source="destination_location.site.name", read_only=True, allow_null=True)
     created_by_name = serializers.SerializerMethodField()
     items = StockMovementItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = StockMovement
         fields = (
-            "id",
-            "movement_type",
-            "source_location",
-            "source_location_name",
-            "destination_location",
-            "destination_location_name",
-            "created_by",
-            "created_by_name",
-            "created_at",
-            "reference",
-            "items",
+            "id", "movement_type", "source_location", "source_location_name", "source_site_name",
+            "destination_location", "destination_location_name", "destination_site_name", "created_by",
+            "created_by_name", "created_at", "reference", "items",
         )
         read_only_fields = fields
 
