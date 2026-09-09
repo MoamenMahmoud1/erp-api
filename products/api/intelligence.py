@@ -2,10 +2,22 @@ from django.utils.dateparse import parse_date
 from django.utils.timezone import localdate
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
-from common.permissions import ReadAuthenticatedWriteStaffPermission
+from products.models import Product
 from products.services.intelligence import product_intelligence
+
+
+class ProductIntelligencePermission(BasePermission):
+    message = "You do not have permission to view product intelligence."
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.has_perm("products.view_product")
+        )
 
 
 def _positive_int(request, name, default, maximum):
@@ -33,7 +45,7 @@ def _positive_int(request, name, default, maximum):
     ],
 )
 @api_view(["GET"])
-@permission_classes([ReadAuthenticatedWriteStaffPermission])
+@permission_classes([ProductIntelligencePermission])
 def product_intelligence_view(request):
     """Return explainable product demand and stock recommendations."""
     as_of_raw = request.query_params.get("as_of")
