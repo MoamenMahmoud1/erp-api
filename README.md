@@ -1,83 +1,65 @@
 # ERP API
 
-A production-oriented ERP backend built with Django and Django REST Framework, with a React/TypeScript frontend in the same repository.
+Production-oriented ERP backend and web application built with **Django**, **Django REST Framework**, **PostgreSQL**, **Redis**, and **Celery**.
 
-## What it provides
+The repository contains the central business API and a permission-aware **React/TypeScript web frontend**. It is the web/administration side of the ERP platform; the complementary **Flutter mobile client** for sales representatives and warehouse staff lives in [`sales_erp`](https://github.com/MoamenMahmoud1/sales_erp).
 
-- Organization, sites, departments and employees
-- Role-based and permission-based access control
-- Customer and supplier management
-- Product catalog and carton pricing
+## Features
+
+- Organization, sites, departments, employees, roles, and permissions
+- Customers, suppliers, products, and carton pricing
 - Purchases and atomic stock intake
-- Invoices with historical price snapshots and lifecycle handling
-- Inventory balances and immutable stock-movement history
+- Invoices with historical price snapshots and lifecycle transitions
+- Inventory balances with an immutable stock-movement ledger
 - Payments and deterministic invoice allocation
-- Accounting journals, balances, analytics and financial reporting
-- Product intelligence for demand, stock cover and reorder recommendations
-- Stateful authentication sessions backed by Redis with stateless JWT access tokens
-- Authentication throttling and session-aware permissions
+- Accounting journals, balances, P&L, cash-flow, and operational reporting
+- Product intelligence for demand trends, stock cover, margins, and reorder recommendations
+- Secure JWT authentication with refresh/session state and throttling
+- Redis-backed caching, throttling, and authentication session state
+- Celery background and scheduled jobs
 
 ## Architecture
 
 ```text
-React + TypeScript frontend
-            |
-            v
-     Django REST API
-            |
-   +--------+--------+
-   |        |        |
-   v        v        v
-PostgreSQL Redis    Celery
-   |
-   +--> transactional source of truth
+                    React + TypeScript
+                          Web App
+                             |
+                             v
+                    Django REST API
+                             |
+              +--------------+--------------+
+              |              |              |
+              v              v              v
+         PostgreSQL        Redis          Celery
+        source of truth   cache/auth     background jobs
 ```
 
-The project keeps domain boundaries explicit: each business area owns its models, serializers, views, URLs, permissions and tests. Transactional business operations use database transactions and row-level locking where required to protect financial and inventory integrity.
+The backend keeps domain boundaries explicit and isolates transactional business operations behind service layers. Critical financial and inventory writes use database transactions and row-level locking to preserve integrity under concurrent requests.
 
-The API is served through ASGI, while database transactions remain isolated behind synchronous service boundaries where needed. PostgreSQL is the system of record; Redis supports caching, throttling and authentication-session state. Celery is used for scheduled integrity work and background jobs.
-
-## Authentication and authorization
-
-- JWT access tokens
-- Refresh/session state stored in `AuthSession`
-- Redis-backed server-side session snapshots
-- HttpOnly cookie handling for sensitive authentication flows
-- Role and permission checks at the API layer
-- Request throttling
-
-## Reporting and product intelligence
-
-The reporting layer reads from authoritative transactional domains and exposes live operational analytics such as sales, purchases, inventory, top products, employee sales, P&L and cash-flow views.
-
-Product intelligence is deterministic and explainable rather than machine-learning based. It derives demand trend, average daily sales, stock cover, estimated margin and reorder recommendations from historical transactional data.
+The API is served through **ASGI**. PostgreSQL is the system of record, Redis handles caching/throttling/session workloads, and Celery handles background processing.
 
 ## Frontend
 
-The repository also contains a React/TypeScript ERP workspace built with Vite, Mantine and React Router. It includes responsive workflows for sales, purchasing, inventory, organization and accounting, with permission-aware navigation and validation/error states.
+The included React/TypeScript frontend provides permission-aware workflows for sales, purchasing, inventory, organization, accounting, reporting, and related administration tasks.
 
-## Infrastructure and quality
+## Quality & Infrastructure
 
-- Docker / Docker Compose for PostgreSQL and Redis
+- Docker / Docker Compose
 - Gunicorn production configuration
-- PostgreSQL connection pooling through psycopg 3
+- psycopg 3 connection pooling
 - GitHub Actions CI
-- Django checks and migration checks
-- Application test suites organized by domain
-- Frontend TypeScript build verification
-- Ruff-based code quality checks
+- Automated Django, migration, and domain-level tests
+- Ruff code-quality checks
+- OpenAPI documentation with drf-spectacular
 
-## Local development
+## Development
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Start PostgreSQL and Redis
-
 docker compose up -d
-
 python manage.py migrate
 python manage.py runserver
 ```
@@ -90,14 +72,18 @@ npm install
 npm run dev
 ```
 
-## Tests
+Tests:
 
 ```bash
 python manage.py test
 ```
 
-The CI workflow also runs domain-specific test suites against PostgreSQL and builds the React frontend.
+## Related Repository
 
-## Documentation
+**Mobile client:** [`MoamenMahmoud1/sales_erp`](https://github.com/MoamenMahmoud1/sales_erp)
 
-Detailed design notes and domain decisions are available under [`docs/`](docs/), including access control, invoice behavior, money conventions, operations/disaster recovery, reporting and intelligence, permissions and testing.
+Together, `erp-api` and `sales_erp` form the web and mobile applications of the same ERP platform.
+
+## License
+
+This repository is **proprietary**. All rights are reserved by the copyright holder. No permission is granted to use, copy, modify, distribute, publish, sublicense, or create derivative works from this code without prior written permission. See [`LICENSE`](LICENSE).
