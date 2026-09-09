@@ -3,14 +3,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from accounting.permissions import AccountingReportPermission
-from accounting.services.analytics import (
-    dashboard_overview,
-    inventory_dashboard,
-    purchase_dashboard,
-    sales_by_employee,
-    sales_dashboard,
-    top_products,
-)
+from accounting.services.analytics import dashboard_overview, inventory_dashboard, purchase_dashboard, sales_by_employee, sales_dashboard, top_products
+from organization.models import Site
 
 
 def _date_range(request):
@@ -38,18 +32,29 @@ def _positive_int(request, name, default, maximum):
     return value, None
 
 
+def _site_id(request):
+    value = request.query_params.get("site")
+    if value is None:
+        return None, None
+    try:
+        site_id = int(value)
+    except (TypeError, ValueError):
+        return None, Response({"detail": "site must be a positive integer."}, status=400)
+    if site_id <= 0 or not Site.objects.filter(pk=site_id).exists():
+        return None, Response({"detail": "site does not exist."}, status=400)
+    return site_id, None
+
+
 @api_view(["GET"])
 @permission_classes([AccountingReportPermission])
 def dashboard_overview_view(request):
     date_from, date_to, error = _date_range(request)
     if error:
         return error
-    return Response(
-        dashboard_overview(
-            date_from=parse_date(date_from) if date_from else None,
-            date_to=parse_date(date_to) if date_to else None,
-        )
-    )
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response(dashboard_overview(date_from=parse_date(date_from) if date_from else None, date_to=parse_date(date_to) if date_to else None, site_id=site_id))
 
 
 @api_view(["GET"])
@@ -58,7 +63,10 @@ def sales_dashboard_view(request):
     date_from, date_to, error = _date_range(request)
     if error:
         return error
-    return Response(sales_dashboard(date_from=date_from, date_to=date_to))
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response(sales_dashboard(date_from=date_from, date_to=date_to, site_id=site_id))
 
 
 @api_view(["GET"])
@@ -67,7 +75,10 @@ def purchase_dashboard_view(request):
     date_from, date_to, error = _date_range(request)
     if error:
         return error
-    return Response(purchase_dashboard(date_from=date_from, date_to=date_to))
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response(purchase_dashboard(date_from=date_from, date_to=date_to, site_id=site_id))
 
 
 @api_view(["GET"])
@@ -76,7 +87,10 @@ def inventory_dashboard_view(request):
     threshold, error = _positive_int(request, "low_stock_threshold", 10, 1000000)
     if error:
         return error
-    return Response(inventory_dashboard(low_stock_threshold=threshold))
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response(inventory_dashboard(low_stock_threshold=threshold, site_id=site_id))
 
 
 @api_view(["GET"])
@@ -88,7 +102,10 @@ def top_products_view(request):
     limit, error = _positive_int(request, "limit", 10, 100)
     if error:
         return error
-    return Response({"date_from": date_from, "date_to": date_to, "products": top_products(date_from=date_from, date_to=date_to, limit=limit)})
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response({"date_from": date_from, "date_to": date_to, "site_id": site_id, "products": top_products(date_from=date_from, date_to=date_to, limit=limit, site_id=site_id)})
 
 
 @api_view(["GET"])
@@ -97,4 +114,7 @@ def sales_by_employee_view(request):
     date_from, date_to, error = _date_range(request)
     if error:
         return error
-    return Response({"date_from": date_from, "date_to": date_to, "employees": sales_by_employee(date_from=date_from, date_to=date_to)})
+    site_id, error = _site_id(request)
+    if error:
+        return error
+    return Response({"date_from": date_from, "date_to": date_to, "site_id": site_id, "employees": sales_by_employee(date_from=date_from, date_to=date_to, site_id=site_id)})
