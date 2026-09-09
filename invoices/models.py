@@ -20,13 +20,8 @@ class Invoice(models.Model):
         RETURNED = "returned", "Returned"
 
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="invoices")
-    site = models.ForeignKey(
-        "organization.Site",
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="invoices",
-    )
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="invoices")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="invoices")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoices")
     coupon = models.ForeignKey("coupons.Coupon", null=True, blank=True, on_delete=models.PROTECT)
     coupon_discount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
@@ -40,6 +35,7 @@ class Invoice(models.Model):
         indexes = [
             models.Index(fields=("customer", "created_at"), name="invoice_cust_created_idx"),
             models.Index(fields=("site", "created_at"), name="invoice_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="invoice_shift_created_idx"),
         ]
         permissions = [
             ("confirm_invoice", "Can confirm an invoice"),
@@ -102,13 +98,7 @@ class InvoiceItem(models.Model):
     product = models.ForeignKey("products.Product", on_delete=models.PROTECT, related_name="invoice_items")
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_price = models.DecimalField(max_digits=12, decimal_places=2)
-    cost_price = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal("0"))],
-    )
+    cost_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))])
 
     class Meta:
         constraints = [
@@ -126,6 +116,8 @@ class InvoiceItem(models.Model):
 
 class InvoiceReturn(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name="returns")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="invoice_returns")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="invoice_returns")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoice_returns")
     reason = models.CharField(max_length=255, blank=True)
     refund_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"), validators=[MinValueValidator(Decimal("0"))])
@@ -133,6 +125,10 @@ class InvoiceReturn(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="invoice_return_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="invoice_return_shift_created_idx"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(refund_amount__gte=Decimal("0")), name="invoice_return_refund_amount_non_negative"),
         ]
