@@ -22,6 +22,25 @@ def increment_company_counter(counter, delta=1):
     )
 
 
+def company_master_data_counts():
+    """Read dashboard master-data counts without scanning source tables."""
+    company = (
+        Company.objects.only(
+            "product_count",
+            "invoice_count",
+            "customer_count",
+            "supplier_count",
+        )
+        .get(singleton_marker=True)
+    )
+    return {
+        "products": company.product_count,
+        "invoices": company.invoice_count,
+        "customers": company.customer_count,
+        "suppliers": company.supplier_count,
+    }
+
+
 def reconcile_company_counters():
     """Rebuild counters from authoritative tables and record the check time."""
     from customers.models import Customer
