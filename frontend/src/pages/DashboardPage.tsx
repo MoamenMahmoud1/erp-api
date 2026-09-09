@@ -37,11 +37,11 @@ function getRange(range: Range, customFrom: string | null, customTo: string | nu
 
 function Metric({ label, value, meta }: { label: string; value: string; meta: string }) {
   return (
-    <div className="dashboard-metric">
+    <Card className="dashboard-kpi-card bento-card" radius="lg" p="lg" withBorder>
       <Text size="xs" c="dimmed" fw={700}>{label}</Text>
-      <Text className="kpi-number" fw={900} size="clamp(1.45rem, 2.4vw, 2rem)" mt={5}>{value}</Text>
-      <Text size="xs" c="dimmed" mt={3}>{meta}</Text>
-    </div>
+      <Text className="kpi-number" fw={900} size="clamp(1.45rem, 2.4vw, 2rem)" mt={6}>{value}</Text>
+      <Text size="xs" c="dimmed" mt={4}>{meta}</Text>
+    </Card>
   );
 }
 
@@ -194,14 +194,12 @@ export function DashboardPage() {
         </Card>
       ) : data ? (
         <>
-          <Card className="surface-panel dashboard-metrics" radius="lg" p={0} withBorder>
-            <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing={0}>
-              <Metric label="Net sales" value={asMoney(data.sales.gross_sales)} meta={`${number.format(data.sales.invoice_count)} invoices`} />
-              <Metric label="Net income" value={asMoney(data.pnl.net_income)} meta={`${asMoney(data.pnl.total_expenses)} expenses`} />
-              <Metric label="Cash & bank" value={asMoney(data.cash_flow.ending_cash)} meta={`${asMoney(data.cash_flow.net_change)} net change`} />
-              <Metric label="Inventory value" value={asMoney(data.inventory.inventory_value)} meta={`${number.format(data.inventory.total_units)} units`} />
-            </SimpleGrid>
-          </Card>
+          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
+            <Metric label="Net sales" value={asMoney(data.sales.gross_sales)} meta={`${number.format(data.sales.invoice_count)} invoices`} />
+            <Metric label="Net income" value={asMoney(data.pnl.net_income)} meta={`${asMoney(data.pnl.total_expenses)} expenses`} />
+            <Metric label="Cash & bank" value={asMoney(data.cash_flow.ending_cash)} meta={`${asMoney(data.cash_flow.net_change)} net change`} />
+            <Metric label="Inventory value" value={asMoney(data.inventory.inventory_value)} meta={`${number.format(data.inventory.total_units)} units`} />
+          </SimpleGrid>
 
           <SimpleGrid cols={{ base: 1, lg: 3 }} spacing="lg">
             <div style={{ gridColumn: 'span 2' }}>
