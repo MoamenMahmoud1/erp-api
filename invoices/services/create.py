@@ -1,9 +1,9 @@
 from django.db import transaction
 
+from accounts.services.employee_shift import operation_context
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from invoices.models import Invoice, InvoiceItem
-from accounts.services.employee_shift import employee_for_user, require_open_shift
 
 
 def _validate_items(items):
@@ -17,25 +17,20 @@ def _validate_items(items):
 
 
 @transaction.atomic
-def _create_invoice(*, created_by_id, validated_data):
+def _create_invoice(*, created_by, validated_data):
     invoice_data = validated_data.copy()
     items = invoice_data.pop("items")
-    invoice_data.pop("site", None)
+    requested_site = invoice_data.pop("site", None)
     invoice_data.pop("shift", None)
     _validate_items(items)
 
-    from django.contrib.auth import get_user_model
-
-    user = get_user_model().objects.get(pk=created_by_id)
-    employee = employee_for_user(user)
-    shift = require_open_shift(user)
-    site_id = shift.site_id if shift else employee.work_site_id
-    if site_id is None:
-        raise InvalidBusinessOperation("The employee must be assigned to a site before creating an invoice.")
+    _employee, site, shift = operation_context(created_by, requested_site=requested_site)
+    if site is None:
+        raise InvalidBusinessOperation("A site is required before creating an invoice.")
 
     invoice = Invoice.objects.create(
-        created_by_id=created_by_id,
-        site_id=site_id,
+        created_by_id=created_by.pk,
+        site=site,
         shift_id=shift.pk if shift else None,
         **invoice_data,
     )
@@ -54,5 +49,5 @@ def _create_invoice(*, created_by_id, validated_data):
 
 
 class CreateInvoice:
-    def __call__(self, *, created_by_id, validated_data):
-        return _create_invoice(created_by_id=created_by_id, validated_data=validated_data)
+    def __call__(self, *, created_by, validated_data):
+        return _create_invoice(created_by=created_by, validated_data=validated_data)
