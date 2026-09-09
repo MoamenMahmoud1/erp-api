@@ -6,6 +6,11 @@ GLOBAL_EMPLOYEE_VISIBILITY_LEVEL = 60
 
 
 class Role(models.Model):
+    class Scope(models.TextChoices):
+        COMPANY = "company", "Company"
+        BRANCH = "branch", "Branch"
+        SITE = "site", "Site"
+
     group = models.OneToOneField(
         Group,
         on_delete=models.CASCADE,
@@ -13,6 +18,13 @@ class Role(models.Model):
     )
     code = models.SlugField(unique=True)
     level = models.PositiveSmallIntegerField(db_index=True)
+    scope = models.CharField(
+        max_length=20,
+        choices=Scope.choices,
+        default=Scope.COMPANY,
+        db_index=True,
+    )
+    requires_shift = models.BooleanField(default=False)
     description = models.TextField(blank=True)
     is_system = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -48,6 +60,26 @@ class Role(models.Model):
 
         role = cls.highest_for_user(user)
         return role.level if role else 0
+
+    @classmethod
+    def highest_role_for_user(cls, user):
+        if not user or not user.is_authenticated:
+            return None
+        return cls.highest_for_user(user)
+
+    @classmethod
+    def scope_for_user(cls, user):
+        if user and user.is_superuser:
+            return cls.Scope.COMPANY
+        role = cls.highest_for_user(user)
+        return role.scope if role else cls.Scope.SITE
+
+    @classmethod
+    def requires_shift_for_user(cls, user):
+        if not user or user.is_superuser:
+            return False
+        role = cls.highest_for_user(user)
+        return bool(role and role.requires_shift)
 
     @classmethod
     def can_manage_user(cls, actor, target_user):
