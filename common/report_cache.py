@@ -7,27 +7,9 @@ from functools import wraps
 from django.conf import settings
 from django.core.cache import cache
 
-REPORT_CACHE_VERSION_KEY = "erp:report:version"
-
-
-def _cache_version():
-    return cache.get(REPORT_CACHE_VERSION_KEY, 1)
-
-
-def invalidate_report_cache():
-    """Invalidate every cached report without scanning or deleting Redis keys."""
-    try:
-        cache.incr(REPORT_CACHE_VERSION_KEY)
-    except ValueError:
-        cache.set(REPORT_CACHE_VERSION_KEY, 2, timeout=None)
-
 
 def cached_report(name, timeout=None):
-    """Cache deterministic report calls for a short configurable TTL.
-
-    The namespace version makes invalidation cheap and backend-agnostic. Old
-    entries expire naturally; new reads use the current version immediately.
-    """
+    """Cache deterministic report calls for a short configurable TTL."""
     ttl = timeout if timeout is not None else getattr(settings, "REPORT_CACHE_TTL", 30)
 
     def decorator(func):
@@ -40,8 +22,7 @@ def cached_report(name, timeout=None):
                 separators=(",", ":"),
             )
             digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:32]
-            version = _cache_version()
-            key = f"erp:report:v{version}:{name}:{digest}"
+            key = f"erp:report:{name}:{digest}"
             cached = cache.get(key)
             if cached is not None:
                 return cached
