@@ -6,7 +6,7 @@ class ProductQuerySet(models.QuerySet):
         return self.filter(is_active=True)
 
     def with_stock_stats(self):
-        from django.db.models import DecimalField, ExpressionWrapper, OuterRef, Subquery, Sum, Value
+        from django.db.models import ExpressionWrapper, IntegerField, OuterRef, Subquery, Sum, Value
         from django.db.models.functions import Coalesce
         from invoices.models import Invoice, InvoiceItem, InvoiceReturnItem
 
@@ -20,9 +20,7 @@ class ProductQuerySet(models.QuerySet):
             .values("total")
         )
         returned = (
-            InvoiceReturnItem.objects.filter(
-                invoice_item__product=OuterRef("pk"),
-            )
+            InvoiceReturnItem.objects.filter(invoice_item__product=OuterRef("pk"))
             .values("invoice_item__product")
             .annotate(total=Sum("quantity"))
             .values("total")
@@ -35,9 +33,9 @@ class ProductQuerySet(models.QuerySet):
         )
         sold_quantity = ExpressionWrapper(
             Coalesce(Subquery(sold), Value(0)) - Coalesce(Subquery(returned), Value(0)),
-            output_field=DecimalField(max_digits=18, decimal_places=0),
+            output_field=IntegerField(),
         )
         return self.annotate(
             _total_stock=Coalesce(Subquery(stock), Value(0)),
-            _sold_quantity=Coalesce(sold_quantity, Value(0)),
+            _sold_quantity=sold_quantity,
         )
