@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Coalesce, Sum
 from django.utils import timezone
 
 from auditlog.services import record_event
-from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
+from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockLocation
 
@@ -23,10 +24,11 @@ def employee_for_user(user):
 
 
 def current_shift_for_user(user):
-    employee = employee_for_user(user)
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
     return (
-        EmployeeShift.objects.select_related("site", "vehicle")
-        .filter(employee=employee, status=EmployeeShift.Status.OPEN)
+        EmployeeShift.objects.select_related("site", "vehicle", "employee__user")
+        .filter(employee__user=user, status=EmployeeShift.Status.OPEN)
         .first()
     )
 
@@ -34,7 +36,7 @@ def current_shift_for_user(user):
 def require_open_shift(user):
     """Return the current shift when the actor's role requires one."""
     if not Role.requires_shift_for_user(user):
-        return current_shift_for_user(user) if getattr(user, "is_authenticated", False) else None
+        return current_shift_for_user(user)
     shift = current_shift_for_user(user)
     if shift is None:
         raise ShiftError("An open shift is required for this operation.")
@@ -105,29 +107,17 @@ def _shift_payment_totals(shift):
     from payments.models import PaymentTransaction
 
     collected = PaymentTransaction.objects.filter(shift=shift).aggregate(
-        cash=transaction_sum("cash_amount"),
-        transfer=transaction_sum("transfer_amount"),
+        cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
+        transfer=Coalesce(Sum("transfer_amount"), Decimal("0.00")),
     )
-    refunds = PaymentTransaction.objects.filter(shift=shift).aggregate(
-        cash=refund_sum("cash_amount"),
-        transfer=refund_sum("transfer_amount"),
+    refunded = PaymentTransaction.objects.filter(shift=shift).aggregate(
+        cash=Coalesce(Sum("refunds__cash_amount"), Decimal("0.00")),
+        transfer=Coalesce(Sum("refunds__transfer_amount"), Decimal("0.00")),
     )
     return {
-        "expected_cash": quantize_money(shift.opening_cash + collected["cash"] - refunds["cash"]),
-        "expected_transfer": quantize_money(collected["transfer"] - refunds["transfer"]),
+        "expected_cash": quantize_money(shift.opening_cash + collected["cash"] - refunded["cash"]),
+        "expected_transfer": quantize_money(collected["transfer"] - refunded["transfer"]),
     }
-
-
-def transaction_sum(field):
-    from django.db.models import Sum
-
-    return Sum(field)
-
-
-def refund_sum(field):
-    from django.db.models import Sum
-
-    return Sum(f"refunds__{field}")
 
 
 @transaction.atomic
