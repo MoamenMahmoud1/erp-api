@@ -12,11 +12,26 @@ from purchases.models import (
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    batch_id = serializers.IntegerField(source="batch.id", read_only=True, allow_null=True)
+    batch_expiry_date = serializers.DateField(source="batch.expiry_date", read_only=True, allow_null=True)
 
     class Meta:
         model = PurchaseItem
-        fields = ("id", "product", "product_name", "quantity", "unit_purchase_price", "total_amount")
-        read_only_fields = ("id", "product_name", "total_amount")
+        fields = (
+            "id", "product", "product_name", "quantity", "unit_purchase_price", "total_amount",
+            "batch", "batch_id", "batch_number", "manufactured_date", "expiry_date", "batch_expiry_date",
+        )
+        read_only_fields = ("id", "product_name", "total_amount", "batch", "batch_id", "batch_expiry_date")
+
+    def validate(self, attrs):
+        manufactured_date = attrs.get("manufactured_date")
+        expiry_date = attrs.get("expiry_date")
+        if manufactured_date and expiry_date and expiry_date < manufactured_date:
+            raise serializers.ValidationError({"expiry_date": "Expiry date cannot be before manufactured date."})
+        batch_number = attrs.get("batch_number")
+        if batch_number is not None:
+            attrs["batch_number"] = batch_number.strip() or None
+        return attrs
 
 
 class PurchaseListSerializer(serializers.ModelSerializer):
