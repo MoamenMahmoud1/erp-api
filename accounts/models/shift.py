@@ -30,65 +30,42 @@ class EmployeeShift(models.Model):
         limit_choices_to={"location_type": "SALES_VEHICLE"},
     )
     business_date = models.DateField()
-    status = models.CharField(
-        max_length=10,
-        choices=Status.choices,
-        default=Status.OPEN,
-        db_index=True,
-    )
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN, db_index=True)
     opened_at = models.DateTimeField(auto_now_add=True)
     closed_at = models.DateTimeField(null=True, blank=True)
-    opening_cash = models.DecimalField(
-        max_digits=14,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        validators=[MinValueValidator(Decimal("0"))],
-    )
-    closing_cash = models.DecimalField(
-        max_digits=14,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(Decimal("0"))],
-    )
+    opening_cash = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(Decimal("0"))])
+    closing_cash = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))])
+    closing_transfer = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))])
     closing_notes = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ("-business_date", "-opened_at")
+        permissions = (
+            ("start_employee_shift", "Can start an employee shift"),
+            ("close_employee_shift", "Can close an employee shift"),
+            ("view_all_employee_shifts", "Can view all employee shifts"),
+        )
         constraints = [
-            models.UniqueConstraint(
-                fields=("employee", "business_date"),
-                name="accounts_employee_shift_employee_date_unique",
-            ),
-            models.UniqueConstraint(
-                fields=("employee",),
-                condition=Q(status="open"),
-                name="accounts_one_open_shift_per_employee",
-            ),
+            models.UniqueConstraint(fields=("employee", "business_date"), name="accounts_employee_shift_employee_date_unique"),
+            models.UniqueConstraint(fields=("employee",), condition=Q(status="open"), name="accounts_one_open_shift_per_employee"),
             models.CheckConstraint(
                 condition=(
-                    Q(status="open", closed_at__isnull=True, closing_cash__isnull=True)
-                    | Q(status="closed", closed_at__isnull=False, closing_cash__isnull=False)
+                    Q(status="open", closed_at__isnull=True, closing_cash__isnull=True, closing_transfer__isnull=True)
+                    | Q(status="closed", closed_at__isnull=False, closing_cash__isnull=False, closing_transfer__isnull=False)
                 ),
                 name="accounts_employee_shift_status_fields_consistent",
             ),
-            models.CheckConstraint(
-                condition=Q(opening_cash__gte=0),
-                name="accounts_employee_shift_opening_cash_non_negative",
-            ),
-            models.CheckConstraint(
-                condition=Q(closing_cash__isnull=True) | Q(closing_cash__gte=0),
-                name="accounts_employee_shift_closing_cash_non_negative",
-            ),
+            models.CheckConstraint(condition=Q(opening_cash__gte=0), name="accounts_employee_shift_opening_cash_non_negative"),
+            models.CheckConstraint(condition=Q(closing_cash__isnull=True) | Q(closing_cash__gte=0), name="accounts_employee_shift_closing_cash_non_negative"),
+            models.CheckConstraint(condition=Q(closing_transfer__isnull=True) | Q(closing_transfer__gte=0), name="accounts_employee_shift_closing_transfer_non_negative"),
         ]
 
     def clean(self):
         super().clean()
-        if self.employee_id and self.site_id:
-            if self.employee.work_site_id != self.site_id:
-                raise ValidationError({"site": "The shift site must match the employee work site."})
+        if self.employee_id and self.site_id and self.employee.work_site_id != self.site_id:
+            raise ValidationError({"site": "The shift site must match the employee work site."})
 
         if self.vehicle_id:
             vehicle = self.vehicle
