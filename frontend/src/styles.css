@@ -23,8 +23,8 @@
   --erp-info: #7ca8bd;
   --erp-radius-xs: 6px;
   --erp-radius-sm: 8px;
-  --erp-radius-md: 10px;
-  --erp-radius-lg: 12px;
+  --erp-radius-md: 12px;
+  --erp-radius-lg: 14px;
   --erp-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.14);
   --erp-shadow-sm: 0 5px 16px rgba(0, 0, 0, 0.18);
   --erp-shadow-md: 0 14px 32px rgba(0, 0, 0, 0.25);
@@ -292,13 +292,16 @@ a { color: inherit; text-decoration: none; }
 
 .unstyled-action:disabled { opacity: 0.5; cursor: default; }
 
-.dashboard-metrics .dashboard-metric {
-  min-width: 0;
-  padding: 18px 20px;
+.dashboard-kpi-card {
+  min-height: 122px;
+  transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
-.dashboard-metrics .dashboard-metric + .dashboard-metric {
-  border-left: 1px solid var(--erp-border);
+.dashboard-kpi-card:hover {
+  border-color: var(--erp-border-strong);
+  background: var(--erp-surface);
+  box-shadow: var(--erp-shadow-sm);
+  transform: translateY(-1px);
 }
 
 .dashboard-risk-row,
@@ -309,6 +312,105 @@ a { color: inherit; text-decoration: none; }
 
 .dashboard-risk-row + .dashboard-risk-row,
 .dashboard-expiry-row + .dashboard-expiry-row {
+  border-top: 1px solid var(--erp-border);
+}
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: var(--erp-bg);
+}
+
+.login-frame {
+  width: min(980px, 100%);
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+  overflow: hidden;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 18px;
+  background: var(--erp-surface);
+  box-shadow: var(--erp-shadow-md);
+}
+
+.login-brand-panel {
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 42px;
+  border-right: 1px solid var(--erp-border);
+  background: var(--erp-surface-raised);
+}
+
+.login-brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin-bottom: 22px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 11px;
+  background: var(--erp-surface);
+  color: var(--erp-primary);
+  font-weight: 900;
+  font-size: 1.05rem;
+}
+
+.login-eyebrow { color: var(--erp-primary) !important; }
+
+.login-brand-title {
+  max-width: 480px;
+  margin-top: 9px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.07;
+  letter-spacing: -0.04em;
+}
+
+.login-brand-copy {
+  max-width: 470px;
+  color: var(--erp-text-secondary);
+  font-size: 0.98rem;
+}
+
+.login-brand-footer {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 20px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.login-security-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  color: var(--erp-success);
+  background: var(--erp-success-soft);
+}
+
+.login-form-panel {
+  min-height: 560px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 42px;
+  background: var(--erp-surface);
+}
+
+.login-form-intro { margin-bottom: 28px; }
+.login-form { width: 100%; }
+.login-submit { font-weight: 800; }
+
+.login-form-note {
+  margin-top: 22px;
+  padding-top: 16px;
   border-top: 1px solid var(--erp-border);
 }
 
@@ -360,7 +462,9 @@ a { color: inherit; text-decoration: none; }
   .user-chip-copy { display: none; }
   .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dashboard-metrics .dashboard-metric + .dashboard-metric { border-left: 0; border-top: 1px solid var(--erp-border); }
+  .login-frame { grid-template-columns: 1fr; }
+  .login-brand-panel { min-height: auto; border-right: 0; border-bottom: 1px solid var(--erp-border); }
+  .login-form-panel { min-height: auto; }
 }
 
 @media (max-width: 800px) {
@@ -374,4 +478,8 @@ a { color: inherit; text-decoration: none; }
   .records-search { min-width: 100%; width: 100%; }
   .detail-grid,
   .metric-strip { grid-template-columns: 1fr; }
+  .login-page { padding: 16px; }
+  .login-brand-panel,
+  .login-form-panel { padding: 28px; }
+  .login-brand-title { font-size: 2rem; }
 }
