@@ -5,7 +5,6 @@ from decimal import Decimal
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
 from django.db.models.functions import Coalesce, TruncDate
 
-from common.report_cache import cached_report
 from invoices.models import Invoice, InvoiceItem
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
@@ -22,9 +21,8 @@ def _range_filter(queryset, field, date_from=None, date_to=None):
     return queryset
 
 
-@cached_report("sales_dashboard")
 def sales_dashboard(*, date_from=None, date_to=None):
-    """Return sales KPIs and a daily net-sales trend."""
+    """Return live sales KPIs and a daily net-sales trend."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
@@ -38,9 +36,8 @@ def sales_dashboard(*, date_from=None, date_to=None):
     return {"date_from": date_from, "date_to": date_to, "gross_sales": totals["gross_sales"] - discount_total, "units_sold": totals["units_sold"], "invoice_count": totals["invoice_count"], "trend": trend}
 
 
-@cached_report("purchase_dashboard")
 def purchase_dashboard(*, date_from=None, date_to=None):
-    """Return purchase KPIs and a daily purchase-value trend."""
+    """Return live purchase KPIs and a daily purchase-value trend."""
     items = PurchaseItem.objects.filter(purchase__status=Purchase.Status.CONFIRMED)
     items = _range_filter(items, "purchase__created_at", date_from, date_to)
     line_total = ExpressionWrapper(F("unit_purchase_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
@@ -49,9 +46,8 @@ def purchase_dashboard(*, date_from=None, date_to=None):
     return {"date_from": date_from, "date_to": date_to, "purchase_value": totals["purchase_value"], "units_purchased": totals["units_purchased"], "purchase_count": totals["purchase_count"], "trend": [{"date": row["day"].isoformat(), "value": row["value"]} for row in daily]}
 
 
-@cached_report("inventory_dashboard")
 def inventory_dashboard(*, low_stock_threshold=10):
-    """Return current inventory KPIs and weighted-average inventory value."""
+    """Return live current inventory KPIs and weighted-average inventory value."""
     stock_rows = Product.objects.filter(is_active=True).values("id", "name").annotate(stock=Coalesce(Sum("stock_balances__quantity"), 0), inventory_value=Coalesce(Sum("stock_balances__total_cost"), ZERO)).order_by("name")
     total_units = sum((row["stock"] for row in stock_rows), 0)
     inventory_value = sum((row["inventory_value"] for row in stock_rows), ZERO)
@@ -59,7 +55,6 @@ def inventory_dashboard(*, low_stock_threshold=10):
     return {"total_units": total_units, "inventory_value": inventory_value, "product_count": len(stock_rows), "low_stock_threshold": low_stock_threshold, "low_stock": low_stock, "low_stock_count": len(low_stock)}
 
 
-@cached_report("top_products")
 def top_products(*, date_from=None, date_to=None, limit=10):
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
@@ -68,7 +63,6 @@ def top_products(*, date_from=None, date_to=None, limit=10):
     return list(rows)
 
 
-@cached_report("sales_by_employee")
 def sales_by_employee(*, date_from=None, date_to=None):
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
@@ -77,7 +71,6 @@ def sales_by_employee(*, date_from=None, date_to=None):
     return [{**row, "employee_name": (f"{row['invoice__created_by__first_name']} {row['invoice__created_by__last_name']}".strip() or row["invoice__created_by__email"])} for row in rows]
 
 
-@cached_report("dashboard_overview")
 def dashboard_overview(*, date_from=None, date_to=None):
     from accounting.services.balances import customer_balances, supplier_balances
     from accounting.services.journal import get_default_company
