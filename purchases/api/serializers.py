@@ -21,27 +21,29 @@ class PurchaseItemSerializer(serializers.ModelSerializer):
 
 class PurchaseListSerializer(serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    site_name = serializers.CharField(source="site.name", read_only=True)
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Purchase
-        fields = ("id", "supplier", "supplier_name", "status", "reference", "created_at", "total_amount")
+        fields = ("id", "supplier", "supplier_name", "site", "site_name", "status", "reference", "created_at", "total_amount")
         read_only_fields = fields
 
 
 class PurchaseSerializer(serializers.ModelSerializer):
     items = PurchaseItemSerializer(many=True)
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    site_name = serializers.CharField(source="site.name", read_only=True)
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
 
     class Meta:
         model = Purchase
         fields = (
-            "id", "supplier", "supplier_name", "status", "reference", "created_by",
+            "id", "supplier", "supplier_name", "site", "site_name", "status", "reference", "created_by",
             "created_at", "updated_at", "total_amount", "items",
         )
         read_only_fields = (
-            "id", "status", "created_by", "created_at", "updated_at", "total_amount",
+            "id", "site_name", "status", "created_by", "created_at", "updated_at", "total_amount",
         )
 
 
@@ -58,19 +60,21 @@ class PurchaseReturnInputSerializer(serializers.Serializer):
 
 class PurchaseReturnSerializer(serializers.ModelSerializer):
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    site_name = serializers.CharField(source="purchase.site.name", read_only=True)
 
     class Meta:
         model = PurchaseReturn
-        fields = ("id", "purchase", "created_by", "reason", "total_amount", "created_at")
+        fields = ("id", "purchase", "site_name", "created_by", "reason", "total_amount", "created_at")
         read_only_fields = fields
 
 
 class SupplierPaymentAllocationSerializer(serializers.ModelSerializer):
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    site_name = serializers.CharField(source="purchase.site.name", read_only=True)
 
     class Meta:
         model = SupplierPaymentAllocation
-        fields = ("id", "purchase", "cash_amount", "transfer_amount", "total_amount", "created_at")
+        fields = ("id", "purchase", "site_name", "cash_amount", "transfer_amount", "total_amount", "created_at")
         read_only_fields = fields
 
 
