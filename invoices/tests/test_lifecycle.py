@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.test import TransactionTestCase
 
-from common.exceptions import InsufficientStock, InvalidStateTransition
+from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import StockBalance, StockMovement
 from invoices.models import Invoice, InvoiceItem
 from invoices.services import CancelInvoice, ConfirmInvoice, CreateInvoice, InvoiceNotFound
@@ -76,6 +76,20 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
         self.assertEqual(StockBalance.objects.get(location=self.location, product=self.product).quantity, 10)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.CANCELLED)
+
+    def test_cancel_confirmed_rejects_when_source_stock_has_moved(self):
+        invoice = self.create_invoice()
+        StockBalance.objects.create(location=self.location, product=self.product, quantity=10)
+        ConfirmInvoice()(invoice.pk)
+
+        StockBalance.objects.filter(location=self.location, product=self.product).update(quantity=0, total_cost=Decimal("0.00"))
+
+        with self.assertRaises(InvalidBusinessOperation):
+            CancelInvoice()(invoice.pk)
+
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
+        self.assertEqual(StockMovement.objects.filter(reference=f"Cancel Invoice #{invoice.pk}").count(), 0)
 
     def test_cancel_rejects_partial_payment(self):
         invoice = self.create_invoice(status=Invoice.Status.CONFIRMED)
