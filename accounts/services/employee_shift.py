@@ -8,19 +8,21 @@ from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockLocation
+from organization.models import Site
 
 from accounts.models import Employee, EmployeeShift, Role
+from services.organization_scope import visible_site_ids
 
 
 class ShiftError(InvalidBusinessOperation):
     pass
 
 
-def employee_for_user(user):
-    try:
-        return Employee.objects.select_related("user", "work_site").get(user_id=user.pk)
-    except Employee.DoesNotExist as exc:
-        raise ShiftError("The authenticated user is not assigned to an employee record.") from exc
+def employee_for_user(user, *, required=True):
+    employee = Employee.objects.select_related("user", "work_site").filter(user_id=user.pk).first()
+    if employee is None and required:
+        raise ShiftError("The authenticated user is not assigned to an employee record.")
+    return employee
 
 
 def current_shift_for_user(user):
@@ -41,6 +43,42 @@ def require_open_shift(user):
     if shift is None:
         raise ShiftError("An open shift is required for this operation.")
     return shift
+
+
+def operation_context(user, *, requested_site=None):
+    """Resolve employee, permitted site and optional current shift for a mutation."""
+    employee = employee_for_user(user, required=False)
+    role_scope = Role.scope_for_user(user)
+    shift = current_shift_for_user(user)
+
+    if role_scope == Role.Scope.COMPANY:
+        if requested_site is not None:
+            site = Site.objects.filter(pk=requested_site.pk, is_active=True).first()
+            if site is None:
+                raise ShiftError("The selected site is inactive or does not exist.")
+        elif shift is not None:
+            site = shift.site
+        elif employee is not None and employee.work_site_id:
+            site = employee.work_site
+        else:
+            site = None
+    else:
+        if employee is None or employee.work_site_id is None:
+            raise ShiftError("The user must have an employee record and work site.")
+        allowed_sites = visible_site_ids(user)
+        site = Site.objects.filter(pk=requested_site.pk if requested_site else employee.work_site_id, is_active=True).first()
+        if site is None or (allowed_sites is not None and not Site.objects.filter(pk=site.pk).filter(pk__in=allowed_sites).exists()):
+            raise ShiftError("The selected site is outside the user's allowed scope.")
+
+    if Role.requires_shift_for_user(user):
+        if shift is None:
+            raise ShiftError("An open shift is required for this operation.")
+        if site is None:
+            site = shift.site
+        if site.pk != shift.site_id:
+            raise ShiftError("The selected site must match the current shift site.")
+
+    return employee, site, shift
 
 
 @transaction.atomic
@@ -95,7 +133,7 @@ def start_shift(*, user, opening_cash=Decimal("0.00"), vehicle_id=None):
 
 
 def _shift_payment_totals(shift):
-    from payments.models import PaymentTransaction, PaymentRefund
+    from payments.models import PaymentRefund, PaymentTransaction
 
     collected = PaymentTransaction.objects.filter(shift_id=shift.pk).aggregate(
         cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
