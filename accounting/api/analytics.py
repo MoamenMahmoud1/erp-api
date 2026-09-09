@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from accounting.permissions import AccountingReportPermission
 from accounting.services.analytics import dashboard_overview, inventory_dashboard, purchase_dashboard, sales_by_employee, sales_dashboard, top_products
 from organization.models import Site
+from services.organization_scope import visible_site_ids
 
 
 def _date_range(request):
@@ -40,8 +41,16 @@ def _site_id(request):
         site_id = int(value)
     except (TypeError, ValueError):
         return None, Response({"detail": "site must be a positive integer."}, status=400)
-    if site_id <= 0 or not Site.objects.filter(pk=site_id).exists():
-        return None, Response({"detail": "site does not exist."}, status=400)
+    if site_id <= 0:
+        return None, Response({"detail": "site must be a positive integer."}, status=400)
+
+    visible_sites = visible_site_ids(request.user)
+    site_queryset = Site.objects.filter(pk=site_id)
+    if visible_sites is not None:
+        site_queryset = site_queryset.filter(pk__in=visible_sites)
+
+    if not site_queryset.exists():
+        return None, Response({"detail": "site does not exist or is outside your allowed scope."}, status=403)
     return site_id, None
 
 
