@@ -4,6 +4,18 @@
 
 The reporting layer is read-only and builds on the existing transactional domains. It does not become a second source of truth: invoices, purchases, stock balances, payments and accounting journals remain authoritative.
 
+## Organization and branch model
+
+`organization.Company` is the single company context. A company can have multiple `Site` records:
+
+- `head_office`
+- `branch`
+- `store`
+
+A store may belong to a branch. Employees can be assigned to a work site, and branch-scoped users see and operate on their branch plus its child stores. Head-office users can operate across the company's sites.
+
+Invoices and purchases carry a `site` so sales and receiving are attributable to the branch/store. Stock locations also carry a `site`; each site can have one active main warehouse, plus sales-vehicle locations. Stock transfers may move inventory between accessible locations.
+
 ## Architecture
 
 ```text
@@ -35,7 +47,7 @@ Celery
   +--> reserved for heavy historical analytics and intelligence jobs later
 ```
 
-The dashboard is intentionally live. It does not wait for a cache refresh and does not depend on Celery for freshness.
+The operational dashboard is intentionally live. It does not wait for a cache refresh and does not depend on Celery for freshness.
 
 ## Master-data counters
 
@@ -70,7 +82,7 @@ Existing accounting analytics provide:
 - sales by employee
 - cross-domain dashboard overview with P&L, cash flow and balances
 
-These reports are intentionally live because operational dashboard values can change immediately after a transaction.
+Operational analytics accept a `site` filter so branch/store sales, purchases, stock, top products and employee sales can be isolated. The broader financial statements still use the company-level journal context.
 
 ## Product intelligence v1
 
@@ -92,7 +104,7 @@ For active products it calculates:
 - recommended reorder quantity
 - plain-language recommendation
 
-The v1 calculation is live and deterministic. It does not use the dashboard cache and it does not create purchase orders automatically.
+The v1 calculation is live and deterministic. It does not use a dashboard cache and it does not create purchase orders automatically.
 
 ### Reorder heuristic
 
@@ -122,19 +134,20 @@ Historical invoice `cost_price` is used when captured; otherwise the current pro
 GET /api/v1/products/intelligence/
 ```
 
-Query parameters:
+### Operational branch filtering
 
-| Parameter | Default | Range | Purpose |
-| --- | ---: | ---: | --- |
-| `as_of` | today | valid date, not future | Analysis end date |
-| `lookback_days` | 30 | 1-365 | Current demand window |
-| `forecast_days` | 7 | 1-90 | Demand horizon |
-| `target_stock_days` | 14 | 1-180 | Desired stock coverage |
-| `slow_moving_days` | 60 | 1-365 | Slow-moving threshold |
-| `limit` | 100 | 1-500 | Number of product rows returned |
-| `product_id` | none | positive integer | Inspect one product |
+Analytics endpoints accept `site=<site_id>` to isolate one branch/store:
 
-The endpoint is read-only and uses the existing authenticated/staff-read permission pattern.
+```http
+GET /api/v1/accounting/analytics/sales/?site=12
+GET /api/v1/accounting/analytics/purchases/?site=12
+GET /api/v1/accounting/analytics/inventory/?site=12
+GET /api/v1/accounting/analytics/top-products/?site=12
+GET /api/v1/accounting/analytics/sales-by-employee/?site=12
+GET /api/v1/accounting/analytics/overview/?site=12
+```
+
+The same site is selectable by name in the sales and purchasing frontend forms instead of exposing raw IDs to users.
 
 ## Celery local development
 
@@ -157,8 +170,4 @@ python manage.py test core.tests.test_celery
 python manage.py test products.tests.test_intelligence
 ```
 
-The counter tests verify transactional create/delete updates and daily-style drift repair. Product-intelligence tests continue to use real Django models and database relationships.
-
-## Next intelligence steps
-
-Celery should be introduced into the intelligence layer only for work that is materially too expensive for a request, such as multi-year historical sales calculations and more advanced forecasting. The deterministic live layer remains the foundation.
+The counter tests verify transactional create/delete updates and daily-style drift repair. Product-intelligence tests continue to use real Django models and database relationships. Branch-aware invoice, purchase, employee, and inventory behavior should be covered by the existing domain/API test suites before deployment.
