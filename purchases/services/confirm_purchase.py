@@ -16,7 +16,7 @@ class ConfirmPurchaseService:
         try:
             purchase = (
                 Purchase.objects.visible_to(actor)
-                .select_for_update()
+                .select_for_update(of=("self",))
                 .select_related("site", "shift")
                 .prefetch_related("items__product")
                 .get(pk=purchase_id)
