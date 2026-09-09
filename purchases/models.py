@@ -17,6 +17,7 @@ class Purchase(models.Model):
 
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="purchases")
     site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="purchases")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="purchases")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     reference = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchases")
@@ -26,7 +27,10 @@ class Purchase(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=("site", "created_at"), name="purchase_site_created_idx")]
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="purchase_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="purchase_shift_created_idx"),
+        ]
         permissions = [
             ("confirm_purchase", "Can confirm purchase"),
             ("cancel_purchase", "Can cancel purchase"),
@@ -63,12 +67,18 @@ class PurchaseItem(models.Model):
 
 class PurchaseReturn(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, related_name="returns")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_returns")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_returns")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchase_returns")
     reason = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="purchase_return_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="purchase_return_shift_created_idx"),
+        ]
 
     @property
     def total_amount(self):
@@ -95,6 +105,8 @@ class PurchaseReturnItem(models.Model):
 
 class SupplierPayment(models.Model):
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="supplier_payments")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="supplier_payments")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="supplier_payments")
     paid_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="supplier_payments_made")
     cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
@@ -103,7 +115,11 @@ class SupplierPayment(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=("supplier", "created_at"), name="suppay_supplier_created_idx")]
+        indexes = [
+            models.Index(fields=("supplier", "created_at"), name="suppay_supplier_created_idx"),
+            models.Index(fields=("site", "created_at"), name="suppay_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="suppay_shift_created_idx"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_transfer_non_negative"),
