@@ -24,11 +24,8 @@ const AUTH_CONTEXT_CHANGED_EVENT = 'erp-context-changed';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
-
   static getDerivedStateFromError(error: Error) { return { error }; }
-
   componentDidCatch(error: Error, info: ErrorInfo) { console.error('ERP frontend error', error, info); }
-
   render() {
     if (!this.state.error) return this.props.children;
     return <Center mih="100vh" p="xl"><Card className="glass" radius="xl" withBorder p="xl" maw={620}><Stack gap="sm"><Text size="sm" fw={800} c="red.5" tt="uppercase" lts=".08em">Application error</Text><Text size="xl" fw={800}>Something went wrong in this screen.</Text><Text c="dimmed">The page crashed instead of leaving a blank screen. Reload it and, if it repeats, the message below identifies the runtime error.</Text>{import.meta.env.DEV && <Text size="sm" ff="monospace" c="dimmed">{this.state.error.message}</Text>}<Button onClick={() => window.location.reload()}>Reload workspace</Button></Stack></Card></Center>;
@@ -40,6 +37,7 @@ function ProtectedPage({ user, permission, children }: { user: UserProfile; perm
 function NotFound() { return <Center h="60vh"><div><h2>Page not found</h2><p>This route is not part of the current ERP workspace.</p></div></Center>; }
 
 function defaultPath(user: UserProfile) {
+  if (user.role?.requires_shift && !user.current_shift && can(user, 'accounts.start_employee_shift')) return '/shift';
   if (can(user, 'accounting.view_financial_reports')) return '/';
   if (can(user, 'invoices.view_invoice')) return '/sales';
   if (can(user, 'inventory.view_stockbalance')) return '/inventory';
@@ -56,11 +54,7 @@ export function App() {
 
   useEffect(() => {
     const handleAuthExpired = () => { authCheckStarted.current = false; setUser(null); setLoading(false); if (window.location.pathname !== '/login') navigate('/login', { replace: true }); };
-    const reloadContext = () => {
-      authCheckStarted.current = false;
-      setLoading(true);
-      api.auth.me().then(setUser).catch(() => { setUser(null); navigate('/login', { replace: true }); }).finally(() => setLoading(false));
-    };
+    const reloadContext = () => { authCheckStarted.current = false; setLoading(true); api.auth.me().then(setUser).catch(() => { setUser(null); navigate('/login', { replace: true }); }).finally(() => setLoading(false)); };
     window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     window.addEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext);
     return () => { window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired); window.removeEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext); };
