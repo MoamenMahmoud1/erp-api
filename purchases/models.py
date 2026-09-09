@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q
 
 from products.models import Product
 from purchases.querysets.purchase import PurchaseQuerySet
@@ -51,12 +51,17 @@ class PurchaseItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="purchase_items")
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
     unit_purchase_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    batch_number = models.CharField(max_length=100, null=True, blank=True)
+    manufactured_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    batch = models.ForeignKey("inventory.InventoryBatch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_items")
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("purchase", "product"), name="purchase_item_unique_product"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="purchase_item_quantity_positive"),
             models.CheckConstraint(condition=Q(unit_purchase_price__gte=0), name="purchase_item_price_non_negative"),
+            models.CheckConstraint(condition=Q(expiry_date__isnull=True) | Q(manufactured_date__isnull=True) | Q(expiry_date__gte=F("manufactured_date")), name="purchase_item_dates_ordered"),
         ]
         ordering = ("id",)
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import F, Q
+from django.utils import timezone
 
 from inventory.querysets import StockLocationQuerySet, StockMovementQuerySet
 from products.models import Product
@@ -51,6 +52,80 @@ class StockLocation(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class InventoryBatch(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="inventory_batches")
+    batch_number = models.CharField(max_length=100, null=True, blank=True)
+    manufactured_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("expiry_date", "id")
+        indexes = [
+            models.Index(fields=("product", "expiry_date"), name="inventory_batch_expiry_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("product", "batch_number"),
+                condition=Q(batch_number__isnull=False),
+                name="inventory_batch_product_number_unique",
+            ),
+            models.CheckConstraint(
+                condition=Q(expiry_date__isnull=True)
+                | Q(manufactured_date__isnull=True)
+                | Q(expiry_date__gte=F("manufactured_date")),
+                name="inventory_batch_dates_ordered",
+            ),
+        ]
+
+    @property
+    def is_expired(self):
+        return self.expiry_date is not None and self.expiry_date < timezone.localdate()
+
+    @property
+    def days_to_expiry(self):
+        if self.expiry_date is None:
+            return None
+        return (self.expiry_date - timezone.localdate()).days
+
+    def __str__(self):
+        label = self.batch_number or f"Batch #{self.pk}"
+        return f"{self.product.name} · {label}"
+
+
+class StockBatchBalance(models.Model):
+    location = models.ForeignKey(StockLocation, on_delete=models.CASCADE, related_name="stock_batch_balances")
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.PROTECT, related_name="stock_balances")
+    quantity = models.PositiveIntegerField(default=0)
+    total_cost = models.DecimalField(max_digits=16, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(Decimal("0"))])
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("batch__expiry_date", "batch_id")
+        constraints = [
+            models.UniqueConstraint(fields=("location", "batch"), name="stock_batch_balance_unique_location_batch"),
+            models.CheckConstraint(condition=Q(quantity__gte=0), name="stock_batch_balance_quantity_non_negative"),
+            models.CheckConstraint(condition=Q(total_cost__gte=Decimal("0")), name="stock_batch_balance_total_cost_non_negative"),
+        ]
+        indexes = [
+            models.Index(fields=("location", "quantity"), name="stock_batch_balance_location_qty_idx"),
+            models.Index(fields=("batch", "location"), name="stock_batch_balance_batch_loc_idx"),
+        ]
+
+    @property
+    def product(self):
+        return self.batch.product
+
+    @property
+    def average_unit_cost(self):
+        if not self.quantity:
+            return Decimal("0.00")
+        return self.total_cost / Decimal(self.quantity)
+
+    def __str__(self):
+        return f"{self.location_id} - {self.batch_id}: {self.quantity}"
 
 
 class StockMovement(models.Model):
@@ -104,6 +179,7 @@ class StockMovement(models.Model):
 class StockMovementItem(models.Model):
     movement = models.ForeignKey(StockMovement, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_movement_items")
+    batch = models.ForeignKey(InventoryBatch, on_delete=models.PROTECT, null=True, blank=True, related_name="movement_items")
     quantity = models.PositiveIntegerField()
     unit_cost = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))], help_text="Historical inventory cost per unit captured at movement time.")
 
@@ -122,7 +198,8 @@ class StockMovementItem(models.Model):
         return self.unit_cost * self.quantity
 
     def __str__(self):
-        return f"{self.product} x {self.quantity}"
+        batch_label = f" · {self.batch.batch_number}" if self.batch_id and self.batch.batch_number else ""
+        return f"{self.product} x {self.quantity}{batch_label}"
 
 
 class StockBalance(models.Model):
@@ -145,4 +222,4 @@ class StockBalance(models.Model):
         return self.total_cost / Decimal(self.quantity)
 
     def __str__(self):
-        return f"{self.location_id} - {self.product_id}: {self.quantity}" 
+        return f"{self.location_id} - {self.product_id}: {self.quantity}"

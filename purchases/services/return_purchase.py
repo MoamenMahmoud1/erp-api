@@ -1,10 +1,10 @@
 from django.db import transaction
+from inventory.models import StockLocation, StockMovement, StockMovementItem
 
 from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_purchase_return
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
-from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
@@ -66,12 +66,35 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
     )
     for line, quantity in cleaned:
         try:
-            balance = StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
+            if line.batch_id:
+                unit_cost, _removed_cost = StockBalanceService.decrease_specific_batch(
+                    location=warehouse,
+                    batch=line.batch,
+                    quantity=quantity,
+                )
+                allocations = [{"batch": line.batch, "quantity": quantity, "unit_cost": unit_cost}]
+            else:
+                balance = StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
+                allocations = getattr(balance, "_stock_allocations", None) or [
+                    {"batch": None, "quantity": quantity, "unit_cost": getattr(balance, "_removed_unit_cost", line.unit_purchase_price)}
+                ]
         except ValueError as exc:
             raise InsufficientStock(f"Insufficient stock for {line.product.name} in {warehouse.name}.") from exc
-        unit_cost = getattr(balance, "_removed_unit_cost", line.unit_purchase_price)
-        PurchaseReturnItem.objects.create(purchase_return=purchase_return, purchase_item=line, quantity=quantity, unit_price=line.unit_purchase_price)
-        StockMovementItem.objects.create(movement=movement, product=line.product, quantity=quantity, unit_cost=unit_cost)
+
+        PurchaseReturnItem.objects.create(
+            purchase_return=purchase_return,
+            purchase_item=line,
+            quantity=quantity,
+            unit_price=line.unit_purchase_price,
+        )
+        for allocation in allocations:
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=line.product,
+                batch=allocation["batch"],
+                quantity=allocation["quantity"],
+                unit_cost=allocation["unit_cost"],
+            )
 
     post_purchase_return(purchase_return=purchase_return, actor_id=created_by_id, company=get_default_company())
     record_event(

@@ -48,9 +48,29 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
             balance = StockBalanceService.decrease(location=source, product=product, quantity=quantity)
         except ValueError as exc:
             raise InsufficientStock(f"Insufficient stock for {product.name} in {source.name}.") from exc
-        unit_cost = getattr(balance, "_removed_unit_cost", product.purchase_price)
-        StockBalanceService.increase(location=destination, product=product, quantity=quantity, unit_cost=unit_cost)
-        StockMovementItem.objects.create(movement=movement, product=product, quantity=quantity, unit_cost=unit_cost)
+
+        allocations = getattr(balance, "_stock_allocations", None) or [
+            {
+                "batch": None,
+                "quantity": quantity,
+                "unit_cost": getattr(balance, "_removed_unit_cost", product.purchase_price),
+            }
+        ]
+        for allocation in allocations:
+            StockBalanceService.increase(
+                location=destination,
+                product=product,
+                quantity=allocation["quantity"],
+                unit_cost=allocation["unit_cost"],
+                batch=allocation["batch"],
+            )
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=product,
+                batch=allocation["batch"],
+                quantity=allocation["quantity"],
+                unit_cost=allocation["unit_cost"],
+            )
 
     log_operation("inventory.transfer", user=created_by.pk, source=source.pk, destination=destination.pk, item_count=len(items), movement=movement.pk)
     record_event(

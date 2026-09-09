@@ -12,6 +12,8 @@ import { ProductsPage, CustomersPage, SuppliersPage, EmployeesPage } from './pag
 import { CartonPricingPage, CouponsPage } from './pages/CommercialPages';
 import { SalesPage, InvoiceDetailsPage, PurchaseDetailsPage, PaymentDetailsPage, PurchasesPage, PaymentsPage, InventoryPage } from './pages/OperationsPages';
 import { InventoryLocationsPage, InventoryMovementsPage, InventoryTransferPage } from './pages/InventoryPages';
+import { InventoryBatchesPage } from './pages/InventoryBatchesPage';
+import { BusinessInsightsPage } from './pages/BusinessInsightsPage';
 import { CreateInvoicePage, CreatePurchasePage, CollectPaymentPage, SupplierPaymentPage } from './pages/TransactionPages';
 import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage } from './pages/AccountingPages';
 import { BalancesPage, OpeningBalancePage, ManualJournalPage } from './pages/AccountingReportsPages';
@@ -75,6 +77,7 @@ export function App() {
 
   const securedRoutes = [
     { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
+    { path: '/insights', permission: 'accounting.view_financial_reports', element: <BusinessInsightsPage /> },
     { path: '/shift', permission: 'accounts.start_employee_shift', element: <ShiftPage user={user!} /> },
     { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage /> },
     { path: '/sales/:id', permission: 'invoices.view_invoice', element: <InvoiceDetailsPage /> },
@@ -91,6 +94,7 @@ export function App() {
     { path: '/organization/sites', permission: 'organization.view_site', element: <SitesPage /> },
     { path: '/organization/departments', permission: 'organization.view_department', element: <DepartmentsPage /> },
     { path: '/inventory', permission: 'inventory.view_stockbalance', element: <InventoryPage /> },
+    { path: '/inventory/batches', permission: 'inventory.view_stockbalance', element: <InventoryBatchesPage /> },
     { path: '/inventory/locations', permission: 'inventory.view_stocklocation', element: <InventoryLocationsPage /> },
     { path: '/inventory/movements', permission: 'inventory.view_stockmovement', element: <InventoryMovementsPage /> },
     { path: '/inventory/transfer', permission: 'inventory.transfer_stock', element: <InventoryTransferPage /> },

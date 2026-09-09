@@ -1,5 +1,7 @@
 """Atomic invoice lifecycle transitions."""
 
+from decimal import Decimal
+
 from django.db import transaction
 
 from accounts.services.employee_shift import require_open_shift
@@ -66,11 +68,26 @@ def _record_sale_movement(invoice, source_location, shift=None):
             balance = StockBalanceService.decrease(location=source_location, product=item.product, quantity=item.quantity)
         except ValueError as exc:
             raise InsufficientStock(f"Insufficient stock for {item.product.name} in {source_location.name}.") from exc
-        unit_cost = getattr(balance, "_removed_unit_cost", item.product.purchase_price)
-        if item.cost_price != unit_cost:
-            item.cost_price = unit_cost
-            item.save(update_fields=("cost_price",))
-        StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity, unit_cost=unit_cost)
+
+        allocations = getattr(balance, "_stock_allocations", None) or [
+            {
+                "batch": None,
+                "quantity": item.quantity,
+                "unit_cost": item.cost_price or item.product.purchase_price,
+                "cost": (item.cost_price or item.product.purchase_price) * item.quantity,
+            }
+        ]
+        total_cost = sum((allocation["cost"] for allocation in allocations), Decimal("0.00"))
+        item.cost_price = total_cost / Decimal(item.quantity)
+        item.save(update_fields=("cost_price",))
+        for allocation in allocations:
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=item.product,
+                batch=allocation["batch"],
+                quantity=allocation["quantity"],
+                unit_cost=allocation["unit_cost"],
+            )
     return movement
 
 
@@ -85,10 +102,6 @@ def confirm_invoice(invoice_id, actor=None):
     source = sales_source_location(invoice, shift=shift)
     if source is None:
         raise InvalidBusinessOperation("The invoice creator has no active sales location for this branch.")
-    for item in invoice.items.select_related("product"):
-        if item.cost_price is None:
-            item.cost_price = item.product.purchase_price
-            item.save(update_fields=("cost_price",))
     movement = _record_sale_movement(invoice, source, shift=shift or invoice.shift)
     company = get_default_company()
     post_sales_invoice(invoice=invoice, actor_id=invoice.created_by_id, company=company)
@@ -110,15 +123,37 @@ def cancel_invoice(invoice_id, actor=None):
     if invoice.net_paid_amount > 0:
         raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
     if invoice.status == Invoice.Status.CONFIRMED:
-        sale = StockMovement.objects.filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE).select_related("source_location").prefetch_related("items").first()
+        sale = (
+            StockMovement.objects
+            .filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE)
+            .select_related("source_location")
+            .prefetch_related("items")
+            .first()
+        )
         if sale is None or sale.source_location is None:
             raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
-        sale_costs = {item.product_id: item.unit_cost for item in sale.items.all()}
-        movement = StockMovement.objects.create(movement_type=StockMovement.MovementType.SALEABLE_RETURN, destination_location=sale.source_location, shift=shift or invoice.shift, created_by=invoice.created_by, reference=f"Cancel Invoice #{invoice.pk}")
-        for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
-            unit_cost = sale_costs.get(item.product_id) or item.cost_price or item.product.purchase_price
-            StockBalanceService.increase(location=sale.source_location, product=item.product, quantity=item.quantity, unit_cost=unit_cost)
-            StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity, unit_cost=unit_cost)
+        movement = StockMovement.objects.create(
+            movement_type=StockMovement.MovementType.SALEABLE_RETURN,
+            destination_location=sale.source_location,
+            shift=shift or invoice.shift,
+            created_by=invoice.created_by,
+            reference=f"Cancel Invoice #{invoice.pk}",
+        )
+        for sale_item in sale.items.all():
+            StockBalanceService.increase(
+                location=sale.source_location,
+                product=sale_item.product,
+                quantity=sale_item.quantity,
+                unit_cost=sale_item.unit_cost or sale_item.product.purchase_price,
+                batch=sale_item.batch,
+            )
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=sale_item.product,
+                batch=sale_item.batch,
+                quantity=sale_item.quantity,
+                unit_cost=sale_item.unit_cost,
+            )
         original_entry = JournalEntry.objects.filter(company=get_default_company(), source_type="invoice.sale", source_id=invoice.pk, status=JournalEntry.Status.POSTED).prefetch_related("lines").first()
         if original_entry is None:
             raise InvalidBusinessOperation("Cannot reverse sale: accounting entry is missing.")

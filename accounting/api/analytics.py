@@ -54,7 +54,13 @@ def dashboard_overview_view(request):
     site_id, error = _site_id(request)
     if error:
         return error
-    return Response(dashboard_overview(date_from=parse_date(date_from) if date_from else None, date_to=parse_date(date_to) if date_to else None, site_id=site_id))
+    return Response(
+        dashboard_overview(
+            date_from=parse_date(date_from) if date_from else None,
+            date_to=parse_date(date_to) if date_to else None,
+            site_id=site_id,
+        )
+    )
 
 
 @api_view(["GET"])
