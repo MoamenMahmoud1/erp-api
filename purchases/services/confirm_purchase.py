@@ -16,6 +16,7 @@ class ConfirmPurchaseService:
             purchase = (
                 Purchase.objects.visible_to(actor)
                 .select_for_update()
+                .select_related("site")
                 .prefetch_related("items__product")
                 .get(pk=purchase_id)
             )
@@ -28,16 +29,18 @@ class ConfirmPurchaseService:
         if not items:
             raise InvalidBusinessOperation("Purchase must contain at least one item.")
 
-        warehouse = (
-            StockLocation.objects.filter(
-                location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
-                is_active=True,
-            )
-            .select_for_update()
-            .first()
+        warehouse_query = StockLocation.objects.filter(
+            location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
+            is_active=True,
         )
-        if warehouse is None:
-            raise InvalidBusinessOperation("Active main warehouse does not exist.")
+        if purchase.site_id:
+            warehouse_query = warehouse_query.filter(site_id=purchase.site_id)
+        warehouses = list(warehouse_query.select_for_update()[:2])
+        if not warehouses:
+            raise InvalidBusinessOperation("An active main warehouse does not exist for this branch.")
+        if len(warehouses) > 1:
+            raise InvalidBusinessOperation("The branch has more than one active main warehouse.")
+        warehouse = warehouses[0]
 
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.PURCHASE,
@@ -71,6 +74,6 @@ class ConfirmPurchaseService:
             entity_type="Purchase",
             entity_id=purchase.pk,
             actor_id=actor.pk,
-            metadata={"warehouse_id": warehouse.pk, "stock_movement_id": movement.pk},
+            metadata={"warehouse_id": warehouse.pk, "stock_movement_id": movement.pk, "site_id": purchase.site_id},
         )
         return purchase
