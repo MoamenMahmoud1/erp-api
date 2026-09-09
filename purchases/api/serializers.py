@@ -45,7 +45,7 @@ class PurchaseSerializer(serializers.ModelSerializer):
             "created_at", "updated_at", "total_amount", "items",
         )
         read_only_fields = (
-            "id", "site", "site_name", "shift_id", "status", "created_by", "created_at", "updated_at", "total_amount",
+            "id", "site_name", "shift_id", "status", "created_by", "created_at", "updated_at", "total_amount",
         )
 
 
@@ -93,4 +93,4 @@ class SupplierPaymentSerializer(serializers.ModelSerializer):
             "id", "supplier", "site", "site_name", "shift_id", "paid_by", "cash_amount", "transfer_amount",
             "reference", "total_amount", "created_at", "allocations",
         )
-        read_only_fields = ("id", "site", "site_name", "shift_id", "paid_by", "total_amount", "created_at", "allocations")
+        read_only_fields = ("id", "site_name", "shift_id", "paid_by", "total_amount", "created_at", "allocations")
