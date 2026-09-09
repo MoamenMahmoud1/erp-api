@@ -7,6 +7,9 @@ django-filter==26.1
 djangorestframework-simplejwt==5.5.1
 drf-spectacular==0.30.0
 
+# Background jobs
+celery[redis]==5.6.2
+
 # Database
 # The pool extra enables psycopg 3 connection pooling.
 psycopg[binary,pool]==3.3.4

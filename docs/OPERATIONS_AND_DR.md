@@ -10,7 +10,11 @@ Every request emits a structured `erp.metrics` log containing method, path, stat
 
 ## Report scaling
 
-Management reports use a short Redis-backed cache controlled by `REPORT_CACHE_TTL` (default 30 seconds). The `warm_reports` management command can be scheduled from cron/systemd/Kubernetes to pre-populate common dashboard reports.
+Management reports use a short Redis-backed cache controlled by `REPORT_CACHE_TTL` (default 30 seconds). The `accounting.tasks.warm_analytics_reports` Celery task can pre-populate the standard dashboard window, and Celery Beat schedules it every 15 minutes. Report calculations remain in `accounting/services/` and are reused by HTTP endpoints and background jobs.
+
+Product intelligence uses its own one-hour cache and is refreshed by `products.tasks.refresh_product_intelligence` every hour through Celery Beat.
+
+For production, run at least one dedicated Celery worker and one Beat scheduler process alongside the web application. Redis is the configured broker by default and may be overridden with `CELERY_BROKER_URL`.
 
 ## Database backups
 

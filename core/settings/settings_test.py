@@ -27,3 +27,8 @@ CACHES = {
 # Read-only reports must never leak cached results between isolated Django
 # TestCase databases. Production keeps the short Redis TTL.
 REPORT_CACHE_TTL = 0
+
+# Task tests must remain deterministic and never require a local broker.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_URL = "memory://"

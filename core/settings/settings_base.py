@@ -5,6 +5,7 @@ Base settings shared between development & production.
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -14,6 +15,8 @@ FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:3000")
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@apihigh.local")
 EMAIL_VERIFICATION_TIMEOUT = config("EMAIL_VERIFICATION_TIMEOUT", default=60 * 60 * 24, cast=int)
 EMAIL_CHANGE_TIMEOUT = config("EMAIL_CHANGE_TIMEOUT", default=60 * 60, cast=int)
+REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 
 AUTH_USER_MODEL = "accounts.CustomUserModel"
 AUTHENTICATION_BACKENDS = [
@@ -146,6 +149,32 @@ INTERNAL_IPS = ["127.0.0.1"]
 REPORT_CACHE_TTL = config("REPORT_CACHE_TTL", default=30, cast=int)
 if REPORT_CACHE_TTL < 1:
     raise ValueError("REPORT_CACHE_TTL must be >= 1")
+
+# Celery uses the configured Redis infrastructure by default. Production can
+# override the broker independently with CELERY_BROKER_URL.
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ENABLE_UTC = True
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
+CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
+CELERY_BEAT_SCHEDULE = {
+    "warm-analytics-reports": {
+        "task": "accounting.tasks.warm_analytics_reports",
+        "schedule": crontab(minute="*/15"),
+    },
+    "refresh-product-intelligence": {
+        "task": "products.tasks.refresh_product_intelligence",
+        "schedule": crontab(minute=0),
+    },
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
     "DESCRIPTION": "Backend API for the Sales ERP suite. Authentication uses short-lived JWT access tokens backed by an active server-side Redis session; include the access token in the Authorization header as `Bearer <token>`. ",
