@@ -25,43 +25,19 @@ const AUTH_CONTEXT_CHANGED_EVENT = 'erp-context-changed';
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
 
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
+  static getDerivedStateFromError(error: Error) { return { error }; }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ERP frontend error', error, info);
-  }
+  componentDidCatch(error: Error, info: ErrorInfo) { console.error('ERP frontend error', error, info); }
 
   render() {
     if (!this.state.error) return this.props.children;
-    return (
-      <Center mih="100vh" p="xl">
-        <Card className="glass" radius="xl" withBorder p="xl" maw={620}>
-          <Stack gap="sm">
-            <Text size="sm" fw={800} c="red.5" tt="uppercase" lts=".08em">Application error</Text>
-            <Text size="xl" fw={800}>Something went wrong in this screen.</Text>
-            <Text c="dimmed">The page crashed instead of leaving a blank screen. Reload it and, if it repeats, the message below identifies the runtime error.</Text>
-            {import.meta.env.DEV && <Text size="sm" ff="monospace" c="dimmed">{this.state.error.message}</Text>}
-            <Button onClick={() => window.location.reload()}>Reload workspace</Button>
-          </Stack>
-        </Card>
-      </Center>
-    );
+    return <Center mih="100vh" p="xl"><Card className="glass" radius="xl" withBorder p="xl" maw={620}><Stack gap="sm"><Text size="sm" fw={800} c="red.5" tt="uppercase" lts=".08em">Application error</Text><Text size="xl" fw={800}>Something went wrong in this screen.</Text><Text c="dimmed">The page crashed instead of leaving a blank screen. Reload it and, if it repeats, the message below identifies the runtime error.</Text>{import.meta.env.DEV && <Text size="sm" ff="monospace" c="dimmed">{this.state.error.message}</Text>}<Button onClick={() => window.location.reload()}>Reload workspace</Button></Stack></Card></Center>;
   }
 }
 
-function Authenticated({ user, children }: { user: UserProfile; children: ReactNode }) {
-  return <Shell user={user}>{children}</Shell>;
-}
-
-function ProtectedPage({ user, permission, children }: { user: UserProfile; permission: string; children: ReactNode }) {
-  return <PermissionGuard user={user} permission={permission}>{children}</PermissionGuard>;
-}
-
-function NotFound() {
-  return <Center h="60vh"><div><h2>Page not found</h2><p>This route is not part of the current ERP workspace.</p></div></Center>;
-}
+function Authenticated({ user, children }: { user: UserProfile; children: ReactNode }) { return <Shell user={user}>{children}</Shell>; }
+function ProtectedPage({ user, permission, children }: { user: UserProfile; permission: string; children: ReactNode }) { return <PermissionGuard user={user} permission={permission}>{children}</PermissionGuard>; }
+function NotFound() { return <Center h="60vh"><div><h2>Page not found</h2><p>This route is not part of the current ERP workspace.</p></div></Center>; }
 
 function defaultPath(user: UserProfile) {
   if (can(user, 'accounting.view_financial_reports')) return '/';
@@ -79,68 +55,39 @@ export function App() {
   const authCheckStarted = useRef(false);
 
   useEffect(() => {
-    const handleAuthExpired = () => {
-      authCheckStarted.current = false;
-      setUser(null);
-      setLoading(false);
-      if (window.location.pathname !== '/login') navigate('/login', { replace: true });
-    };
-
+    const handleAuthExpired = () => { authCheckStarted.current = false; setUser(null); setLoading(false); if (window.location.pathname !== '/login') navigate('/login', { replace: true }); };
     const reloadContext = () => {
       authCheckStarted.current = false;
       setLoading(true);
-      api.auth.me()
-        .then(setUser)
-        .catch(() => {
-          setUser(null);
-          navigate('/login', { replace: true });
-        })
-        .finally(() => setLoading(false));
+      api.auth.me().then(setUser).catch(() => { setUser(null); navigate('/login', { replace: true }); }).finally(() => setLoading(false));
     };
-
     window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
     window.addEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext);
-    return () => {
-      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
-      window.removeEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext);
-    };
+    return () => { window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired); window.removeEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext); };
   }, [navigate]);
 
   useEffect(() => {
-    if (location.pathname === '/login') {
-      authCheckStarted.current = false;
-      setLoading(false);
-      return;
-    }
+    if (location.pathname === '/login') { authCheckStarted.current = false; setLoading(false); return; }
     if (user || authCheckStarted.current) return;
-
     authCheckStarted.current = true;
     setLoading(true);
-    api.auth.me()
-      .then(setUser)
-      .catch(() => {
-        setUser(null);
-        navigate('/login', { replace: true });
-      })
-      .finally(() => setLoading(false));
+    api.auth.me().then(setUser).catch(() => { setUser(null); navigate('/login', { replace: true }); }).finally(() => setLoading(false));
   }, [location.pathname, navigate, user]);
 
   if (loading) return <Center h="100vh"><Loader size="lg" /></Center>;
   if (!user && location.pathname !== '/login') return null;
   if (location.pathname === '/login') return user ? <Navigate to={defaultPath(user)} replace /> : <LoginPage />;
-  if (location.pathname === '/' && !can(user!, 'accounting.view_financial_reports')) {
-    return <Navigate to={defaultPath(user!)} replace />;
-  }
+  if (location.pathname === '/' && !can(user!, 'accounting.view_financial_reports')) return <Navigate to={defaultPath(user!)} replace />;
 
   const securedRoutes = [
     { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
     { path: '/shift', permission: 'accounts.start_employee_shift', element: <ShiftPage user={user!} /> },
     { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage /> },
     { path: '/sales/:id', permission: 'invoices.view_invoice', element: <InvoiceDetailsPage /> },
-    { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage /> },
+    { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage user={user!} /> },
     { path: '/purchases', permission: 'purchases.view_purchase', element: <PurchasesPage /> },
     { path: '/purchases/:id', permission: 'purchases.view_purchase', element: <PurchaseDetailsPage /> },
-    { path: '/purchases/new', permission: 'purchases.add_purchase', element: <CreatePurchasePage /> },
+    { path: '/purchases/new', permission: 'purchases.add_purchase', element: <CreatePurchasePage user={user!} /> },
     { path: '/products', permission: 'products.view_product', element: <ProductsPage /> },
     { path: '/products/cartons', permission: 'products.view_cartonpricing', element: <CartonPricingPage /> },
     { path: '/customers', permission: 'customers.view_customer', element: <CustomersPage /> },
@@ -170,16 +117,5 @@ export function App() {
     { path: '/accounting/manual-journal', permission: 'accounting.add_journalentry', element: <ManualJournalPage /> },
   ];
 
-  return (
-    <AppErrorBoundary>
-      <Authenticated user={user!}>
-        <Routes>
-          {securedRoutes.map(({ path, permission, element }) => (
-            <Route key={path} path={path} element={<ProtectedPage user={user!} permission={permission}>{element}</ProtectedPage>} />
-          ))}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Authenticated>
-    </AppErrorBoundary>
-  );
+  return <AppErrorBoundary><Authenticated user={user!}><Routes>{securedRoutes.map(({ path, permission, element }) => <Route key={path} path={path} element={<ProtectedPage user={user!} permission={permission}>{element}</ProtectedPage>} />)}<Route path="*" element={<NotFound />} /></Routes></Authenticated></AppErrorBoundary>;
 }
