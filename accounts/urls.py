@@ -8,14 +8,8 @@ from .api.views.logout import LogoutAllView, LogoutView
 from .api.views.password_change import PasswordChangeView
 from .api.views.password_reset import PasswordResetConfirmView, PasswordResetRequestView
 from .api.views.refresh import RefreshView
-from .api.views.shift import CloseEmployeeShiftView, CurrentEmployeeShiftView, EmployeeShiftListView, StartEmployeeShiftView
-from .api.views.account_email import (
-    EmailChangeConfirmView,
-    EmailChangeRequestView,
-    EmailVerificationResendView,
-    EmailVerificationView,
-    SignUpView,
-)
+from .api.views.shift import CloseEmployeeShiftView, CurrentEmployeeShiftView, EmployeeShiftListView, EmployeeShiftVehicleOptionsView, StartEmployeeShiftView
+from .api.views.account_email import EmailChangeConfirmView, EmailChangeRequestView, EmailVerificationResendView, EmailVerificationView, SignUpView
 
 app_name = "accounts"
 
@@ -39,6 +33,7 @@ urlpatterns = [
     path("auth/password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("auth/", include("authsession.urls")),
     path("shifts/current/", CurrentEmployeeShiftView.as_view(), name="shift-current"),
+    path("shifts/vehicles/", EmployeeShiftVehicleOptionsView.as_view(), name="shift-vehicles"),
     path("shifts/start/", StartEmployeeShiftView.as_view(), name="shift-start"),
     path("shifts/close/", CloseEmployeeShiftView.as_view(), name="shift-close"),
     path("shifts/", EmployeeShiftListView.as_view(), name="shift-list"),
