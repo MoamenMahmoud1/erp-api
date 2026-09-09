@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from inventory.models import StockBalance, StockLocation, StockMovement, StockMovementItem
+from inventory.models import InventoryBatch, StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
 from products.models import Product
 
 
@@ -19,6 +19,40 @@ class StockLocationSerializer(serializers.ModelSerializer):
         return obj.employee.get_full_name() or obj.employee.username
 
 
+class InventoryBatchSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+
+    class Meta:
+        model = InventoryBatch
+        fields = ("id", "product", "product_name", "batch_number", "manufactured_date", "expiry_date", "created_at", "is_expired", "days_to_expiry")
+        read_only_fields = fields
+
+    is_expired = serializers.BooleanField(read_only=True)
+    days_to_expiry = serializers.IntegerField(read_only=True, allow_null=True)
+
+
+class StockBatchBalanceSerializer(serializers.ModelSerializer):
+    batch_id = serializers.IntegerField(source="batch.id", read_only=True)
+    batch_number = serializers.CharField(source="batch.batch_number", read_only=True, allow_null=True)
+    product = serializers.IntegerField(source="batch.product.id", read_only=True)
+    product_name = serializers.CharField(source="batch.product.name", read_only=True)
+    location_name = serializers.CharField(source="location.name", read_only=True)
+    site_name = serializers.CharField(source="location.site.name", read_only=True, allow_null=True)
+    manufactured_date = serializers.DateField(source="batch.manufactured_date", read_only=True, allow_null=True)
+    expiry_date = serializers.DateField(source="batch.expiry_date", read_only=True, allow_null=True)
+    is_expired = serializers.BooleanField(source="batch.is_expired", read_only=True)
+    days_to_expiry = serializers.IntegerField(source="batch.days_to_expiry", read_only=True, allow_null=True)
+    average_unit_cost = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = StockBatchBalance
+        fields = (
+            "id", "batch_id", "batch_number", "product", "product_name", "location", "location_name", "site_name",
+            "manufactured_date", "expiry_date", "is_expired", "days_to_expiry", "quantity", "total_cost", "average_unit_cost", "updated_at",
+        )
+        read_only_fields = fields
+
+
 class StockBalanceSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     location_name = serializers.CharField(source="location.name", read_only=True)
@@ -33,11 +67,13 @@ class StockBalanceSerializer(serializers.ModelSerializer):
 
 class StockMovementItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    batch_number = serializers.CharField(source="batch.batch_number", read_only=True, allow_null=True)
+    expiry_date = serializers.DateField(source="batch.expiry_date", read_only=True, allow_null=True)
     total_cost = serializers.DecimalField(max_digits=16, decimal_places=2, read_only=True)
 
     class Meta:
         model = StockMovementItem
-        fields = ("id", "product", "product_name", "quantity", "unit_cost", "total_cost")
+        fields = ("id", "product", "product_name", "batch", "batch_number", "expiry_date", "quantity", "unit_cost", "total_cost")
         read_only_fields = fields
 
 
@@ -54,8 +90,8 @@ class StockMovementSerializer(serializers.ModelSerializer):
         model = StockMovement
         fields = (
             "id", "movement_type", "shift_id", "source_location", "source_location_name", "source_site_name",
-            "destination_location", "destination_location_name", "destination_site_name", "created_by",
-            "created_by_name", "created_at", "reference", "items",
+            "destination_location", "destination_location_name", "destination_site_name", "created_by", "created_by_name",
+            "created_at", "reference", "items",
         )
         read_only_fields = fields
 
