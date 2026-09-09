@@ -14,7 +14,7 @@ from accounting.services.analytics import (
 from accounts.models import CustomUserModel
 from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
-from invoices.models import Invoice, InvoiceItem
+from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from suppliers.models import Supplier
@@ -104,6 +104,66 @@ class AnalyticsTests(TestCase):
         self.assertEqual(result["gross_sales"], Decimal("280"))
         self.assertEqual(result["units_sold"], 3)
         self.assertEqual(result["invoice_count"], 1)
+
+    def test_sales_dashboard_accounts_for_partial_return(self):
+        invoice = self._invoice(
+            self.user,
+            product=self.product_a,
+            quantity=2,
+            price="100",
+        )
+        invoice_item = invoice.items.get()
+        sales_return = InvoiceReturn.objects.create(
+            invoice=invoice,
+            created_by=self.user,
+            refund_amount=Decimal("100"),
+        )
+        InvoiceReturnItem.objects.create(
+            invoice_return=sales_return,
+            invoice_item=invoice_item,
+            quantity=1,
+            unit_price=Decimal("100"),
+        )
+
+        result = sales_dashboard(
+            date_from=timezone.localdate() - timedelta(days=1),
+            date_to=timezone.localdate(),
+        )
+        self.assertEqual(result["gross_sales"], Decimal("100"))
+        self.assertEqual(result["units_sold"], 1)
+        self.assertEqual(result["returns"], Decimal("100"))
+        self.assertEqual(result["returned_units"], 1)
+
+    def test_sales_dashboard_accounts_for_full_return_in_same_period(self):
+        invoice = self._invoice(
+            self.user,
+            product=self.product_a,
+            quantity=1,
+            price="100",
+        )
+        invoice_item = invoice.items.get()
+        sales_return = InvoiceReturn.objects.create(
+            invoice=invoice,
+            created_by=self.user,
+            refund_amount=Decimal("100"),
+        )
+        InvoiceReturnItem.objects.create(
+            invoice_return=sales_return,
+            invoice_item=invoice_item,
+            quantity=1,
+            unit_price=Decimal("100"),
+        )
+        invoice.status = Invoice.Status.RETURNED
+        invoice.save(update_fields=("status", "updated_at"))
+
+        result = sales_dashboard(
+            date_from=timezone.localdate() - timedelta(days=1),
+            date_to=timezone.localdate(),
+        )
+        self.assertEqual(result["gross_sales"], Decimal("0"))
+        self.assertEqual(result["units_sold"], 0)
+        self.assertEqual(result["returns"], Decimal("100"))
+        self.assertEqual(result["returned_units"], 1)
 
     def test_purchase_dashboard(self):
         self._purchase(product=self.product_a, quantity=4, price="40")
