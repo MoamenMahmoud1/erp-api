@@ -1,6 +1,6 @@
 from django.db import transaction
 
-from accounts.services.employee_shift import employee_for_user, require_open_shift
+from accounts.services.employee_shift import operation_context
 from common.exceptions import InvalidBusinessOperation
 from purchases.models import Purchase, PurchaseItem
 
@@ -13,25 +13,6 @@ def _validate_items(items):
         raise InvalidBusinessOperation("A product cannot appear more than once.")
     if any(not item["product"].is_active for item in items):
         raise InvalidBusinessOperation("Inactive products cannot be added to a purchase.")
-
-
-def _resolve_site(*, created_by, site):
-    from organization.models import Site
-
-    employee = getattr(created_by, "employee", None)
-    if site is None and employee and employee.work_site_id:
-        site = employee.work_site
-    if site is None:
-        return None
-    if not site.is_active:
-        raise InvalidBusinessOperation("The selected branch/store is inactive.")
-    if employee and employee.work_site_id and employee.work_site.company_id != site.company_id:
-        raise InvalidBusinessOperation("The purchase site must belong to the employee's company.")
-    if employee and employee.work_site_id and employee.work_site.site_type != "head_office":
-        allowed = site.pk == employee.work_site_id or site.parent_id == employee.work_site_id
-        if not allowed:
-            raise InvalidBusinessOperation("The purchase site is outside the employee's branch scope.")
-    return Site.objects.get(pk=site.pk)
 
 
 def _scoped_purchase(purchase_id, actor, *, for_update=True):
@@ -48,16 +29,19 @@ def _scoped_purchase(purchase_id, actor, *, for_update=True):
 def create_purchase(*, created_by, validated_data):
     data = validated_data.copy()
     items = data.pop("items")
+    requested_site = data.pop("site", None)
+    data.pop("shift", None)
     _validate_items(items)
     if not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
 
-    shift = require_open_shift(created_by)
-    employee = employee_for_user(created_by)
-    data["site"] = _resolve_site(created_by=created_by, site=data.get("site") or (shift.site if shift else None))
-    data.pop("shift", None)
+    _employee, site, shift = operation_context(created_by, requested_site=requested_site)
+    if site is None:
+        raise InvalidBusinessOperation("A site is required before creating a purchase.")
+
     purchase = Purchase.objects.create(
         created_by_id=created_by.pk,
+        site=site,
         shift_id=shift.pk if shift else None,
         **data,
     )
@@ -72,11 +56,10 @@ def update_purchase(*, purchase_id, validated_data, actor):
         raise InvalidBusinessOperation("Only draft purchases can be edited.")
     data = validated_data.copy()
     items = data.pop("items", None)
+    data.pop("site", None)
     data.pop("shift", None)
     if "supplier" in data and not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
-    if "site" in data:
-        data["site"] = _resolve_site(created_by=actor, site=data["site"])
     if items is not None:
         _validate_items(items)
         purchase.items.all().delete()
