@@ -16,6 +16,13 @@ class Purchase(models.Model):
         CANCELLED = "CANCELLED", "Cancelled"
 
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="purchases")
+    site = models.ForeignKey(
+        "organization.Site",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="purchases",
+    )
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     reference = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchases")
@@ -25,6 +32,7 @@ class Purchase(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [models.Index(fields=("site", "created_at"), name="purchase_site_created_idx")]
         permissions = [
             ("confirm_purchase", "Can confirm purchase"),
             ("cancel_purchase", "Can cancel purchase"),
@@ -131,7 +139,7 @@ class SupplierPayment(models.Model):
 class SupplierPaymentAllocation(models.Model):
     payment = models.ForeignKey(SupplierPayment, on_delete=models.CASCADE, related_name="allocations")
     purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, related_name="supplier_payment_allocations")
-    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
+    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0")))])
     transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     created_at = models.DateTimeField(auto_now_add=True)
 
