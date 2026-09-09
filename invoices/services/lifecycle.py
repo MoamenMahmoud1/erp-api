@@ -191,6 +191,12 @@ def cancel_invoice(invoice_id, actor=None):
     return invoice
 
 
+# Kept for compatibility with older internal callers/tests. It intentionally
+# bypasses actor/shift checks and is only suitable for trusted service code.
+def _cancel_invoice_sync(invoice_id):
+    return cancel_invoice(invoice_id, actor=None)
+
+
 class ConfirmInvoice:
     def __call__(self, invoice_id, actor=None):
         return confirm_invoice(invoice_id, actor)
