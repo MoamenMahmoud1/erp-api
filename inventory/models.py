@@ -14,6 +14,13 @@ class StockLocation(models.Model):
         MAIN_WAREHOUSE = "MAIN_WAREHOUSE", "Main Warehouse"
         SALES_VEHICLE = "SALES_VEHICLE", "Sales Vehicle"
 
+    site = models.ForeignKey(
+        "organization.Site",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="stock_locations",
+    )
     name = models.CharField(max_length=150)
     location_type = models.CharField(max_length=30, choices=LocationType.choices)
     employee = models.OneToOneField(
@@ -31,9 +38,14 @@ class StockLocation(models.Model):
         ordering = ("name",)
         constraints = [
             models.UniqueConstraint(
+                fields=("site",),
+                condition=Q(site__isnull=False, location_type="MAIN_WAREHOUSE", is_active=True),
+                name="inventory_one_active_main_warehouse_per_site",
+            ),
+            models.UniqueConstraint(
                 fields=("location_type",),
-                condition=Q(location_type="MAIN_WAREHOUSE", is_active=True),
-                name="inventory_one_active_main_warehouse",
+                condition=Q(site__isnull=True, location_type="MAIN_WAREHOUSE", is_active=True),
+                name="inventory_one_legacy_main_warehouse",
             ),
         ]
 
