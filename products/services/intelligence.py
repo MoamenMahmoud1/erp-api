@@ -7,7 +7,6 @@ from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Sum
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from common.report_cache import cached_report
 from inventory.models import StockBalance
 from invoices.models import InvoiceItem
 from products.models import Product
@@ -31,7 +30,6 @@ def _sales_expression(field, fallback):
     )
 
 
-@cached_report("product_intelligence", timeout=3600)
 def product_intelligence(
     *,
     as_of=None,
