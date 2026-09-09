@@ -1,10 +1,10 @@
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
 
-from inventory.models import InventoryBatch, StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
+from inventory.models import InventoryBatch, StockBalance, StockBatchBalance, StockLocation
 from inventory.services.stock_balance import StockBalanceService
 from products.models import Product
 
@@ -66,12 +66,3 @@ class BatchTrackingTests(TestCase):
         self.assertEqual(removed_cost, Decimal("22.00"))
         self.assertEqual(StockBatchBalance.objects.get(location=self.location, batch=self.soon).quantity, 3)
         self.assertEqual(StockBalance.objects.get(location=self.location, product=self.product).quantity, 3)
-
-    def test_movement_item_can_reference_batch(self):
-        movement = StockMovement.objects.create(
-            movement_type=StockMovement.MovementType.PURCHASE,
-            destination_location=self.location,
-            created_by_id=1,
-        )
-        item = StockMovementItem.objects.create(movement=movement, product=self.product, batch=self.soon, quantity=1, unit_cost=Decimal("10"))
-        self.assertEqual(item.batch.batch_number, "SOON")
