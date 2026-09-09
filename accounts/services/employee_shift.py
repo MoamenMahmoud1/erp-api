@@ -18,7 +18,7 @@ class ShiftError(InvalidBusinessOperation):
 
 def employee_for_user(user):
     try:
-        return Employee.objects.select_related("user", "work_site").get(user=user)
+        return Employee.objects.select_related("user", "work_site").get(user_id=user.pk)
     except Employee.DoesNotExist as exc:
         raise ShiftError("The authenticated user is not assigned to an employee record.") from exc
 
@@ -28,7 +28,7 @@ def current_shift_for_user(user):
         return None
     return (
         EmployeeShift.objects.select_related("site", "vehicle", "employee__user")
-        .filter(employee__user=user, status=EmployeeShift.Status.OPEN)
+        .filter(employee__user_id=user.pk, status=EmployeeShift.Status.OPEN)
         .first()
     )
 
@@ -54,11 +54,7 @@ def start_shift(*, user, opening_cash=Decimal("0.00"), vehicle_id=None):
         raise ShiftError("Opening cash cannot be negative.")
 
     business_date = timezone.localdate()
-    existing = (
-        EmployeeShift.objects.select_for_update()
-        .filter(employee=employee, business_date=business_date)
-        .first()
-    )
+    existing = EmployeeShift.objects.select_for_update().filter(employee=employee, business_date=business_date).first()
     if existing is not None:
         if existing.status == EmployeeShift.Status.OPEN:
             raise ShiftError("The employee already has an open shift today.")
@@ -93,26 +89,21 @@ def start_shift(*, user, opening_cash=Decimal("0.00"), vehicle_id=None):
         entity_type="EmployeeShift",
         entity_id=shift.pk,
         actor_id=user.pk,
-        metadata={
-            "employee_id": employee.pk,
-            "site_id": shift.site_id,
-            "vehicle_id": shift.vehicle_id,
-            "business_date": str(shift.business_date),
-        },
+        metadata={"employee_id": employee.pk, "site_id": shift.site_id, "vehicle_id": shift.vehicle_id, "business_date": str(shift.business_date)},
     )
     return shift
 
 
 def _shift_payment_totals(shift):
-    from payments.models import PaymentTransaction
+    from payments.models import PaymentTransaction, PaymentRefund
 
-    collected = PaymentTransaction.objects.filter(shift=shift).aggregate(
+    collected = PaymentTransaction.objects.filter(shift_id=shift.pk).aggregate(
         cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
         transfer=Coalesce(Sum("transfer_amount"), Decimal("0.00")),
     )
-    refunded = PaymentTransaction.objects.filter(shift=shift).aggregate(
-        cash=Coalesce(Sum("refunds__cash_amount"), Decimal("0.00")),
-        transfer=Coalesce(Sum("refunds__transfer_amount"), Decimal("0.00")),
+    refunded = PaymentRefund.objects.filter(shift_id=shift.pk).aggregate(
+        cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
+        transfer=Coalesce(Sum("transfer_amount"), Decimal("0.00")),
     )
     return {
         "expected_cash": quantize_money(shift.opening_cash + collected["cash"] - refunded["cash"]),
@@ -124,11 +115,7 @@ def _shift_payment_totals(shift):
 def close_shift(*, user, closing_cash, closing_transfer, notes=""):
     employee = employee_for_user(user)
     try:
-        shift = (
-            EmployeeShift.objects.select_for_update()
-            .select_related("site", "vehicle")
-            .get(employee=employee, status=EmployeeShift.Status.OPEN)
-        )
+        shift = EmployeeShift.objects.select_for_update().select_related("site", "vehicle").get(employee=employee, status=EmployeeShift.Status.OPEN)
     except EmployeeShift.DoesNotExist as exc:
         raise ShiftError("There is no open shift for this employee.") from exc
 
