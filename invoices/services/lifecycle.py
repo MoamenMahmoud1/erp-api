@@ -19,13 +19,20 @@ class InvoiceNotFound(InvalidBusinessOperation):
 def load_invoice_for_update(invoice_id, actor=None):
     queryset = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     try:
-        return queryset.select_for_update(of=("self",)).select_related("customer", "coupon", "created_by").prefetch_related("items__product", "payment_allocations", "payment_refunds").get(pk=invoice_id)
+        return queryset.select_for_update(of=("self",)).select_related("customer", "coupon", "created_by", "site").prefetch_related("items__product", "payment_allocations", "payment_refunds").get(pk=invoice_id)
     except Invoice.DoesNotExist as exc:
         raise InvoiceNotFound("Invoice not found.") from exc
 
 
-def sales_source_location(user):
-    return StockLocation.objects.filter(employee=user, location_type=StockLocation.LocationType.SALES_VEHICLE, is_active=True).select_for_update().first()
+def sales_source_location(invoice):
+    queryset = StockLocation.objects.filter(
+        employee=invoice.created_by,
+        location_type=StockLocation.LocationType.SALES_VEHICLE,
+        is_active=True,
+    )
+    if invoice.site_id:
+        queryset = queryset.filter(site_id=invoice.site_id)
+    return queryset.select_for_update().first()
 
 
 def _record_sale_movement(invoice, source_location):
@@ -48,9 +55,9 @@ def confirm_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidStateTransition("Only a draft invoice can be confirmed.")
-    source = sales_source_location(invoice.created_by)
+    source = sales_source_location(invoice)
     if source is None:
-        raise InvalidBusinessOperation("The invoice creator has no active sales location from which to fulfill this sale.")
+        raise InvalidBusinessOperation("The invoice creator has no active sales location for this branch.")
     for item in invoice.items.select_related("product"):
         if item.cost_price is None:
             item.cost_price = item.product.purchase_price
@@ -61,7 +68,7 @@ def confirm_invoice(invoice_id, actor=None):
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
-    record_event(action="invoice.confirm", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "stock_location_id": source.pk})
+    record_event(action="invoice.confirm", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "stock_location_id": source.pk, "site_id": invoice.site_id})
     return invoice
 
 
@@ -91,14 +98,6 @@ def cancel_invoice(invoice_id, actor=None):
     log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
     record_event(action="invoice.cancel", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status})
     return invoice
-
-
-def _record_sale_movement_sync(invoice, source_location):
-    return _record_sale_movement(invoice, source_location)
-
-
-def _cancel_invoice_sync(invoice_id, actor=None):
-    return cancel_invoice(invoice_id, actor)
 
 
 class ConfirmInvoice:
