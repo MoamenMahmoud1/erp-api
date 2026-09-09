@@ -5,13 +5,17 @@ from decimal import Decimal
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
 from django.db.models.functions import Coalesce, TruncDate
 
-from invoices.models import Invoice, InvoiceItem
+from invoices.models import Invoice, InvoiceItem, InvoiceReturn
+from organization.services.metrics import company_master_data_counts
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
-from organization.services.metrics import company_master_data_counts
 
 ZERO = Decimal("0.00")
-SALES_STATUSES = (Invoice.Status.CONFIRMED, Invoice.Status.PAID)
+SALES_STATUSES = (
+    Invoice.Status.CONFIRMED,
+    Invoice.Status.PAID,
+    Invoice.Status.RETURNED,
+)
 
 
 def _range_filter(queryset, field, date_from=None, date_to=None):
@@ -23,18 +27,80 @@ def _range_filter(queryset, field, date_from=None, date_to=None):
 
 
 def sales_dashboard(*, date_from=None, date_to=None):
-    """Return live sales KPIs and a daily net-sales trend."""
+    """Return live net-sales KPIs and a daily net-sales trend.
+
+    Sales are recognized on invoice date, while refunds/returns are recognized
+    on the return date. This keeps a full return from disappearing from the
+    original sales period and prevents a same-period return from producing a
+    negative sale by itself.
+    """
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
-    totals = items.aggregate(gross_sales=Coalesce(Sum(line_total), ZERO), units_sold=Coalesce(Sum("quantity"), 0), invoice_count=Count("invoice", distinct=True))
+    line_total = ExpressionWrapper(
+        F("unit_price") * F("quantity"),
+        output_field=DecimalField(max_digits=18, decimal_places=2),
+    )
+    totals = items.aggregate(
+        gross_sales=Coalesce(Sum(line_total), ZERO),
+        units_sold=Coalesce(Sum("quantity"), 0),
+        invoice_count=Count("invoice", distinct=True),
+    )
     invoices = Invoice.objects.filter(status__in=SALES_STATUSES)
     invoices = _range_filter(invoices, "created_at", date_from, date_to)
     discount_total = invoices.aggregate(total=Coalesce(Sum("coupon_discount"), ZERO))["total"]
-    daily_gross = items.annotate(day=TruncDate("invoice__created_at")).values("day").annotate(value=Coalesce(Sum(line_total), ZERO)).order_by("day")
-    daily_discounts = {row["day"]: row["value"] for row in invoices.annotate(day=TruncDate("created_at")).values("day").annotate(value=Coalesce(Sum("coupon_discount"), ZERO))}
-    trend = [{"date": row["day"].isoformat(), "value": row["value"] - daily_discounts.get(row["day"], ZERO)} for row in daily_gross]
-    return {"date_from": date_from, "date_to": date_to, "gross_sales": totals["gross_sales"] - discount_total, "units_sold": totals["units_sold"], "invoice_count": totals["invoice_count"], "trend": trend}
+
+    returns = InvoiceReturn.objects.all()
+    returns = _range_filter(returns, "created_at", date_from, date_to)
+    return_totals = returns.aggregate(
+        amount=Coalesce(Sum("refund_amount"), ZERO),
+    )
+    return_items = returns.values("id").annotate(
+        returned_units=Coalesce(Sum("items__quantity"), 0),
+    )
+    returned_units = sum((row["returned_units"] for row in return_items), 0)
+
+    daily_gross = (
+        items.annotate(day=TruncDate("invoice__created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum(line_total), ZERO))
+        .order_by("day")
+    )
+    daily_discounts = {
+        row["day"]: row["value"]
+        for row in invoices.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum("coupon_discount"), ZERO))
+    }
+    daily_returns = {
+        row["day"]: row["value"]
+        for row in returns.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(value=Coalesce(Sum("refund_amount"), ZERO))
+    }
+
+    trend_dates = set(daily_discounts) | set(daily_returns) | {row["day"] for row in daily_gross}
+    trend = []
+    gross_by_day = {row["day"]: row["value"] for row in daily_gross}
+    for day in sorted(trend_dates):
+        trend.append(
+            {
+                "date": day.isoformat(),
+                "value": gross_by_day.get(day, ZERO)
+                - daily_discounts.get(day, ZERO)
+                - daily_returns.get(day, ZERO),
+            }
+        )
+
+    return {
+        "date_from": date_from,
+        "date_to": date_to,
+        "gross_sales": totals["gross_sales"] - discount_total - return_totals["amount"],
+        "units_sold": totals["units_sold"] - returned_units,
+        "invoice_count": totals["invoice_count"],
+        "returns": return_totals["amount"],
+        "returned_units": returned_units,
+        "trend": trend,
+    }
 
 
 def purchase_dashboard(*, date_from=None, date_to=None):
@@ -57,6 +123,7 @@ def inventory_dashboard(*, low_stock_threshold=10):
 
 
 def top_products(*, date_from=None, date_to=None, limit=10):
+    """Return gross product revenue; returns are reported separately by the sales KPI."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
@@ -65,6 +132,7 @@ def top_products(*, date_from=None, date_to=None, limit=10):
 
 
 def sales_by_employee(*, date_from=None, date_to=None):
+    """Return gross sales contribution by invoice creator."""
     items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
     items = _range_filter(items, "invoice__created_at", date_from, date_to)
     line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
