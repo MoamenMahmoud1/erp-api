@@ -4,14 +4,9 @@ from rest_framework.response import Response
 
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
 from common.pagination import StandardPagination
-from inventory.api.filters import StockBalanceFilter, StockMovementFilter
-from inventory.api.serializers import (
-    StockBalanceSerializer,
-    StockLocationSerializer,
-    StockMovementSerializer,
-    TransferInputSerializer,
-)
-from inventory.models import StockBalance, StockLocation, StockMovement
+from inventory.api.filters import StockBalanceFilter, StockBatchBalanceFilter, StockMovementFilter
+from inventory.api.serializers import StockBalanceSerializer, StockBatchBalanceSerializer, StockLocationSerializer, StockMovementSerializer, TransferInputSerializer
+from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement
 from inventory.permissions import InventoryReadPermission, InventoryTransferPermission
 from inventory.services.transfer_stock import TransferStock
 
@@ -42,6 +37,22 @@ class StockBalanceListView(generics.ListAPIView):
         )
 
 
+class StockBatchBalanceListView(generics.ListAPIView):
+    serializer_class = StockBatchBalanceSerializer
+    permission_classes = (InventoryReadPermission,)
+    permission_codename = "inventory.view_stockbalance"
+    pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend,)
+    filterset_class = StockBatchBalanceFilter
+
+    def get_queryset(self):
+        return (
+            StockBatchBalance.objects.select_related("batch__product", "location", "location__site")
+            .filter(location__in=StockLocation.objects.visible_to(self.request.user))
+            .order_by("batch__expiry_date", "batch__product__name", "location__name")
+        )
+
+
 class MovementListView(generics.ListAPIView):
     serializer_class = StockMovementSerializer
     permission_classes = (InventoryReadPermission,)
@@ -53,7 +64,7 @@ class MovementListView(generics.ListAPIView):
     def get_queryset(self):
         return (
             StockMovement.objects.visible_to(self.request.user)
-            .prefetch_related("items__product")
+            .prefetch_related("items__product", "items__batch")
             .select_related("source_location", "destination_location", "created_by")
         )
 
@@ -77,13 +88,10 @@ class TransferView(generics.GenericAPIView):
         except InsufficientStock as exc:
             return Response({"detail": str(exc), "code": "insufficient_stock"}, status=409)
         except InvalidBusinessOperation as exc:
-            return Response(
-                {"detail": str(exc), "code": "transfer_invalid"},
-                status=status.HTTP_409_CONFLICT,
-            )
+            return Response({"detail": str(exc), "code": "transfer_invalid"}, status=status.HTTP_409_CONFLICT)
 
         movement = (
-            StockMovement.objects.prefetch_related("items__product")
+            StockMovement.objects.prefetch_related("items__product", "items__batch")
             .select_related("source_location", "destination_location", "created_by")
             .get(pk=movement.pk)
         )
