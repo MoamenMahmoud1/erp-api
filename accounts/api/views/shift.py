@@ -90,10 +90,10 @@ class CloseEmployeeShiftView(generics.GenericAPIView):
         data = EmployeeShiftSerializer(shift).data
         data.update(
             {
-                "expected_cash": totals["expected_cash"],
-                "cash_difference": shift.closing_cash - totals["expected_cash"],
-                "expected_transfer": totals["expected_transfer"],
-                "transfer_difference": shift.closing_transfer - totals["expected_transfer"],
+                "expected_cash": str(totals["expected_cash"]),
+                "cash_difference": str(shift.closing_cash - totals["expected_cash"]),
+                "expected_transfer": str(totals["expected_transfer"]),
+                "transfer_difference": str(shift.closing_transfer - totals["expected_transfer"]),
             }
         )
         return Response(data)
