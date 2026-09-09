@@ -19,7 +19,7 @@ import {
   TextInput,
   Title,
 } from '@mantine/core';
-import { IconEdit, IconPlus, IconSearch, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconSearch, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
 import type { Json, Paginated } from '../lib/api';
@@ -157,11 +157,11 @@ export function CrudPage({
     <Stack gap="lg">
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md">
         <div className="page-heading">
-          <Text size="sm" c="erp.6" fw={700} tt="uppercase" lts="0.05em">Master data</Text>
+          <Text size="sm" c="erp.6" fw={700} tt="uppercase" lts="0.05em">{title === 'Products' ? 'Catalog' : 'Master data'}</Text>
           <Title order={1} mt={4}>{title}</Title>
           <Text c="dimmed" mt={4}>{subtitle}</Text>
         </div>
-        {create && <Button leftSection={<IconPlus size={17} />} onClick={openCreate} color="erp" radius="sm">New {itemTitle}</Button>}
+        {create && <Button onClick={openCreate} color="erp" radius="sm">Add {itemTitle}</Button>}
       </Group>
 
       <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
@@ -185,7 +185,7 @@ export function CrudPage({
         <Group justify="space-between" p="md" className="records-footer" wrap="wrap"><Text size="sm" c="dimmed">{data.count.toLocaleString()} records</Text><Pagination total={Math.max(1, Math.ceil(data.count / pageSize))} value={page} onChange={setPage} color="erp" /></Group>
       </Paper>
 
-      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `Edit ${itemTitle}` : `New ${itemTitle}`} centered size="md" radius="sm" overlayProps={{ backgroundOpacity: 0.20, blur: 0 }}>
+      <Modal opened={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `Edit ${itemTitle}` : `Add ${itemTitle}`} centered size="md" radius="sm" overlayProps={{ backgroundOpacity: 0.20, blur: 0 }}>
         <form onSubmit={submit}><Stack gap="md">
           {visibleFields.map((field) => {
             if (field.type === 'boolean') return <Checkbox key={field.key} color="erp" label={field.label} checked={Boolean(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.currentTarget.checked }))} />;
@@ -193,7 +193,7 @@ export function CrudPage({
             if (field.type === 'select') return <Select key={field.key} label={field.label} data={field.options || []} value={String(form[field.key] ?? '')} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} allowDeselect={field.clearable === true} clearable={field.clearable === true} radius="sm" />;
             return <TextInput key={field.key} label={field.label} value={String(form[field.key] ?? '')} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.currentTarget.value }))} required={field.required} radius="sm" />;
           })}
-          <Button type="submit" fullWidth radius="sm" color="erp" disabled={!create && !editing}>{editing ? 'Save changes' : `Create ${itemTitle}`}</Button>
+          <Button type="submit" fullWidth radius="sm" color="erp" disabled={!create && !editing}>{editing ? 'Save changes' : `Add ${itemTitle}`}</Button>
         </Stack></form>
       </Modal>
     </Stack>
