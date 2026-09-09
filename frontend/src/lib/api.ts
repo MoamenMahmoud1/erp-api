@@ -152,7 +152,7 @@ export const api = {
     list: (query = '') => request<Paginated>(`/coupons/${query}`),
     get: (id: number) => request(`/coupons/${id}/`),
     create: (body: Json) => jsonRequest('/coupons/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/`, 'PATCH', body),
+    update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/PATCH`, 'PATCH', body),
     delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }),
   },
 
@@ -204,6 +204,7 @@ export const api = {
   inventory: {
     locations: (query = '') => request<Paginated>(`/inventory/locations/${query}`),
     stock: (query = '') => request<Paginated>(`/inventory/stock/${query}`),
+    batches: (query = '') => request<Paginated>(`/inventory/batches/${query}`),
     movements: (query = '') => request<Paginated>(`/inventory/movements/${query}`),
     transfer: (body: Json) => jsonRequest('/inventory/transfers/', 'POST', body),
   },
@@ -284,13 +285,31 @@ export type UserProfile = {
 };
 export type DashboardOverview = {
   counts?: { product_count: number; invoice_count: number; customer_count: number; supplier_count: number };
+  site_id?: number | null;
   sales: { gross_sales: number | string; units_sold: number; invoice_count: number; trend: { date: string; value: number | string }[] };
   purchases: { purchase_value: number | string; units_purchased: number; purchase_count: number; trend: { date: string; value: number | string }[] };
-  inventory: { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock_threshold: number; low_stock: { product_id: number; product_name: string; stock: number }[] };
+  inventory: {
+    total_units: number;
+    inventory_value: number | string;
+    product_count: number;
+    low_stock_count: number;
+    low_stock_threshold: number;
+    low_stock: { product_id: number; product_name: string; stock: number }[];
+    expired_units: number;
+    expiring_7_days_units: number;
+    expiring_30_days_units: number;
+    expired_batch_count: number;
+    expiring_7_days_batch_count: number;
+    expiring_30_days_batch_count: number;
+    expiry_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[];
+    expired_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[];
+  };
   pnl: { total_revenue: number | string; total_expenses: number | string; net_income: number | string };
   cash_flow: { opening_cash: number | string; total_inflows: number | string; total_outflows: number | string; net_change: number | string; ending_cash: number | string };
   top_products: { product_id: number; 'product__name': string; quantity: number; revenue: number | string }[];
   sales_by_employee: { invoice__created_by_id: number; invoice__created_by__email: string; invoice__created_by__first_name: string; invoice__created_by__last_name: string; employee_name: string; quantity: number; revenue: number | string }[];
+  top_customers: { customer_id: number; customer_name: string; invoice_count: number; units_sold: number; gross_revenue: number | string; returns: number | string; revenue: number | string }[];
+  bottom_customers: { customer_id: number; customer_name: string; invoice_count: number; units_sold: number; gross_revenue: number | string; returns: number | string; revenue: number | string }[];
   customer_balances: { customer_id: number; customer_name: string; balance: number | string }[];
   supplier_balances: { supplier_id: number; supplier_name: string; balance: number | string }[];
 };
