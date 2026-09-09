@@ -1,12 +1,8 @@
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import {
-  ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme,
-} from '@mantine/core';
-import {
-  IconBook, IconBox, IconBuilding, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet,
-} from '@tabler/icons-react';
+import { ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
+import { IconBook, IconBox, IconBuilding, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
@@ -51,7 +47,10 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
   const visibleSections = useMemo(
     () => sections
-      .map((section) => ({ ...section, items: section.items.filter((item) => can(user, item.permission)) }))
+      .map((section) => ({
+        ...section,
+        items: section.items.filter((item) => can(user, item.permission) && (item.to !== '/shift' || user.role?.requires_shift)),
+      }))
       .filter((section) => section.items.length > 0),
     [user],
   );
@@ -95,7 +94,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             <TextInput className="topbar-search" leftSection={<IconSearch size={17} />} rightSection={<Text size="xs" c="dimmed" className="shortcut-hint">⌘ K</Text>} placeholder="Search modules…" value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitSearch(); if (event.key === 'Escape') setSearch(''); }} visibleFrom="sm" styles={{ input: { borderRadius: 999 } }} />
             <Group gap="xs">
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}><ActionIcon variant="subtle" radius="xl" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">{dark ? <IconSun size={18} /> : <IconMoon size={18} />}</ActionIcon></Tooltip>
-              <Menu shadow="md" width={230} position="bottom-end">
+              <Menu shadow="md" width={260} position="bottom-end">
                 <Menu.Target><button className="user-chip" type="button"><Avatar radius="xl" size="sm" color="indigo">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar><span className="user-chip-copy"><Text size="sm" fw={750}>{user.first_name || user.username}</Text><Text size="xs" c="dimmed">{roleLabel} · {siteLabel}</Text></span><IconChevronDown size={15} /></button></Menu.Target>
                 <Menu.Dropdown>
                   <Menu.Label>Workspace</Menu.Label>
