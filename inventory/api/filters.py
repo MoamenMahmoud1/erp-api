@@ -1,7 +1,8 @@
 import django_filters
+from django.db.models import Q
 from django.utils import timezone
 
-from inventory.models import StockBatchBalance, StockMovement
+from inventory.models import StockBalance, StockBatchBalance, StockMovement
 
 
 class StockBalanceFilter(django_filters.FilterSet):
@@ -10,7 +11,6 @@ class StockBalanceFilter(django_filters.FilterSet):
     min_quantity = django_filters.NumberFilter(field_name="quantity", lookup_expr="gte")
 
     class Meta:
-        from inventory.models import StockBalance
         model = StockBalance
         fields = ("product", "location", "min_quantity")
 
@@ -31,8 +31,9 @@ class StockBatchBalanceFilter(django_filters.FilterSet):
         if value is None:
             return queryset
         today = timezone.localdate()
-        lookup = {"batch__expiry_date__lt": today} if value else {"batch__expiry_date__gte": today}
-        return queryset.filter(**lookup)
+        if value:
+            return queryset.filter(batch__expiry_date__lt=today)
+        return queryset.filter(Q(batch__expiry_date__isnull=True) | Q(batch__expiry_date__gte=today))
 
 
 class StockMovementFilter(django_filters.FilterSet):
