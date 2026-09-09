@@ -30,7 +30,7 @@ class Role(models.Model):
     def highest_for_user(cls, user):
         if not user or not user.is_authenticated:
             return None
-        return cls.objects.filter(group__user_id=user.pk).order_by("-level").first()
+        return cls.objects.filter(group__user__id=user.pk).order_by("-level").first()
 
     @classmethod
     def level_for_user(cls, user):
