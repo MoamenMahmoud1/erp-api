@@ -123,35 +123,31 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
   return (
     <div className="app-bg">
-      <div className="aurora-orb one" />
-      <div className="aurora-orb two" />
-      <div className="aurora-orb three" />
       <AppShell
         padding={{ base: 'sm', md: 'lg' }}
-        navbar={{ width: 258, breakpoint: 'md', collapsed: { mobile: !opened } }}
-        header={{ height: 74 }}
+        navbar={{ width: 250, breakpoint: 'md', collapsed: { mobile: !opened } }}
+        header={{ height: 68 }}
         styles={{
           main: { background: 'transparent' },
           header: {
-            background: dark ? 'rgba(8, 13, 25, 0.90)' : 'rgba(255, 255, 255, 0.94)',
-            backdropFilter: 'blur(12px)',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)',
+            background: dark ? '#0f172a' : '#ffffff',
+            borderColor: dark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(15, 23, 42, 0.10)',
           },
           navbar: {
-            background: dark ? 'rgba(8, 13, 25, 0.96)' : 'rgba(255, 255, 255, 0.97)',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)',
+            background: dark ? '#0f172a' : '#ffffff',
+            borderColor: dark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(15, 23, 42, 0.10)',
           },
         }}
       >
         <AppShell.Header>
           <Group h="100%" px={{ base: 'sm', md: 'lg' }} justify="space-between" gap="sm">
-            <Group gap="sm" miw={{ base: 'auto', sm: 230 }}>
+            <Group gap="sm" miw={{ base: 'auto', sm: 220 }}>
               <Burger opened={opened} onClick={() => setOpened((value) => !value)} hiddenFrom="md" size="sm" aria-label="Open navigation" />
               <Group gap="sm">
-                <ThemeIcon variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }} size={36} radius="xl">E</ThemeIcon>
+                <ThemeIcon color="blue" variant="light" size={34} radius="md">E</ThemeIcon>
                 <div className="brand-copy">
-                  <Text fw={850} size="sm" lh={1.1}>ERP Command Center</Text>
-                  <Text size="xs" c="dimmed" mt={3}>Sales & operations</Text>
+                  <Text fw={750} size="sm" lh={1.1}>ERP Workspace</Text>
+                  <Text size="xs" c="dimmed" mt={2}>Sales & operations</Text>
                 </div>
               </Group>
             </Group>
@@ -165,20 +161,20 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               onKeyDown={(event) => { if (event.key === 'Enter') submitSearch(); if (event.key === 'Escape') setSearch(''); }}
               visibleFrom="sm"
               aria-label="Search modules"
-              styles={{ input: { borderRadius: 999 } }}
+              styles={{ input: { borderRadius: 7 } }}
             />
             <Group gap="xs">
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
-                <ActionIcon variant="subtle" radius="xl" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
+                <ActionIcon variant="subtle" radius="md" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
                 </ActionIcon>
               </Tooltip>
               <Menu shadow="md" width={280} position="bottom-end">
                 <Menu.Target>
                   <button className="user-chip" type="button" aria-label="Open account menu">
-                    <Avatar radius="xl" size="sm" color="indigo">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
+                    <Avatar radius="md" size="sm" color="blue">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
                     <span className="user-chip-copy">
-                      <Text size="sm" fw={750}>{user.first_name || user.username}</Text>
+                      <Text size="sm" fw={700}>{user.first_name || user.username}</Text>
                       <Text size="xs" c="dimmed">{roleLabel} · {siteLabel}</Text>
                     </span>
                     <IconChevronDown size={15} />
@@ -200,10 +196,10 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
         <AppShell.Navbar p="sm">
           <AppShell.Section grow component={ScrollArea} scrollbarSize={4} offsetScrollbars>
-            <Stack gap="lg">
+            <Stack gap="md">
               {visibleSections.map((section) => (
                 <div key={section.label}>
-                  <Text px="sm" mb={7} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">{section.label}</Text>
+                  <Text px="sm" mb={6} size="xs" fw={750} tt="uppercase" c="dimmed" lts="0.06em">{section.label}</Text>
                   <Stack gap={2}>
                     {section.items.map((item) => {
                       const active = item.to === '/' ? location.pathname === '/' : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
@@ -216,8 +212,8 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                           label={item.label}
                           leftSection={<span className="nav-icon">{item.icon}</span>}
                           onClick={() => setOpened(false)}
-                          variant="light"
-                          styles={{ root: { minHeight: 40, borderRadius: 10 }, label: { fontWeight: active ? 750 : 600 } }}
+                          variant="subtle"
+                          styles={{ root: { minHeight: 38, borderRadius: 7 }, label: { fontWeight: active ? 700 : 550 } }}
                         />
                       );
                     })}
