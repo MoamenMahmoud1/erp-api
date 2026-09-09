@@ -1,4 +1,4 @@
-import { Badge, Group } from '@mantine/core';
+import { Badge } from '@mantine/core';
 
 import { RecordsPage } from '../components/RecordsPage';
 import { api } from '../lib/api';
@@ -17,7 +17,7 @@ export function InventoryBatchesPage() {
       eyebrow="INVENTORY"
       title="Batches & expiry"
       subtitle="Trace received lots, production dates, expiry dates and the quantity still available at each location."
-      list={(query = '') => api.inventory.batches(query || '?page_size=50')}
+      list={api.inventory.batches}
       columns={[
         { key: 'product_name', label: 'Product' },
         { key: 'batch_number', label: 'Batch / lot', format: (value) => String(value || 'Unnumbered') },
@@ -25,13 +25,10 @@ export function InventoryBatchesPage() {
         { key: 'quantity', label: 'Qty' },
         { key: 'manufactured_date', label: 'Manufactured' },
         { key: 'expiry_date', label: 'Expiry' },
-        {
-          key: 'is_expired', label: 'Status', format: (value, row) => expiryBadge(value, row.days_to_expiry),
-        },
+        { key: 'is_expired', label: 'Status', format: (value, row) => expiryBadge(value, row.days_to_expiry) },
         { key: 'average_unit_cost', label: 'Unit cost' },
         { key: 'total_cost', label: 'Inventory value' },
       ]}
-      topContent={<Group gap="xs"><Badge variant="dot">FEFO</Badge><Badge variant="light">Expired stock stays visible for control</Badge></Group>}
     />
   );
 }
