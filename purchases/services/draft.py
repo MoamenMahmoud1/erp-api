@@ -13,6 +13,11 @@ def _validate_items(items):
         raise InvalidBusinessOperation("A product cannot appear more than once.")
     if any(not item["product"].is_active for item in items):
         raise InvalidBusinessOperation("Inactive products cannot be added to a purchase.")
+    for item in items:
+        manufactured_date = item.get("manufactured_date")
+        expiry_date = item.get("expiry_date")
+        if manufactured_date and expiry_date and expiry_date < manufactured_date:
+            raise InvalidBusinessOperation("Expiry date cannot be before manufactured date.")
 
 
 def _scoped_purchase(purchase_id, actor, *, for_update=True):
