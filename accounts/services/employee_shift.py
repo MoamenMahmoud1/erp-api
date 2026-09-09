@@ -154,7 +154,12 @@ def _shift_payment_totals(shift):
 def close_shift(*, user, closing_cash, closing_transfer, notes=""):
     employee = employee_for_user(user)
     try:
-        shift = EmployeeShift.objects.select_for_update().select_related("site", "vehicle").get(employee=employee, status=EmployeeShift.Status.OPEN)
+        shift = (
+            EmployeeShift.objects
+            .select_for_update(of=("self",))
+            .select_related("site", "vehicle")
+            .get(employee=employee, status=EmployeeShift.Status.OPEN)
+        )
     except EmployeeShift.DoesNotExist as exc:
         raise ShiftError("There is no open shift for this employee.") from exc
 
