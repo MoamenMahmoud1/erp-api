@@ -29,6 +29,7 @@ products/tests/
   test_product_api.py
   test_carton_pricing_api.py
   test_intelligence.py
+  test_intelligence_api.py
 
 organization/tests/
   test_company.py
@@ -67,7 +68,7 @@ Use these tests for serializer/view behavior, HTTP status codes, permissions, pa
 
 `organization.tests.test_metrics` verifies that master-data counters update on normal creates/deletes and that the daily reconciliation service repairs deliberate counter drift. `core.tests.test_celery` verifies that Celery is wired correctly and that only the daily counter reconciliation is scheduled currently.
 
-Product intelligence tests remain live/database-backed. Dashboard analytics tests remain live as well; they do not depend on report-cache warming.
+Product intelligence has both service-level and API contract coverage. Dashboard analytics tests remain live; they do not depend on report-cache warming.
 
 ## Local commands
 
@@ -90,7 +91,7 @@ python manage.py test invoices.tests.test_lifecycle
 python manage.py test payments.tests.test_collection
 python manage.py test organization.tests.test_metrics
 python manage.py test core.tests.test_celery
-python manage.py test products.tests.test_intelligence
+python manage.py test products.tests.test_intelligence products.tests.test_intelligence_api
 ```
 
 Run one test class or method:
