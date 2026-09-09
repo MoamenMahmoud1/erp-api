@@ -1,7 +1,31 @@
-from django.db import migrations, models
-import django.db.models.deletion
-from django.db.models import F, Q
 from decimal import Decimal
+
+from django.db import migrations, models
+from django.db.models import F, Q
+import django.db.models.deletion
+
+
+def backfill_legacy_batches(apps, schema_editor):
+    StockBalance = apps.get_model("inventory", "StockBalance")
+    InventoryBatch = apps.get_model("inventory", "InventoryBatch")
+    StockBatchBalance = apps.get_model("inventory", "StockBatchBalance")
+
+    for balance in StockBalance.objects.select_related("product", "location").iterator():
+        batch_number = f"LEGACY-{balance.location_id}-{balance.product_id}"
+        batch, _ = InventoryBatch.objects.get_or_create(
+            product_id=balance.product_id,
+            batch_number=batch_number,
+            defaults={"manufactured_date": None, "expiry_date": None},
+        )
+        StockBatchBalance.objects.update_or_create(
+            location_id=balance.location_id,
+            batch_id=batch.pk,
+            defaults={"quantity": balance.quantity, "total_cost": balance.total_cost},
+        )
+
+
+def noop_reverse(apps, schema_editor):
+    pass
 
 
 class Migration(migrations.Migration):
@@ -27,18 +51,11 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="inventorybatch",
-            constraint=models.UniqueConstraint(
-                condition=Q(batch_number__isnull=False),
-                fields=("product", "batch_number"),
-                name="inventory_batch_product_number_unique",
-            ),
+            constraint=models.UniqueConstraint(condition=Q(batch_number__isnull=False), fields=("product", "batch_number"), name="inventory_batch_product_number_unique"),
         ),
         migrations.AddConstraint(
             model_name="inventorybatch",
-            constraint=models.CheckConstraint(
-                condition=Q(expiry_date__isnull=True) | Q(manufactured_date__isnull=True) | Q(expiry_date__gte=F("manufactured_date")),
-                name="inventory_batch_dates_ordered",
-            ),
+            constraint=models.CheckConstraint(condition=Q(expiry_date__isnull=True) | Q(manufactured_date__isnull=True) | Q(expiry_date__gte=F("manufactured_date")), name="inventory_batch_dates_ordered"),
         ),
         migrations.CreateModel(
             name="StockBatchBalance",
@@ -52,10 +69,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ("batch__expiry_date", "batch_id"),
-                "indexes": [
-                    models.Index(fields=("location", "quantity"), name="stock_batch_balance_location_qty_idx"),
-                    models.Index(fields=("batch", "location"), name="stock_batch_balance_batch_loc_idx"),
-                ],
+                "indexes": [models.Index(fields=("location", "quantity"), name="stock_batch_balance_location_qty_idx"), models.Index(fields=("batch", "location"), name="stock_batch_balance_batch_loc_idx")],
             },
         ),
         migrations.AddConstraint(
@@ -75,4 +89,5 @@ class Migration(migrations.Migration):
             name="batch",
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name="movement_items", to="inventory.inventorybatch"),
         ),
+        migrations.RunPython(backfill_legacy_batches, noop_reverse),
     ]
