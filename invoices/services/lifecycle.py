@@ -7,6 +7,7 @@ from accounting.services import get_default_company, post_sales_invoice, reverse
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
+from common.report_events import schedule_report_refresh
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice
@@ -62,6 +63,7 @@ def confirm_invoice(invoice_id, actor=None):
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
     record_event(action="invoice.confirm", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "stock_location_id": source.pk})
+    schedule_report_refresh(refresh_product_intelligence=True)
     return invoice
 
 
@@ -90,6 +92,7 @@ def cancel_invoice(invoice_id, actor=None):
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
     record_event(action="invoice.cancel", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status})
+    schedule_report_refresh(refresh_product_intelligence=invoice.status == Invoice.Status.CANCELLED)
     return invoice
 
 
