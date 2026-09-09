@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 
-from accounts.services.employee_shift import employee_for_user, require_open_shift
+from accounts.services.employee_shift import operation_context
 from accounting.services import get_default_company, post_customer_collection
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
@@ -35,9 +35,11 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     if total_received == 0:
         return None
 
-    shift = require_open_shift(actor) if actor is not None else None
-    employee = employee_for_user(actor) if actor is not None else None
-    site_id = shift.site_id if shift else (employee.work_site_id if employee else None)
+    shift = None
+    site = None
+    if actor is not None:
+        _employee, site, shift = operation_context(actor)
+    site_id = site.pk if site else None
 
     invoices = Invoice.objects.filter(customer=customer, status=Invoice.Status.CONFIRMED)
     if actor is not None:
