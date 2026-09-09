@@ -3,7 +3,7 @@ import { Component, useEffect, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Card, Center, Stack, Text, Loader } from '@mantine/core';
 
-import { PermissionGuard } from './components/PermissionGuard';
+import { PermissionGuard, can } from './components/PermissionGuard';
 import { Shell } from './components/Shell';
 import { api, type UserProfile } from './lib/api';
 import { DashboardPage } from './pages/DashboardPage';
@@ -17,8 +17,10 @@ import { AccountingHomePage, AccountsPage, JournalsPage, StatementsPage } from '
 import { BalancesPage, OpeningBalancePage, ManualJournalPage } from './pages/AccountingReportsPages';
 import { ExpensesPage, PeriodsPage, GeneralLedgerPage, TrialBalancePage } from './pages/AccountingOperationsPages';
 import { CompanyPage, SitesPage, DepartmentsPage } from './pages/OrganizationPages';
+import { ShiftPage } from './pages/ShiftPage';
 
 const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
+const AUTH_CONTEXT_CHANGED_EVENT = 'erp-context-changed';
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null as Error | null };
@@ -33,7 +35,6 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 
   render() {
     if (!this.state.error) return this.props.children;
-
     return (
       <Center mih="100vh" p="xl">
         <Card className="glass" radius="xl" withBorder p="xl" maw={620}>
@@ -62,6 +63,14 @@ function NotFound() {
   return <Center h="60vh"><div><h2>Page not found</h2><p>This route is not part of the current ERP workspace.</p></div></Center>;
 }
 
+function defaultPath(user: UserProfile) {
+  if (can(user, 'accounting.view_financial_reports')) return '/';
+  if (can(user, 'invoices.view_invoice')) return '/sales';
+  if (can(user, 'inventory.view_stockbalance')) return '/inventory';
+  if (can(user, 'accounts.start_employee_shift')) return '/shift';
+  return '/login';
+}
+
 export function App() {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,13 +83,27 @@ export function App() {
       authCheckStarted.current = false;
       setUser(null);
       setLoading(false);
-      if (window.location.pathname !== '/login') {
-        navigate('/login', { replace: true });
-      }
+      if (window.location.pathname !== '/login') navigate('/login', { replace: true });
+    };
+
+    const reloadContext = () => {
+      authCheckStarted.current = false;
+      setLoading(true);
+      api.auth.me()
+        .then(setUser)
+        .catch(() => {
+          setUser(null);
+          navigate('/login', { replace: true });
+        })
+        .finally(() => setLoading(false));
     };
 
     window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
-    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    window.addEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext);
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+      window.removeEventListener(AUTH_CONTEXT_CHANGED_EVENT, reloadContext);
+    };
   }, [navigate]);
 
   useEffect(() => {
@@ -104,10 +127,14 @@ export function App() {
 
   if (loading) return <Center h="100vh"><Loader size="lg" /></Center>;
   if (!user && location.pathname !== '/login') return null;
-  if (location.pathname === '/login') return user ? <Navigate to="/" replace /> : <LoginPage />;
+  if (location.pathname === '/login') return user ? <Navigate to={defaultPath(user)} replace /> : <LoginPage />;
+  if (location.pathname === '/' && !can(user!, 'accounting.view_financial_reports')) {
+    return <Navigate to={defaultPath(user!)} replace />;
+  }
 
   const securedRoutes = [
     { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
+    { path: '/shift', permission: 'accounts.start_employee_shift', element: <ShiftPage user={user!} /> },
     { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage /> },
     { path: '/sales/:id', permission: 'invoices.view_invoice', element: <InvoiceDetailsPage /> },
     { path: '/sales/new', permission: 'invoices.add_invoice', element: <CreateInvoicePage /> },
