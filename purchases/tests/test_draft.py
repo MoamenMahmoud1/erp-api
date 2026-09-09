@@ -3,7 +3,9 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from accounts.models import Employee
 from common.exceptions import InvalidBusinessOperation
+from organization.models import Company, Site
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.draft import CreatePurchase, DeletePurchase, UpdatePurchase
@@ -19,6 +21,17 @@ class PurchaseDraftServiceTests(TestCase):
             password="StrongPass123!",
             is_staff=True,
         )
+        self.company = Company.objects.create(name="Purchase Draft Company")
+        self.site = Site.objects.create(
+            company=self.company,
+            code="PO-BR",
+            name="Purchase Draft Branch",
+            site_type=Site.Type.BRANCH,
+            address_line_1="Test address",
+            city="Cairo",
+            country_code="EG",
+        )
+        Employee.objects.create(user=self.user, work_site=self.site)
         self.supplier = Supplier.objects.create(name="Supplier")
         self.product = Product.objects.create(
             name="Product",
