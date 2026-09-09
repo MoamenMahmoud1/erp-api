@@ -1,10 +1,10 @@
 from django.db import transaction
 
+from accounts.services.employee_shift import require_open_shift
 from common.exceptions import InvalidBusinessOperation
 from invoices.models import Invoice, InvoiceItem
 
 from .coupon import _calculator, _validate_coupon
-from .create import _resolve_site
 from .lifecycle import load_invoice_for_update
 
 
@@ -14,14 +14,21 @@ def update_invoice(*, invoice_id, validated_data, actor=None):
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidBusinessOperation("Only draft invoices can be edited.")
 
+    if actor is not None:
+        current_shift = require_open_shift(actor)
+        if current_shift is not None and invoice.site_id != current_shift.site_id:
+            raise InvalidBusinessOperation("The invoice belongs to a different site than the current shift.")
+
     data = validated_data.copy()
     items = data.pop("items", None)
+    data.pop("site", None)
+    data.pop("shift", None)
     if items is not None:
         if not items:
             raise InvalidBusinessOperation("An invoice must contain at least one item.")
         product_ids = [item["product"].pk for item in items]
         if len(product_ids) != len(set(product_ids)):
-            raise InvalidBusinessOperation("A product cannot appear more than once.")
+            raise InvalidBusinessOperation("A product cannot appear more than once in an invoice.")
         if any(not item["product"].is_active for item in items):
             raise InvalidBusinessOperation("Inactive products cannot be added to an invoice.")
         invoice.items.all().delete()
@@ -37,15 +44,11 @@ def update_invoice(*, invoice_id, validated_data, actor=None):
             ]
         )
 
-    if "site" in data:
-        if actor is None:
-            raise InvalidBusinessOperation("An actor is required to change an invoice site.")
-        data["site"] = _resolve_site(created_by_id=actor.pk, site=data["site"])
-
     changed_fields = {"updated_at"}
     for field, value in data.items():
-        setattr(invoice, field, value)
-        changed_fields.add(field)
+        if field not in {"site", "shift"}:
+            setattr(invoice, field, value)
+            changed_fields.add(field)
 
     if invoice.coupon_id:
         _validate_coupon(invoice.coupon, invoice)
