@@ -17,37 +17,37 @@ const sections: NavSection[] = [
       { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} />, permission: 'accounting.view_financial_reports' },
       { label: 'Insights', to: '/insights', icon: <IconChartBar size={17} />, permission: 'accounting.view_financial_reports' },
       { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
-      { label: 'New sale', to: '/sales/new', icon: <IconReceipt size={17} />, permission: 'invoices.add_invoice' },
       { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
-      { label: 'New purchase', to: '/purchases/new', icon: <IconShoppingCart size={17} />, permission: 'purchases.add_purchase' },
-      { label: 'Collect payment', to: '/payments/collect', icon: <IconWallet size={17} />, permission: 'payments.process_collection' },
-      { label: 'Pay supplier', to: '/payments/supplier', icon: <IconTruck size={17} />, permission: 'purchases.process_supplier_payment' },
-      { label: 'My Shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: false },
+      { label: 'Payments', to: '/payments', icon: <IconWallet size={17} />, permission: 'payments.view_paymenttransaction' },
+      { label: 'My shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: false },
     ],
   },
   {
-    label: 'Master data',
+    label: 'Catalog',
     items: [
       { label: 'Products', to: '/products', icon: <IconBox size={17} />, permission: 'products.view_product' },
       { label: 'Carton pricing', to: '/products/cartons', icon: <IconPackage size={17} />, permission: 'products.view_cartonpricing' },
       { label: 'Customers', to: '/customers', icon: <IconUsers size={17} />, permission: 'customers.view_customer' },
       { label: 'Suppliers', to: '/suppliers', icon: <IconTruck size={17} />, permission: 'suppliers.view_supplier' },
-      { label: 'Employees', to: '/employees', icon: <IconUsers size={17} />, permission: 'accounts.view_employee' },
       { label: 'Coupons', to: '/coupons', icon: <IconReceipt size={17} />, permission: 'coupons.view_coupon' },
     ],
   },
   {
-    label: 'Operations',
+    label: 'Inventory',
     items: [
-      { label: 'Inventory', to: '/inventory', icon: <IconPackage size={17} />, permission: 'inventory.view_stockbalance' },
+      { label: 'Stock', to: '/inventory', icon: <IconPackage size={17} />, permission: 'inventory.view_stockbalance' },
       { label: 'Batches & expiry', to: '/inventory/batches', icon: <IconCalendarDue size={17} />, permission: 'inventory.view_stockbalance' },
       { label: 'Locations', to: '/inventory/locations', icon: <IconBuilding size={17} />, permission: 'inventory.view_stocklocation' },
       { label: 'Movements', to: '/inventory/movements', icon: <IconChartBar size={17} />, permission: 'inventory.view_stockmovement' },
-      { label: 'Transfer stock', to: '/inventory/transfer', icon: <IconTruck size={17} />, permission: 'inventory.transfer_stock' },
-      { label: 'Payments', to: '/payments', icon: <IconWallet size={17} />, permission: 'payments.view_paymenttransaction' },
+    ],
+  },
+  {
+    label: 'Organization',
+    items: [
       { label: 'Company', to: '/organization/company', icon: <IconBuilding size={17} />, permission: 'organization.view_company' },
       { label: 'Sites', to: '/organization/sites', icon: <IconBuilding size={17} />, permission: 'organization.view_site' },
       { label: 'Departments', to: '/organization/departments', icon: <IconUsers size={17} />, permission: 'organization.view_department' },
+      { label: 'Employees', to: '/employees', icon: <IconUsers size={17} />, permission: 'accounts.view_employee' },
     ],
   },
   {
@@ -61,6 +61,11 @@ const sections: NavSection[] = [
       { label: 'Statements', to: '/accounting/statements', icon: <IconChartBar size={17} />, permission: 'accounting.view_financial_reports' },
       { label: 'AR / AP', to: '/accounting/balances', icon: <IconWallet size={17} />, permission: 'accounting.view_financial_reports' },
       { label: 'Expenses', to: '/accounting/expenses', icon: <IconWallet size={17} />, permission: 'accounting.view_expense' },
+    ],
+  },
+  {
+    label: 'Accounting setup',
+    items: [
       { label: 'Periods', to: '/accounting/periods', icon: <IconCalendarDue size={17} />, permission: 'accounting.view_accountingperiod' },
       { label: 'Opening balance', to: '/accounting/opening-balance', icon: <IconBook size={17} />, permission: 'accounting.manage_chart_of_accounts' },
       { label: 'Manual journal', to: '/accounting/manual-journal', icon: <IconFileInvoice size={17} />, permission: 'accounting.add_journalentry' },
@@ -125,18 +130,12 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     <div className="app-bg">
       <AppShell
         padding={{ base: 'sm', md: 'lg' }}
-        navbar={{ width: 250, breakpoint: 'md', collapsed: { mobile: !opened } }}
+        navbar={{ width: 244, breakpoint: 'md', collapsed: { mobile: !opened } }}
         header={{ height: 68 }}
         styles={{
           main: { background: 'transparent' },
-          header: {
-            background: 'var(--erp-surface)',
-            borderColor: 'var(--erp-border)',
-          },
-          navbar: {
-            background: 'var(--erp-surface)',
-            borderColor: 'var(--erp-border)',
-          },
+          header: { background: 'var(--erp-surface)', borderColor: 'var(--erp-border)' },
+          navbar: { background: 'var(--erp-surface)', borderColor: 'var(--erp-border)' },
         }}
       >
         <AppShell.Header>
@@ -196,11 +195,11 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
         <AppShell.Navbar p="sm">
           <AppShell.Section grow component={ScrollArea} scrollbarSize={4} offsetScrollbars>
-            <Stack gap="md">
+            <Stack gap="lg">
               {visibleSections.map((section) => (
                 <div key={section.label}>
-                  <Text px="sm" mb={6} size="xs" fw={750} tt="uppercase" c="dimmed" lts="0.06em">{section.label}</Text>
-                  <Stack gap={2}>
+                  <Text px="sm" mb={6} size="xs" fw={750} tt="uppercase" c="dimmed" lts="0.07em">{section.label}</Text>
+                  <Stack gap={1}>
                     {section.items.map((item) => {
                       const active = item.to === '/' ? location.pathname === '/' : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
                       return (
@@ -213,7 +212,10 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                           leftSection={<span className="nav-icon">{item.icon}</span>}
                           onClick={() => setOpened(false)}
                           variant="subtle"
-                          styles={{ root: { minHeight: 38, borderRadius: 'var(--erp-radius-sm)' }, label: { fontWeight: active ? 700 : 550 } }}
+                          styles={{
+                            root: { minHeight: 36, borderRadius: 'var(--erp-radius-sm)' },
+                            label: { fontWeight: active ? 700 : 550 },
+                          }}
                         />
                       );
                     })}
