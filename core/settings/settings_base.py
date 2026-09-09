@@ -5,6 +5,7 @@ Base settings shared between development & production.
 from datetime import timedelta
 from pathlib import Path
 
+from celery.schedules import crontab
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -82,6 +83,7 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 LANGUAGE_CODE = "en-us"
@@ -149,8 +151,6 @@ REPORT_CACHE_TTL = config("REPORT_CACHE_TTL", default=30, cast=int)
 if REPORT_CACHE_TTL < 1:
     raise ValueError("REPORT_CACHE_TTL must be >= 1")
 
-# Celery infrastructure is configured now but intentionally has no active Beat
-# schedule. Long-running analytics jobs will use it in a later phase.
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -163,6 +163,15 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
+
+# Only the cheap integrity check is scheduled today. Heavy historical analytics
+# will use Celery later without putting their cost on dashboard requests.
+CELERY_BEAT_SCHEDULE = {
+    "reconcile-company-counters": {
+        "task": "organization.tasks.reconcile_company_counters",
+        "schedule": crontab(hour=2, minute=0),
+    },
+}
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
