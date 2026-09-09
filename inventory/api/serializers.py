@@ -10,17 +10,7 @@ class StockLocationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StockLocation
-        fields = (
-            "id",
-            "site",
-            "site_name",
-            "name",
-            "location_type",
-            "employee",
-            "employee_name",
-            "is_active",
-            "created_at",
-        )
+        fields = ("id", "site", "site_name", "name", "location_type", "employee", "employee_name", "is_active", "created_at")
         read_only_fields = fields
 
     def get_employee_name(self, obj):
@@ -56,13 +46,14 @@ class StockMovementSerializer(serializers.ModelSerializer):
     destination_location_name = serializers.CharField(source="destination_location.name", read_only=True, allow_null=True)
     source_site_name = serializers.CharField(source="source_location.site.name", read_only=True, allow_null=True)
     destination_site_name = serializers.CharField(source="destination_location.site.name", read_only=True, allow_null=True)
+    shift_id = serializers.IntegerField(source="shift.id", read_only=True, allow_null=True)
     created_by_name = serializers.SerializerMethodField()
     items = StockMovementItemSerializer(many=True, read_only=True)
 
     class Meta:
         model = StockMovement
         fields = (
-            "id", "movement_type", "source_location", "source_location_name", "source_site_name",
+            "id", "movement_type", "shift_id", "source_location", "source_location_name", "source_site_name",
             "destination_location", "destination_location_name", "destination_site_name", "created_by",
             "created_by_name", "created_at", "reference", "items",
         )
