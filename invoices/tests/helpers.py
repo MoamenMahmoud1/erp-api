@@ -3,9 +3,10 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 
+from accounts.models import Employee
 from customers.models import Customer
 from inventory.models import StockLocation
-from organization.models import Company
+from organization.models import Company, Site
 from products.models import Product
 
 
@@ -13,12 +14,22 @@ class InvoiceTestMixin:
     def setUp(self):
         User = get_user_model()
         self.company = Company.objects.create(name="Invoice Test Company")
+        self.site = Site.objects.create(
+            company=self.company,
+            code="INV-BR",
+            name="Invoice Test Branch",
+            site_type=Site.Type.BRANCH,
+            address_line_1="Test address",
+            city="Cairo",
+            country_code="EG",
+        )
         self.user = User.objects.create_user(
             username="invoice-user",
             email="invoice@example.com",
             password="StrongPass123!",
             is_staff=True,
         )
+        Employee.objects.create(user=self.user, work_site=self.site)
         invoice_permissions = Permission.objects.filter(
             content_type__app_label="invoices",
             content_type__model="invoice",
@@ -44,4 +55,5 @@ class InvoiceTestMixin:
             name="Van 01",
             location_type=StockLocation.LocationType.SALES_VEHICLE,
             employee=self.user,
+            site=self.site,
         )
