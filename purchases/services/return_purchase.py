@@ -13,7 +13,7 @@ from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None):
     purchases = Purchase.objects.visible_to(actor) if actor is not None else Purchase.objects
     try:
-        purchase = purchases.select_for_update().select_related("site", "shift").prefetch_related("items__return_items").get(pk=purchase_id)
+        purchase = purchases.select_for_update(of=("self",)).select_related("site", "shift").prefetch_related("items__return_items").get(pk=purchase_id)
     except Purchase.DoesNotExist as exc:
         raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
 
