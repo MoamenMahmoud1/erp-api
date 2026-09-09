@@ -28,6 +28,29 @@ async function parseResponse(response: Response) {
   try { return JSON.parse(text) as Json; } catch { return text; }
 }
 
+function stringifyErrorValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(stringifyErrorValue).filter(Boolean).join(' ');
+  if (value && typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([key, item]) => `${key}: ${stringifyErrorValue(item)}`).join(' · ');
+  return String(value ?? '');
+}
+
+function requestErrorMessage(data: Json, status: number): string {
+  if (typeof data === 'string' && data.trim()) return data.trim();
+  if (data && typeof data === 'object' && !Array.isArray(data)) {
+    const record = data as Record<string, unknown>;
+    if (record.detail !== undefined) {
+      const detail = stringifyErrorValue(record.detail).trim();
+      if (detail) return detail;
+    }
+    const fields = Object.entries(record)
+      .filter(([key]) => key !== 'detail')
+      .map(([key, value]) => `${key.replaceAll('_', ' ')}: ${stringifyErrorValue(value)}`)
+      .filter((message) => message.split(': ').slice(1).join(': ').trim());
+    if (fields.length) return fields.join(' · ');
+  }
+  return `Request failed with status ${status}`;
+}
+
 async function getCsrfToken() {
   const response = await fetch(`${API_BASE}/auth/csrf/`, { credentials: 'include', headers: { Accept: 'application/json' } });
   const data = (await parseResponse(response)) as { csrf_token?: string } | null;
@@ -80,12 +103,7 @@ async function request<T = Json>(path: string, init: RequestInit = {}, retry = t
   }
 
   const data = await parseResponse(response);
-  if (!response.ok) {
-    const message = typeof data === 'object' && data !== null && 'detail' in data
-      ? String((data as Record<string, unknown>).detail)
-      : `Request failed with status ${response.status}`;
-    throw new Error(message);
-  }
+  if (!response.ok) throw new Error(requestErrorMessage(data, response.status));
   return data as T;
 }
 
