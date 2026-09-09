@@ -72,7 +72,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         invoice, error = _run_invoice(
-            lambda: CreateInvoice()(created_by_id=request.user.pk, validated_data=serializer.validated_data)
+            lambda: CreateInvoice()(created_by=request.user, validated_data=serializer.validated_data)
         )
         if error:
             return error
