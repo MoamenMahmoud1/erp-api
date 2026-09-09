@@ -3,10 +3,22 @@ from django.db import IntegrityError
 from rest_framework import generics, status
 from rest_framework.response import Response
 
-from accounts.api.serializers.shift import CloseEmployeeShiftSerializer, EmployeeShiftSerializer, StartEmployeeShiftSerializer
+from accounts.api.serializers.shift import (
+    CloseEmployeeShiftSerializer,
+    EmployeeShiftSerializer,
+    EmployeeShiftVehicleOptionSerializer,
+    StartEmployeeShiftSerializer,
+)
 from accounts.models import EmployeeShift, Role
 from accounts.permissions.shift import EmployeeShiftPermission
-from accounts.services.employee_shift import ShiftError, close_shift, current_shift_for_user, start_shift
+from accounts.services.employee_shift import (
+    ShiftError,
+    close_shift,
+    current_shift_for_user,
+    employee_for_user,
+    start_shift,
+)
+from inventory.models import StockLocation
 from services.organization_scope import visible_site_ids
 
 
@@ -18,6 +30,23 @@ class CurrentEmployeeShiftView(generics.GenericAPIView):
         if shift is None:
             return Response(None)
         return Response(EmployeeShiftSerializer(shift).data)
+
+
+class EmployeeShiftVehicleOptionsView(generics.ListAPIView):
+    permission_classes = (EmployeeShiftPermission,)
+    permission_codename = "accounts.start_employee_shift"
+    serializer_class = EmployeeShiftVehicleOptionSerializer
+
+    def get_queryset(self):
+        employee = employee_for_user(self.request.user, required=False)
+        if employee is None or employee.work_site_id is None:
+            return StockLocation.objects.none()
+        return StockLocation.objects.filter(
+            site_id=employee.work_site_id,
+            employee_id=employee.user_id,
+            location_type=StockLocation.LocationType.SALES_VEHICLE,
+            is_active=True,
+        ).order_by("name", "id")
 
 
 class StartEmployeeShiftView(generics.GenericAPIView):
