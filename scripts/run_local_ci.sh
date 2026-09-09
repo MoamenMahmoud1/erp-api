@@ -65,10 +65,13 @@ fi
 run_step "P0/P1 focused tests" "$PYTHON" manage.py test \
     accounting.tests.test_permissions \
     accounting.tests.test_reconciliation \
+    accounting.tests.test_balances \
     inventory.tests.test_permissions \
     inventory.tests.test_valuation \
     authsession.tests.test_permission_invalidation \
     accounts.tests.test_current_user_permissions \
+    organization.tests.test_metrics \
+    core.tests.test_celery \
     auditlog \
     --verbosity 2
 
@@ -78,6 +81,7 @@ run_step "Catalog suite" "$PYTHON" manage.py test products coupons --verbosity 1
 run_step "Sales suite" "$PYTHON" manage.py test invoices payments inventory --verbosity 1
 run_step "Purchasing suite" "$PYTHON" manage.py test purchases --verbosity 1
 run_step "Accounting suite" "$PYTHON" manage.py test accounting auditlog --verbosity 1
+run_step "Infrastructure suite" "$PYTHON" manage.py test core common --verbosity 1
 
 # Production settings use the real PostgreSQL connection pool and may require
 # a real production-style database/Redis environment. Keep this opt-in for
