@@ -120,4 +120,4 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
 
 class CreateSalesReturn:
     def __call__(self, *, invoice_id, items, created_by_id, reason="", actor=None):
-        return create_sales_return(invoice_id=invoice_id, items=items, created_by_id=created_by_id, reason=reason, created_by_id=created_by_id, actor=actor)
+        return create_sales_return(invoice_id=invoice_id, items=items, created_by_id=created_by_id, reason=reason, actor=actor)
