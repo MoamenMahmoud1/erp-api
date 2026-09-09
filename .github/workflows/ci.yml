@@ -118,6 +118,8 @@ jobs:
             apps: purchases
           - suite: accounting
             apps: accounting auditlog
+          - suite: infrastructure
+            apps: core common
 
     services:
       postgres:
