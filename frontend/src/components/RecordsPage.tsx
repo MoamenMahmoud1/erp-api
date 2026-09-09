@@ -140,20 +140,20 @@ export function RecordsPage({
   const totalPages = Math.max(1, Math.ceil(data.count / pageSize));
 
   return (
-    <Stack gap="xl">
+    <Stack gap="lg">
       <Group justify="space-between" align="flex-end" wrap="wrap" gap="md">
         <div className="page-heading">
-          <Text size="sm" c="indigo.3" fw={800} tt="uppercase" lts=".08em">{eyebrow}</Text>
+          <Text size="sm" c="blue.5" fw={700} tt="uppercase" lts="0.05em">{eyebrow}</Text>
           <Title order={1} mt={4}>{title}</Title>
           <Text c="dimmed" mt={4} maw={760}>{subtitle}</Text>
         </div>
         <Group gap="xs" wrap="wrap" justify="flex-end">
           {topContent}
-          <Button variant="light" leftSection={<IconRefresh size={16} />} loading={loading} onClick={() => void load()} radius="lg">Refresh</Button>
+          <Button variant="light" leftSection={<IconRefresh size={16} />} loading={loading} onClick={() => void load()} radius="md">Refresh</Button>
         </Group>
       </Group>
 
-      <Paper className="glass records-toolbar" p="sm" radius="xl" withBorder>
+      <Paper className="records-toolbar" p="sm" radius="md" withBorder>
         <Group gap="sm" wrap="wrap">
           <TextInput
             className="records-search"
@@ -164,15 +164,15 @@ export function RecordsPage({
             value={search}
             onChange={(event) => setSearch(event.currentTarget.value)}
             onKeyDown={(event) => { if (event.key === 'Enter') void searchRecords(); if (event.key === 'Escape') { setSearch(''); void load(1, ''); setPage(1); } }}
-            radius="lg"
+            radius="md"
             aria-label={`Search ${title}`}
           />
-          <Button radius="lg" onClick={() => void searchRecords()}>Search</Button>
-          {search && <Button radius="lg" variant="subtle" onClick={() => { setSearch(''); setPage(1); void load(1, ''); }}>Clear</Button>}
+          <Button radius="md" onClick={() => void searchRecords()}>Search</Button>
+          {search && <Button radius="md" variant="subtle" onClick={() => { setSearch(''); setPage(1); void load(1, ''); }}>Clear</Button>}
         </Group>
       </Paper>
 
-      <Paper className="surface-panel bento-card records-panel" radius="xl" withBorder>
+      <Paper className="surface-panel records-panel" radius="md" withBorder>
         <ScrollArea type="auto" offsetScrollbars>
           <Table miw={820} highlightOnHover verticalSpacing="sm" horizontalSpacing="md">
             <Table.Thead className="records-thead">
@@ -190,8 +190,8 @@ export function RecordsPage({
                     {showActionColumn && (
                       <Table.Td>
                         <Group justify="flex-end" gap={6} wrap="wrap">
-                          {details && <Button size="xs" variant="light" leftSection={<IconEye size={14} />} onClick={() => void openDetails(row)} radius="md">Details</Button>}
-                          {rowActions.map((action) => <Button key={action.label} size="xs" variant="light" color={action.color} onClick={() => void runAction(action, row)} radius="md">{action.label}</Button>)}
+                          {details && <Button size="xs" variant="light" leftSection={<IconEye size={14} />} onClick={() => void openDetails(row)} radius="sm">Details</Button>}
+                          {rowActions.map((action) => <Button key={action.label} size="xs" variant="light" color={action.color} onClick={() => void runAction(action, row)} radius="sm">{action.label}</Button>)}
                         </Group>
                       </Table.Td>
                     )}
@@ -213,13 +213,13 @@ export function RecordsPage({
             </Table.Tbody>
           </Table>
         </ScrollArea>
-        <Group justify="space-between" align="center" p="md" wrap="wrap">
+        <Group justify="space-between" align="center" p="md" wrap="wrap" className="records-footer">
           <Text size="sm" c="dimmed">{data.count.toLocaleString()} records</Text>
           <Pagination total={totalPages} value={Math.min(page, totalPages)} onChange={setPage} boundaries={1} siblings={1} />
         </Group>
       </Paper>
 
-      <Modal opened={detailOpen} onClose={() => setDetailOpen(false)} title={`${title} details`} centered size="lg" radius="xl" fullScreen={false}>
+      <Modal opened={detailOpen} onClose={() => setDetailOpen(false)} title={`${title} details`} centered size="lg" radius="md" fullScreen={false}>
         {detailLoading ? <Group justify="center" py="xl"><Loader size="sm" /></Group> : detailData ? (details?.render ? details.render(detailData) : <GenericDetails data={detailData} />) : <Text c="dimmed">No detail data available.</Text>}
       </Modal>
     </Stack>
