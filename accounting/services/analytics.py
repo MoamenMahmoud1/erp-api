@@ -3,12 +3,12 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
 from django.db.models.functions import Coalesce, TruncDate
 from django.utils import timezone
 
 from inventory.models import StockBatchBalance
-from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
+from invoices.models import Invoice, InvoiceItem, InvoiceReturn
 from organization.services.metrics import company_master_data_counts
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
@@ -66,9 +66,18 @@ def purchase_dashboard(*, date_from=None, date_to=None, site_id=None):
 
 def inventory_dashboard(*, low_stock_threshold=10, site_id=None):
     products = Product.objects.filter(is_active=True)
+    stock_filter = Q(stock_balances__location__site_id=site_id) if site_id is not None else Q()
+    stock_rows = list(
+        products.values("id", "name")
+        .annotate(
+            stock=Coalesce(Sum("stock_balances__quantity", filter=stock_filter), 0),
+            inventory_value=Coalesce(Sum("stock_balances__total_cost", filter=stock_filter), ZERO),
+        )
+        .order_by("name")
+    )
+    # A site filter on the aggregation, rather than only on Product, prevents stock from other branches being included.
     if site_id is not None:
-        products = products.filter(stock_balances__location__site_id=site_id).distinct()
-    stock_rows = list(products.values("id", "name").annotate(stock=Coalesce(Sum("stock_balances__quantity"), 0), inventory_value=Coalesce(Sum("stock_balances__total_cost"), ZERO)).order_by("name"))
+        stock_rows = [row for row in stock_rows if row["stock"] or row["inventory_value"]]
     total_units = sum((row["stock"] for row in stock_rows), 0)
     inventory_value = sum((row["inventory_value"] for row in stock_rows), ZERO)
     low_stock = [{"product_id": row["id"], "product_name": row["name"], "stock": row["stock"]} for row in stock_rows if row["stock"] <= low_stock_threshold]
@@ -120,23 +129,12 @@ def customer_sales_ranking(*, date_from=None, date_to=None, limit=5, site_id=Non
     return_queryset = _range_filter(return_queryset, "created_at", date_from, date_to)
     return_rows = return_queryset.values("invoice__customer_id").annotate(returns=Coalesce(Sum("refund_amount"), ZERO))
     return_map = {row["invoice__customer_id"]: row["returns"] for row in return_rows}
-
     ranked = []
     for row in sales_rows:
         returns = return_map.get(row["invoice__customer_id"], ZERO)
-        ranked.append({
-            "customer_id": row["invoice__customer_id"],
-            "customer_name": row["invoice__customer__name"],
-            "invoice_count": row["invoice_count"],
-            "units_sold": row["quantity"],
-            "gross_revenue": row["gross_revenue"],
-            "returns": returns,
-            "revenue": row["gross_revenue"] - returns,
-        })
+        ranked.append({"customer_id": row["invoice__customer_id"], "customer_name": row["invoice__customer__name"], "invoice_count": row["invoice_count"], "units_sold": row["quantity"], "gross_revenue": row["gross_revenue"], "returns": returns, "revenue": row["gross_revenue"] - returns})
     ranked.sort(key=lambda row: (-row["revenue"], -row["units_sold"], row["customer_id"]))
-    top = ranked[:limit]
-    bottom = sorted(ranked, key=lambda row: (row["revenue"], row["units_sold"], row["customer_id"]))[:limit]
-    return top, bottom
+    return ranked[:limit], sorted(ranked, key=lambda row: (row["revenue"], row["units_sold"], row["customer_id"]))[:limit]
 
 
 def dashboard_overview(*, date_from=None, date_to=None, site_id=None):
