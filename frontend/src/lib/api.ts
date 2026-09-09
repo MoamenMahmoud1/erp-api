@@ -107,138 +107,34 @@ export const api = {
     logout: () => jsonRequest('/auth/logout/', 'POST').finally(() => setAccessToken(null)),
     logoutAll: () => jsonRequest('/auth/logout-all/', 'POST').finally(() => setAccessToken(null)),
   },
-
   organization: {
-    company: () => request('/organization/company/'),
-    updateCompany: (body: Json) => jsonRequest('/organization/company/', 'PATCH', body),
-    sites: (query = '') => request<Paginated>(`/organization/sites/${query}`),
-    departments: (query = '') => request<Paginated>(`/organization/departments/${query}`),
-    createSite: (body: Json) => jsonRequest('/organization/sites/', 'POST', body),
-    updateSite: (id: number, body: Json) => jsonRequest(`/organization/sites/${id}/`, 'PATCH', body),
-    deleteSite: (id: number) => request(`/organization/sites/${id}/`, { method: 'DELETE' }),
-    createDepartment: (body: Json) => jsonRequest('/organization/departments/', 'POST', body),
-    updateDepartment: (id: number, body: Json) => jsonRequest(`/organization/departments/${id}/`, 'PATCH', body),
-    deleteDepartment: (id: number) => request(`/organization/departments/${id}/`, { method: 'DELETE' }),
+    company: () => request('/organization/company/'), updateCompany: (body: Json) => jsonRequest('/organization/company/', 'PATCH', body),
+    sites: (query = '') => request<Paginated>(`/organization/sites/${query}`), departments: (query = '') => request<Paginated>(`/organization/departments/${query}`),
+    createSite: (body: Json) => jsonRequest('/organization/sites/', 'POST', body), updateSite: (id: number, body: Json) => jsonRequest(`/organization/sites/${id}/`, 'PATCH', body), deleteSite: (id: number) => request(`/organization/sites/${id}/`, { method: 'DELETE' }),
+    createDepartment: (body: Json) => jsonRequest('/organization/departments/', 'POST', body), updateDepartment: (id: number, body: Json) => jsonRequest(`/organization/departments/${id}/`, 'PATCH', body), deleteDepartment: (id: number) => request(`/organization/departments/${id}/`, { method: 'DELETE' }),
   },
-
   products: {
-    list: (query = '') => request<Paginated>(`/products/${query}`),
-    get: (id: number) => request(`/products/${id}/`),
-    create: (body: Json) => jsonRequest('/products/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/products/${id}/`, 'PATCH', body),
-    delete: (id: number) => request(`/products/${id}/`, { method: 'DELETE' }),
-    cartonPricings: (query = '') => request<Paginated>(`/carton-pricings/${query}`),
-    createCartonPricing: (body: Json) => jsonRequest('/carton-pricings/', 'POST', body),
-    updateCartonPricing: (id: number, body: Json) => jsonRequest(`/carton-pricings/${id}/`, 'PATCH', body),
-    deleteCartonPricing: (id: number) => request(`/carton-pricings/${id}/`, { method: 'DELETE' }),
+    list: (query = '') => request<Paginated>(`/products/${query}`), get: (id: number) => request(`/products/${id}/`), create: (body: Json) => jsonRequest('/products/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/products/${id}/`, 'PATCH', body), delete: (id: number) => request(`/products/${id}/`, { method: 'DELETE' }),
+    cartonPricings: (query = '') => request<Paginated>(`/carton-pricings/${query}`), createCartonPricing: (body: Json) => jsonRequest('/carton-pricings/', 'POST', body), updateCartonPricing: (id: number, body: Json) => jsonRequest(`/carton-pricings/${id}/`, 'PATCH', body), deleteCartonPricing: (id: number) => request(`/carton-pricings/${id}/`, { method: 'DELETE' }),
   },
-
-  customers: {
-    list: (query = '') => request<Paginated>(`/customers/${query}`),
-    get: (id: number) => request(`/customers/${id}/`),
-    create: (body: Json) => jsonRequest('/customers/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/customers/${id}/`, 'PATCH', body),
-    delete: (id: number) => request(`/customers/${id}/`, { method: 'DELETE' }),
-  },
-
-  suppliers: {
-    list: (query = '') => request<Paginated>(`/suppliers/${query}`),
-    get: (id: number) => request(`/suppliers/${id}/`),
-    create: (body: Json) => jsonRequest('/suppliers/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body),
-  },
-
-  coupons: {
-    list: (query = '') => request<Paginated>(`/coupons/${query}`),
-    get: (id: number) => request(`/coupons/${id}/`),
-    create: (body: Json) => jsonRequest('/coupons/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/PATCH`, 'PATCH', body),
-    delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }),
-  },
-
+  customers: { list: (query = '') => request<Paginated>(`/customers/${query}`), get: (id: number) => request(`/customers/${id}/`), create: (body: Json) => jsonRequest('/customers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/customers/${id}/`, 'PATCH', body), delete: (id: number) => request(`/customers/${id}/`, { method: 'DELETE' }) },
+  suppliers: { list: (query = '') => request<Paginated>(`/suppliers/${query}`), get: (id: number) => request(`/suppliers/${id}/`), create: (body: Json) => jsonRequest('/suppliers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body) },
+  coupons: { list: (query = '') => request<Paginated>(`/coupons/${query}`), get: (id: number) => request(`/coupons/${id}/`), create: (body: Json) => jsonRequest('/coupons/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/`, 'PATCH', body), delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }) },
   employees: {
-    list: (query = '') => request<Paginated>(`/employees/${query}`),
-    get: (id: number) => request(`/employees/${id}/`),
-    options: (query = '') => request<Paginated>(`/employees/options/${query}`),
-    create: (body: Json) => jsonRequest('/employees/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body),
-    delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
-    currentShift: () => request<EmployeeShift | null>('/shifts/current/'),
-    vehicleOptions: () => request<EmployeeVehicleOption[]>('/shifts/vehicles/'),
-    startShift: (body: { opening_cash?: number; vehicle?: number | null }) => jsonRequest<EmployeeShift>('/shifts/start/', 'POST', body),
-    closeShift: (body: { closing_cash: number; closing_transfer: number; closing_notes?: string }) => jsonRequest<EmployeeShiftCloseResponse>('/shifts/close/', 'POST', body),
-    shifts: (query = '') => request<Paginated>(`/shifts/${query}`),
+    list: (query = '') => request<Paginated>(`/employees/${query}`), get: (id: number) => request(`/employees/${id}/`), options: (query = '') => request<Paginated>(`/employees/options/${query}`), create: (body: Json) => jsonRequest('/employees/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body), delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
+    currentShift: () => request<EmployeeShift | null>('/shifts/current/'), vehicleOptions: () => request<EmployeeVehicleOption[]>('/shifts/vehicles/'), startShift: (body: { opening_cash?: number; vehicle?: number | null }) => jsonRequest<EmployeeShift>('/shifts/start/', 'POST', body), closeShift: (body: { closing_cash: number; closing_transfer: number; closing_notes?: string }) => jsonRequest<EmployeeShiftCloseResponse>('/shifts/close/', 'POST', body), shifts: (query = '') => request<Paginated>(`/shifts/${query}`),
   },
-
   invoices: {
-    list: (query = '') => request<Paginated>(`/invoices/${query}`),
-    get: (id: number) => request(`/invoices/${id}/`),
-    create: (body: Json) => jsonRequest('/invoices/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/invoices/${id}/`, 'PATCH', body),
-    delete: (id: number) => request(`/invoices/${id}/`, { method: 'DELETE' }),
-    confirm: (id: number) => request(`/invoices/${id}/confirm/`, { method: 'POST' }),
-    cancel: (id: number) => request(`/invoices/${id}/cancel/`, { method: 'POST' }),
-    applyCoupon: (id: number, code: string) => jsonRequest(`/invoices/${id}/apply-coupon/`, 'POST', { code }),
-    removeCoupon: (id: number) => jsonRequest(`/invoices/${id}/remove-coupon/`, 'POST'),
-    returns: (id: number, body: Json) => jsonRequest(`/invoices/${id}/returns/`, 'POST', body),
+    list: (query = '') => request<Paginated>(`/invoices/${query}`), get: (id: number) => request(`/invoices/${id}/`), create: (body: Json) => jsonRequest('/invoices/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/invoices/${id}/`, 'PATCH', body), delete: (id: number) => request(`/invoices/${id}/`, { method: 'DELETE' }), confirm: (id: number) => request(`/invoices/${id}/confirm/`, { method: 'POST' }), cancel: (id: number) => request(`/invoices/${id}/cancel/`, { method: 'POST' }), applyCoupon: (id: number, code: string) => jsonRequest(`/invoices/${id}/apply-coupon/`, 'POST', { code }), removeCoupon: (id: number) => jsonRequest(`/invoices/${id}/remove-coupon/`, 'POST'), returns: (id: number, body: Json) => jsonRequest(`/invoices/${id}/returns/`, 'POST', body),
   },
-
   purchases: {
-    list: (query = '') => request<Paginated>(`/purchases/${query}`),
-    get: (id: number) => request(`/purchases/${id}/`),
-    create: (body: Json) => jsonRequest('/purchases/', 'POST', body),
-    update: (id: number, body: Json) => jsonRequest(`/purchases/${id}/edit/`, 'PATCH', body),
-    confirm: (id: number) => request(`/purchases/${id}/confirm/`, { method: 'POST' }),
-    cancel: (id: number) => request(`/purchases/${id}/cancel/`, { method: 'POST' }),
-    delete: (id: number) => request(`/purchases/${id}/delete/`, { method: 'DELETE' }),
-    returns: (id: number, body: Json) => jsonRequest(`/purchases/${id}/returns/`, 'POST', body),
-    supplierPayment: (body: Json) => jsonRequest('/purchases/supplier-payments/', 'POST', body),
+    list: (query = '') => request<Paginated>(`/purchases/${query}`), get: (id: number) => request(`/purchases/${id}/`), create: (body: Json) => jsonRequest('/purchases/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/purchases/${id}/edit/`, 'PATCH', body), confirm: (id: number) => request(`/purchases/${id}/confirm/`, { method: 'POST' }), cancel: (id: number) => request(`/purchases/${id}/cancel/`, { method: 'POST' }), delete: (id: number) => request(`/purchases/${id}/delete/`, { method: 'DELETE' }), returns: (id: number, body: Json) => jsonRequest(`/purchases/${id}/returns/`, 'POST', body), supplierPayment: (body: Json) => jsonRequest('/purchases/supplier-payments/', 'POST', body),
   },
-
-  payments: {
-    collections: (body: Json) => jsonRequest('/payments/collections/', 'POST', body),
-    refunds: (body: Json) => jsonRequest('/payments/refunds/', 'POST', body),
-    transactions: (query = '') => request<Paginated>(`/payments/transactions/${query}`),
-  },
-
-  inventory: {
-    locations: (query = '') => request<Paginated>(`/inventory/locations/${query}`),
-    stock: (query = '') => request<Paginated>(`/inventory/stock/${query}`),
-    batches: (query = '') => request<Paginated>(`/inventory/batches/${query}`),
-    movements: (query = '') => request<Paginated>(`/inventory/movements/${query}`),
-    transfer: (body: Json) => jsonRequest('/inventory/transfers/', 'POST', body),
-  },
-
+  payments: { collections: (body: Json) => jsonRequest('/payments/collections/', 'POST', body), refunds: (body: Json) => jsonRequest('/payments/refunds/', 'POST', body), transactions: (query = '') => request<Paginated>(`/payments/transactions/${query}`) },
+  inventory: { locations: (query = '') => request<Paginated>(`/inventory/locations/${query}`), stock: (query = '') => request<Paginated>(`/inventory/stock/${query}`), batches: (query = '') => request<Paginated>(`/inventory/batches/${query}`), movements: (query = '') => request<Paginated>(`/inventory/movements/${query}`), transfer: (body: Json) => jsonRequest('/inventory/transfers/', 'POST', body) },
   accounting: {
-    dashboardOverview: (query = '') => request<DashboardOverview>(`/accounting/analytics/overview/${query}`),
-    accounts: (query = '') => request<Paginated>(`/accounting/accounts/${query}`),
-    createAccount: (body: Json) => jsonRequest('/accounting/accounts/', 'POST', body),
-    updateAccount: (id: number, body: Json) => jsonRequest(`/accounting/accounts/${id}/`, 'PATCH', body),
-    deleteAccount: (id: number) => request(`/accounting/accounts/${id}/`, { method: 'DELETE' }),
-    journalEntries: (query = '') => request<Paginated>(`/accounting/journal-entries/${query}`),
-    journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`),
-    createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body),
-    postJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/post/`, { method: 'POST' }),
-    expenses: (query = '') => request(`/accounting/expenses/${query}`),
-    createExpense: (body: Json) => jsonRequest('/accounting/expenses/', 'POST', body),
-    periods: (query = '') => request<Paginated>(`/accounting/periods/${query}`),
-    createPeriod: (body: Json) => jsonRequest('/accounting/periods/', 'POST', body),
-    closePeriod: (id: number) => request(`/accounting/periods/${id}/close/`, { method: 'POST' }),
-    generalLedger: (query = '') => request(`/accounting/general-ledger/${query}`),
-    trialBalance: (query = '') => request(`/accounting/trial-balance/${query}`),
-    openingBalance: (body: Json) => jsonRequest('/accounting/opening-balance/', 'POST', body),
-    profitAndLoss: (query = '') => request(`/accounting/statements/profit-and-loss/${query}`),
-    balanceSheet: (query = '') => request(`/accounting/statements/balance-sheet/${query}`),
-    cashFlow: (query = '') => request(`/accounting/statements/cash-flow/${query}`),
-    customerBalances: (query = '') => request(`/accounting/reports/customer-balances/${query}`),
-    supplierBalances: (query = '') => request(`/accounting/reports/supplier-balances/${query}`),
-    customerAging: (query = '') => request(`/accounting/reports/customer-aging/${query}`),
-    supplierAging: (query = '') => request(`/accounting/reports/supplier-aging/${query}`),
-    salesAnalytics: (query = '') => request(`/accounting/analytics/sales/${query}`),
-    purchaseAnalytics: (query = '') => request(`/accounting/analytics/purchases/${query}`),
-    inventoryAnalytics: (query = '') => request(`/accounting/analytics/inventory/${query}`),
-    topProducts: (query = '') => request(`/accounting/analytics/top-products/${query}`),
-    salesByEmployee: (query = '') => request(`/accounting/analytics/sales-by-employee/${query}`),
+    dashboardOverview: (query = '') => request<DashboardOverview>(`/accounting/analytics/overview/${query}`), accounts: (query = '') => request<Paginated>(`/accounting/accounts/${query}`), createAccount: (body: Json) => jsonRequest('/accounting/accounts/', 'POST', body), updateAccount: (id: number, body: Json) => jsonRequest(`/accounting/accounts/${id}/`, 'PATCH', body), deleteAccount: (id: number) => request(`/accounting/accounts/${id}/`, { method: 'DELETE' }),
+    journalEntries: (query = '') => request<Paginated>(`/accounting/journal-entries/${query}`), journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`), createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body), postJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/post/`, { method: 'POST' }), expenses: (query = '') => request(`/accounting/expenses/${query}`), createExpense: (body: Json) => jsonRequest('/accounting/expenses/', 'POST', body), periods: (query = '') => request<Paginated>(`/accounting/periods/${query}`), createPeriod: (body: Json) => jsonRequest('/accounting/periods/', 'POST', body), closePeriod: (id: number) => request(`/accounting/periods/${id}/close/`, { method: 'POST' }), generalLedger: (query = '') => request(`/accounting/general-ledger/${query}`), trialBalance: (query = '') => request(`/accounting/trial-balance/${query}`), openingBalance: (body: Json) => jsonRequest('/accounting/opening-balance/', 'POST', body), profitAndLoss: (query = '') => request(`/accounting/statements/profit-and-loss/${query}`), balanceSheet: (query = '') => request(`/accounting/statements/balance-sheet/${query}`), cashFlow: (query = '') => request(`/accounting/statements/cash-flow/${query}`), customerBalances: (query = '') => request(`/accounting/reports/customer-balances/${query}`), supplierBalances: (query = '') => request(`/accounting/reports/supplier-balances/${query}`), customerAging: (query = '') => request(`/accounting/reports/customer-aging/${query}`), supplierAging: (query = '') => request(`/accounting/reports/supplier-aging/${query}`), salesAnalytics: (query = '') => request(`/accounting/analytics/sales/${query}`), purchaseAnalytics: (query = '') => request(`/accounting/analytics/purchases/${query}`), inventoryAnalytics: (query = '') => request(`/accounting/analytics/inventory/${query}`), topProducts: (query = '') => request(`/accounting/analytics/top-products/${query}`), salesByEmployee: (query = '') => request(`/accounting/analytics/sales-by-employee/${query}`),
   },
 };
 
@@ -246,64 +142,15 @@ export type Paginated = { count: number; next: string | null; previous: string |
 export type EmployeeRole = { code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
 export type EmployeeVehicleOption = { id: number; name: string };
-export type EmployeeShift = {
-  id: number;
-  employee: number;
-  employee_name: string;
-  site: number;
-  site_name: string;
-  vehicle: number | null;
-  vehicle_name: string | null;
-  business_date: string;
-  status: 'open' | 'closed';
-  opened_at: string;
-  closed_at: string | null;
-  opening_cash: number | string;
-  closing_cash: number | string | null;
-  closing_transfer: number | string | null;
-  closing_notes: string;
-};
-export type EmployeeShiftCloseResponse = EmployeeShift & {
-  expected_cash: number | string;
-  cash_difference: number | string;
-  expected_transfer: number | string;
-  transfer_difference: number | string;
-};
-export type UserProfile = {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  is_staff: boolean;
-  is_superuser: boolean;
-  role_level: number;
-  permissions: string[];
-  role: EmployeeRole | null;
-  employee: { id: number; site: EmployeeSite | null; department: { id: number; name: string; code: string } | null } | null;
-  current_shift: { id: number; business_date: string; status: 'open'; opened_at: string; site_id: number; vehicle: { id: number; name: string } | null; opening_cash: number | string } | null;
-};
+export type EmployeeShift = { id: number; employee: number; employee_name: string; site: number; site_name: string; vehicle: number | null; vehicle_name: string | null; business_date: string; status: 'open' | 'closed'; opened_at: string; closed_at: string | null; opening_cash: number | string; closing_cash: number | string | null; closing_transfer: number | string | null; closing_notes: string };
+export type EmployeeShiftCloseResponse = EmployeeShift & { expected_cash: number | string; cash_difference: number | string; expected_transfer: number | string; transfer_difference: number | string };
+export type UserProfile = { id: number; username: string; email: string; first_name: string; last_name: string; is_staff: boolean; is_superuser: boolean; role_level: number; permissions: string[]; role: EmployeeRole | null; employee: { id: number; site: EmployeeSite | null; department: { id: number; name: string; code: string } | null } | null; current_shift: { id: number; business_date: string; status: 'open'; opened_at: string; site_id: number; vehicle: { id: number; name: string } | null; opening_cash: number | string } | null };
 export type DashboardOverview = {
   counts?: { product_count: number; invoice_count: number; customer_count: number; supplier_count: number };
   site_id?: number | null;
   sales: { gross_sales: number | string; units_sold: number; invoice_count: number; trend: { date: string; value: number | string }[] };
   purchases: { purchase_value: number | string; units_purchased: number; purchase_count: number; trend: { date: string; value: number | string }[] };
-  inventory: {
-    total_units: number;
-    inventory_value: number | string;
-    product_count: number;
-    low_stock_count: number;
-    low_stock_threshold: number;
-    low_stock: { product_id: number; product_name: string; stock: number }[];
-    expired_units: number;
-    expiring_7_days_units: number;
-    expiring_30_days_units: number;
-    expired_batch_count: number;
-    expiring_7_days_batch_count: number;
-    expiring_30_days_batch_count: number;
-    expiry_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[];
-    expired_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[];
-  };
+  inventory: { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock_threshold: number; low_stock: { product_id: number; product_name: string; stock: number }[]; expired_units: number; expiring_7_days_units: number; expiring_30_days_units: number; expired_batch_count: number; expiring_7_days_batch_count: number; expiring_30_days_batch_count: number; expiry_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[]; expired_alerts: { product_id: number; product_name: string; location_id: number; location_name: string; batch_id: number; batch_number: string | null; manufactured_date: string | null; expiry_date: string; days_to_expiry: number; quantity: number; inventory_value: number | string }[] };
   pnl: { total_revenue: number | string; total_expenses: number | string; net_income: number | string };
   cash_flow: { opening_cash: number | string; total_inflows: number | string; total_outflows: number | string; net_change: number | string; ending_cash: number | string };
   top_products: { product_id: number; 'product__name': string; quantity: number; revenue: number | string }[];
@@ -314,9 +161,4 @@ export type DashboardOverview = {
   supplier_balances: { supplier_id: number; supplier_name: string; balance: number | string }[];
 };
 
-export function query(params: Record<string, string | number | undefined>) {
-  const search = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); });
-  const value = search.toString();
-  return value ? `?${value}` : '';
-}
+export function query(params: Record<string, string | number | undefined>) { const search = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); }); const value = search.toString(); return value ? `?${value}` : ''; }
