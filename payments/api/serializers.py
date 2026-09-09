@@ -27,10 +27,13 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
 
 
 class PaymentRefundSerializer(serializers.ModelSerializer):
+    site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
+    shift_id = serializers.IntegerField(source="shift.id", read_only=True, allow_null=True)
+
     class Meta:
         model = PaymentRefund
         fields = (
-            "id", "transaction", "invoice", "allocation", "cash_amount",
+            "id", "transaction", "invoice", "allocation", "site", "site_name", "shift_id", "cash_amount",
             "transfer_amount", "total_amount", "reason", "created_by", "created_at",
         )
         read_only_fields = fields
@@ -38,14 +41,15 @@ class PaymentRefundSerializer(serializers.ModelSerializer):
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(source="customer.name", read_only=True)
+    site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
+    shift_id = serializers.IntegerField(source="shift.id", read_only=True, allow_null=True)
     allocations = PaymentAllocationSerializer(many=True, read_only=True)
     refunds = PaymentRefundSerializer(many=True, read_only=True)
 
     class Meta:
         model = PaymentTransaction
         fields = (
-            "id", "customer", "customer_name", "cash_amount", "transfer_amount",
-            "total_amount", "refunded_amount", "refundable_amount", "allocations",
-            "refunds", "created_at",
+            "id", "customer", "customer_name", "site", "site_name", "shift_id", "cash_amount", "transfer_amount",
+            "total_amount", "refunded_amount", "refundable_amount", "allocations", "refunds", "created_at",
         )
         read_only_fields = fields
