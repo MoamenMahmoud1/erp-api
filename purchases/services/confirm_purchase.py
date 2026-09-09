@@ -3,6 +3,7 @@ from django.db import transaction
 from accounting.services import get_default_company, post_purchase
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
+from common.report_events import schedule_report_refresh
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase
@@ -73,4 +74,5 @@ class ConfirmPurchaseService:
             actor_id=actor.pk,
             metadata={"warehouse_id": warehouse.pk, "stock_movement_id": movement.pk},
         )
+        schedule_report_refresh(refresh_product_intelligence=True)
         return purchase
