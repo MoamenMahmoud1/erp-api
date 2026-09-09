@@ -83,7 +83,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 LANGUAGE_CODE = "en-us"
@@ -164,8 +163,8 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
 
-# Only the cheap integrity check is scheduled today. Heavy historical analytics
-# will use Celery later without putting their cost on dashboard requests.
+# The dashboard stays live. Celery is used only for an inexpensive daily
+# integrity check today; heavy historical analytics will use it later.
 CELERY_BEAT_SCHEDULE = {
     "reconcile-company-counters": {
         "task": "organization.tasks.reconcile_company_counters",
