@@ -6,6 +6,7 @@ import {
   Button,
   Checkbox,
   Group,
+  Loader,
   Modal,
   NumberInput,
   Pagination,
