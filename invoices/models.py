@@ -20,6 +20,13 @@ class Invoice(models.Model):
         RETURNED = "returned", "Returned"
 
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="invoices")
+    site = models.ForeignKey(
+        "organization.Site",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="invoices",
+    )
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoices")
     coupon = models.ForeignKey("coupons.Coupon", null=True, blank=True, on_delete=models.PROTECT)
     coupon_discount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
@@ -30,7 +37,10 @@ class Invoice(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=("customer", "created_at"), name="invoice_cust_created_idx")]
+        indexes = [
+            models.Index(fields=("customer", "created_at"), name="invoice_cust_created_idx"),
+            models.Index(fields=("site", "created_at"), name="invoice_site_created_idx"),
+        ]
         permissions = [
             ("confirm_invoice", "Can confirm an invoice"),
             ("cancel_invoice", "Can cancel an invoice"),
