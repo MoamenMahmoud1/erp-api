@@ -32,13 +32,13 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
     if (!this.state.error) return this.props.children;
     return (
       <Center mih="100vh" p="xl">
-        <Card className="glass" radius="xl" withBorder p="xl" maw={620} w="100%">
+        <Card className="surface-panel" radius="md" withBorder p="xl" maw={620} w="100%">
           <Stack gap="sm">
-            <Text size="sm" fw={800} c="red.5" tt="uppercase" lts=".08em">Application error</Text>
+            <Text size="sm" fw={800} c="red.5" tt="uppercase" lts=".06em">Application error</Text>
             <Text size="xl" fw={800}>Something went wrong in this screen.</Text>
             <Text c="dimmed">The workspace protected the rest of the application from the error. Reload the screen and retry the action.</Text>
             {import.meta.env.DEV && <Text size="sm" ff="monospace" c="dimmed" style={{ overflowWrap: 'anywhere' }}>{this.state.error.message}</Text>}
-            <Button onClick={() => window.location.reload()} radius="lg">Reload workspace</Button>
+            <Button onClick={() => window.location.reload()} radius="md">Reload workspace</Button>
           </Stack>
         </Card>
       </Center>
@@ -57,7 +57,7 @@ function ProtectedPage({ user, permission, children }: { user: UserProfile; perm
 function NotFound() {
   return (
     <Center mih="60vh" p="xl">
-      <Card className="glass" radius="xl" withBorder p="xl" maw={560} w="100%" ta="center">
+      <Card className="surface-panel" radius="md" withBorder p="xl" maw={560} w="100%" ta="center">
         <Text size="xl" fw={850}>Page not found</Text>
         <Text c="dimmed" mt="xs">This route is not part of the current ERP workspace.</Text>
       </Card>
