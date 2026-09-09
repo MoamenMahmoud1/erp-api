@@ -8,11 +8,15 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from inventory.models import StockBalance
-from invoices.models import InvoiceItem
+from invoices.models import Invoice, InvoiceItem, InvoiceReturnItem
 from products.models import Product
 
 ZERO = Decimal("0.00")
-SALES_STATUSES = ("confirmed", "paid")
+SALES_STATUSES = (
+    Invoice.Status.CONFIRMED,
+    Invoice.Status.PAID,
+    Invoice.Status.RETURNED,
+)
 
 
 def _quantize(value, places="0.01"):
@@ -24,6 +28,13 @@ def _ceil_units(value):
 
 
 def _sales_expression(field, fallback):
+    return ExpressionWrapper(
+        F("quantity") * Coalesce(F(field), F(fallback)),
+        output_field=DecimalField(max_digits=20, decimal_places=2),
+    )
+
+
+def _return_expression(field, fallback):
     return ExpressionWrapper(
         F("quantity") * Coalesce(F(field), F(fallback)),
         output_field=DecimalField(max_digits=20, decimal_places=2),
@@ -42,8 +53,9 @@ def product_intelligence(
 ):
     """Return explainable demand, stock-health and reorder recommendations.
 
-    This is deliberately a deterministic planning heuristic. It never creates
-    purchase orders and does not claim to be a machine-learning forecast.
+    This is deliberately a deterministic planning heuristic. It accounts for
+    sales returns by the return event date and never creates purchase orders.
+    It does not claim to be a machine-learning forecast.
     """
     if as_of is None:
         as_of = timezone.localdate()
@@ -107,6 +119,43 @@ def product_intelligence(
         .values("product_id")
         .annotate(sold_units=Coalesce(Sum("quantity"), 0))
     }
+
+    current_returns_qs = InvoiceReturnItem.objects.filter(
+        invoice_return__created_at__date__gte=current_start,
+        invoice_return__created_at__date__lte=as_of,
+        invoice_item__product_id__in=product_ids,
+    )
+    current_returns = {
+        row["invoice_item__product_id"]: row
+        for row in current_returns_qs.values("invoice_item__product_id")
+        .annotate(
+            returned_units=Coalesce(Sum("quantity"), 0),
+            returned_revenue=Coalesce(
+                Sum(
+                    ExpressionWrapper(
+                        F("quantity") * F("unit_price"),
+                        output_field=DecimalField(max_digits=20, decimal_places=2),
+                    )
+                ),
+                ZERO,
+            ),
+            returned_cogs=Coalesce(
+                Sum(_return_expression("invoice_item__cost_price", "invoice_item__product__purchase_price")),
+                ZERO,
+            ),
+        )
+    }
+    previous_returns_qs = InvoiceReturnItem.objects.filter(
+        invoice_return__created_at__date__gte=previous_start,
+        invoice_return__created_at__date__lte=previous_end,
+        invoice_item__product_id__in=product_ids,
+    )
+    previous_returns = {
+        row["invoice_item__product_id"]: row
+        for row in previous_returns_qs.values("invoice_item__product_id")
+        .annotate(returned_units=Coalesce(Sum("quantity"), 0))
+    }
+
     last_sales = {
         row["product_id"]: row["last_sale"]
         for row in sale_items.filter(invoice__created_at__date__gte=slow_start)
@@ -128,12 +177,28 @@ def product_intelligence(
         pid = product["id"]
         sales = current.get(pid, {})
         previous_sales = previous.get(pid, {})
+        returns = current_returns.get(pid, {})
+        previous_return = previous_returns.get(pid, {})
         stock_row = stock.get(pid, {})
 
-        sold_units = int(sales.get("sold_units", 0) or 0)
-        previous_units = int(previous_sales.get("sold_units", 0) or 0)
-        revenue = Decimal(sales.get("revenue", ZERO) or ZERO)
-        cogs = Decimal(sales.get("cogs", ZERO) or ZERO)
+        gross_sold_units = int(sales.get("sold_units", 0) or 0)
+        returned_units = int(returns.get("returned_units", 0) or 0)
+        sold_units = max(0, gross_sold_units - returned_units)
+        previous_units = max(
+            0,
+            int(previous_sales.get("sold_units", 0) or 0)
+            - int(previous_return.get("returned_units", 0) or 0),
+        )
+        revenue = max(
+            ZERO,
+            Decimal(sales.get("revenue", ZERO) or ZERO)
+            - Decimal(returns.get("returned_revenue", ZERO) or ZERO),
+        )
+        cogs = max(
+            ZERO,
+            Decimal(sales.get("cogs", ZERO) or ZERO)
+            - Decimal(returns.get("returned_cogs", ZERO) or ZERO),
+        )
         current_sales_days = int(sales.get("sales_days", 0) or 0)
         stock_units = int(stock_row.get("stock", 0) or 0)
         inventory_value = Decimal(stock_row.get("inventory_value", ZERO) or ZERO)
@@ -207,6 +272,7 @@ def product_intelligence(
                 "stock_units": stock_units,
                 "inventory_value": inventory_value,
                 "sold_units": sold_units,
+                "returned_units": returned_units,
                 "previous_period_sold_units": previous_units,
                 "average_daily_sales": average_daily_sales,
                 "forecast_units": forecast_units,
