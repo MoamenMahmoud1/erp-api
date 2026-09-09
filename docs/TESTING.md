@@ -28,9 +28,11 @@ products/tests/
   test_models.py
   test_product_api.py
   test_carton_pricing_api.py
+  test_intelligence.py
 
 organization/tests/
   test_company.py
+  test_metrics.py
   test_site.py
   test_department.py
 ```
@@ -61,6 +63,12 @@ Use these tests for business rules and transactional workflows such as invoice l
 
 Use these tests for serializer/view behavior, HTTP status codes, permissions, pagination, and response payloads. API tests should exercise the real authentication path when the endpoint depends on an auth session.
 
+### Operational counters
+
+`organization.tests.test_metrics` verifies that master-data counters update on normal creates/deletes and that the daily reconciliation service repairs deliberate counter drift. `core.tests.test_celery` verifies that Celery is wired correctly and that only the daily counter reconciliation is scheduled currently.
+
+Product intelligence tests remain live/database-backed. Dashboard analytics tests remain live as well; they do not depend on report-cache warming.
+
 ## Local commands
 
 Run everything:
@@ -80,7 +88,9 @@ Run one responsibility:
 ```bash
 python manage.py test invoices.tests.test_lifecycle
 python manage.py test payments.tests.test_collection
-python manage.py test authsession.tests.test_session_api
+python manage.py test organization.tests.test_metrics
+python manage.py test core.tests.test_celery
+python manage.py test products.tests.test_intelligence
 ```
 
 Run one test class or method:
