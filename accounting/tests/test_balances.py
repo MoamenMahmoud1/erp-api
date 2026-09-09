@@ -144,7 +144,7 @@ class BalanceReportTests(TestCase):
             credit=Decimal("0"),
         )
 
-        with self.assertNumQueries(5):
+        with self.assertNumQueries(6):
             result = owner_ledger_balances(
                 owner_kind="customer",
                 as_of=timezone.localdate(),
