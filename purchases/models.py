@@ -81,8 +81,8 @@ class PurchaseReturn(models.Model):
     class Meta:
         ordering = ("-created_at",)
         indexes = [
-            models.Index(fields=("site", "created_at"), name="purchase_return_site_created_idx"),
-            models.Index(fields=("shift", "created_at"), name="purchase_return_shift_created_idx"),
+            models.Index(fields=("site", "created_at"), name="pret_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="pret_shift_created_idx"),
         ]
 
     @property
