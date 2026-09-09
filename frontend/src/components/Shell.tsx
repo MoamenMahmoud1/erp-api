@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
-import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconLightbulb, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
+import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
@@ -15,7 +15,7 @@ const sections: NavSection[] = [
     label: 'Workspace',
     items: [
       { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} />, permission: 'accounting.view_financial_reports' },
-      { label: 'Insights', to: '/insights', icon: <IconLightbulb size={17} />, permission: 'accounting.view_financial_reports' },
+      { label: 'Insights', to: '/insights', icon: <IconChartBar size={17} />, permission: 'accounting.view_financial_reports' },
       { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
       { label: 'New sale', to: '/sales/new', icon: <IconReceipt size={17} />, permission: 'invoices.add_invoice' },
       { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
