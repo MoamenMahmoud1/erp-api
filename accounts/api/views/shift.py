@@ -1,12 +1,9 @@
 from django.db import IntegrityError
+
 from rest_framework import generics, status
 from rest_framework.response import Response
 
-from accounts.api.serializers.shift import (
-    CloseEmployeeShiftSerializer,
-    EmployeeShiftSerializer,
-    StartEmployeeShiftSerializer,
-)
+from accounts.api.serializers.shift import CloseEmployeeShiftSerializer, EmployeeShiftSerializer, StartEmployeeShiftSerializer
 from accounts.models import EmployeeShift, Role
 from accounts.permissions.shift import EmployeeShiftPermission
 from accounts.services.employee_shift import ShiftError, close_shift, current_shift_for_user, start_shift
@@ -15,7 +12,6 @@ from services.organization_scope import visible_site_ids
 
 class CurrentEmployeeShiftView(generics.GenericAPIView):
     permission_classes = (EmployeeShiftPermission,)
-    authentication_classes = ()
 
     def get(self, request, *args, **kwargs):
         shift = current_shift_for_user(request.user)
@@ -33,10 +29,11 @@ class StartEmployeeShiftView(generics.GenericAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
+            vehicle = serializer.validated_data.get("vehicle")
             shift = start_shift(
                 user=request.user,
                 opening_cash=serializer.validated_data.get("opening_cash", "0.00"),
-                vehicle_id=(serializer.validated_data.get("vehicle").pk if serializer.validated_data.get("vehicle") else None),
+                vehicle_id=vehicle.pk if vehicle else None,
             )
         except (ShiftError, IntegrityError) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_409_CONFLICT)
@@ -79,11 +76,7 @@ class EmployeeShiftListView(generics.ListAPIView):
     serializer_class = EmployeeShiftSerializer
 
     def get_queryset(self):
-        queryset = EmployeeShift.objects.select_related(
-            "employee__user",
-            "site",
-            "vehicle",
-        ).order_by("-business_date", "-opened_at")
+        queryset = EmployeeShift.objects.select_related("employee__user", "site", "vehicle").order_by("-business_date", "-opened_at")
         if Role.scope_for_user(self.request.user) == Role.Scope.COMPANY:
             return queryset
         sites = visible_site_ids(self.request.user)
