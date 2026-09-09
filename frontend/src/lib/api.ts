@@ -7,7 +7,6 @@ const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
 let csrfToken = '';
 let refreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
-let authExpiredNotified = false;
 
 function getAccessToken() {
   return localStorage.getItem(ACCESS_KEY);
@@ -16,15 +15,12 @@ function getAccessToken() {
 function setAccessToken(token: string | null) {
   if (token) {
     localStorage.setItem(ACCESS_KEY, token);
-    authExpiredNotified = false;
   } else {
     localStorage.removeItem(ACCESS_KEY);
   }
 }
 
 function notifyAuthExpired() {
-  if (authExpiredNotified) return;
-  authExpiredNotified = true;
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
 }
 
@@ -170,6 +166,10 @@ export const api = {
     create: (body: Json) => jsonRequest('/employees/', 'POST', body),
     update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body),
     delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
+    currentShift: () => request<EmployeeShift | null>('/shifts/current/'),
+    startShift: (body: { opening_cash?: number; vehicle?: number | null }) => jsonRequest<EmployeeShift>('/shifts/start/', 'POST', body),
+    closeShift: (body: { closing_cash: number; closing_transfer: number; closing_notes?: string }) => jsonRequest<EmployeeShiftCloseResponse>('/shifts/close/', 'POST', body),
+    shifts: (query = '') => request<Paginated>(`/shifts/${query}`),
   },
 
   invoices: {
@@ -244,6 +244,31 @@ export const api = {
 };
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
+export type EmployeeRole = { code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
+export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
+export type EmployeeShift = {
+  id: number;
+  employee: number;
+  employee_name: string;
+  site: number;
+  site_name: string;
+  vehicle: number | null;
+  vehicle_name: string | null;
+  business_date: string;
+  status: 'open' | 'closed';
+  opened_at: string;
+  closed_at: string | null;
+  opening_cash: number | string;
+  closing_cash: number | string | null;
+  closing_transfer: number | string | null;
+  closing_notes: string;
+};
+export type EmployeeShiftCloseResponse = EmployeeShift & {
+  expected_cash: number | string;
+  cash_difference: number | string;
+  expected_transfer: number | string;
+  transfer_difference: number | string;
+};
 export type UserProfile = {
   id: number;
   username: string;
@@ -254,8 +279,12 @@ export type UserProfile = {
   is_superuser: boolean;
   role_level: number;
   permissions: string[];
+  role: EmployeeRole | null;
+  employee: { id: number; site: EmployeeSite | null; department: { id: number; name: string; code: string } | null } | null;
+  current_shift: { id: number; business_date: string; status: 'open'; opened_at: string; site_id: number; vehicle: { id: number; name: string } | null; opening_cash: number | string } | null;
 };
 export type DashboardOverview = {
+  counts?: { product_count: number; invoice_count: number; customer_count: number; supplier_count: number };
   sales: { gross_sales: number | string; units_sold: number; invoice_count: number; trend: { date: string; value: number | string }[] };
   purchases: { purchase_value: number | string; units_purchased: number; purchase_count: number; trend: { date: string; value: number | string }[] };
   inventory: { total_units: number; inventory_value: number | string; product_count: number; low_stock_count: number; low_stock_threshold: number; low_stock: { product_id: number; product_name: string; stock: number }[] };
