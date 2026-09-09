@@ -6,6 +6,7 @@ from accounting.services import get_default_company, post_sales_return
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
+from common.report_events import schedule_report_refresh
 from inventory.models import StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice, InvoiceReturn, InvoiceReturnItem
@@ -113,6 +114,7 @@ def create_sales_return(*, invoice_id, items, created_by_id, reason="", actor=No
             "reason": reason,
         },
     )
+    schedule_report_refresh(refresh_product_intelligence=True)
     return sales_return
 
 
