@@ -1,7 +1,8 @@
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Container, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Button, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { IconArrowRight, IconShieldCheck } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
 import { api } from '../lib/api';
@@ -19,29 +20,91 @@ export function LoginPage() {
       await api.auth.login(identifier.trim(), password);
       navigate('/', { replace: true });
     } catch (error) {
-      notifications.show({ title: 'Login failed', message: error instanceof Error ? error.message : 'Please check your credentials.', color: 'red' });
+      notifications.show({
+        title: 'Login failed',
+        message: error instanceof Error ? error.message : 'Please check your credentials.',
+        color: 'red',
+      });
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="app-bg" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24 }}>
-      <div className="aurora-orb one" /><div className="aurora-orb two" />
-      <Container size={460} w="100%">
-        <div className="glass bento-card" style={{ borderRadius: 28, padding: 34, boxShadow: '0 24px 80px rgba(0,0,0,.28)' }}>
-          <Stack gap="xl">
-            <div><Text size="xs" tt="uppercase" fw={900} c="indigo.3" lts=".12em">ERP Command Center</Text><Title order={1} mt={7} style={{ letterSpacing: '-0.04em' }}>Welcome back</Title><Text c="dimmed" mt={6}>Sign in to manage sales, inventory and finance.</Text></div>
-            <form onSubmit={submit}>
-              <Stack gap="md">
-                <TextInput label="Username or email" placeholder="you@example.com" value={identifier} onChange={(event) => setIdentifier(event.currentTarget.value)} required autoFocus />
-                <PasswordInput label="Password" placeholder="Your password" value={password} onChange={(event) => setPassword(event.currentTarget.value)} required />
-                <Button type="submit" size="md" loading={loading} fullWidth variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>Sign in</Button>
-              </Stack>
-            </form>
-          </Stack>
+    <main className="login-page">
+      <section className="login-frame" aria-label="ERP sign in">
+        <div className="login-brand-panel">
+          <div>
+            <div className="login-brand-mark" aria-hidden="true">E</div>
+            <Text className="login-eyebrow" size="xs" fw={800} tt="uppercase" lts=".12em">
+              ERP Workspace
+            </Text>
+            <Title order={1} className="login-brand-title">
+              Everything your operation needs, in one place.
+            </Title>
+            <Text className="login-brand-copy" mt="md">
+              Sales, inventory and finance stay connected so the team can work from the same source of truth.
+            </Text>
+          </div>
+
+          <div className="login-brand-footer">
+            <span className="login-security-icon" aria-hidden="true"><IconShieldCheck size={16} /></span>
+            <div>
+              <Text size="sm" fw={700}>Role-based workspace</Text>
+              <Text size="xs" c="dimmed" mt={2}>Your access is tailored to your responsibilities.</Text>
+            </div>
+          </div>
         </div>
-      </Container>
-    </div>
+
+        <div className="login-form-panel">
+          <div className="login-form-intro">
+            <Text size="sm" fw={700} c="dimmed">Sign in</Text>
+            <Title order={2} mt={4}>Welcome back</Title>
+            <Text size="sm" c="dimmed" mt={6} maw={420}>
+              Continue to your ERP workspace.
+            </Text>
+          </div>
+
+          <form onSubmit={submit} className="login-form">
+            <Stack gap="lg">
+              <TextInput
+                label="Username or email"
+                placeholder="you@example.com"
+                value={identifier}
+                onChange={(event) => setIdentifier(event.currentTarget.value)}
+                autoComplete="username"
+                required
+                autoFocus
+                size="md"
+              />
+              <PasswordInput
+                label="Password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(event) => setPassword(event.currentTarget.value)}
+                autoComplete="current-password"
+                required
+                size="md"
+              />
+              <Button
+                type="submit"
+                size="md"
+                loading={loading}
+                fullWidth
+                color="erp"
+                rightSection={<IconArrowRight size={17} />}
+                className="login-submit"
+              >
+                Sign in
+              </Button>
+            </Stack>
+          </form>
+
+          <Text className="login-form-note" size="xs" c="dimmed">
+            Access is protected by your assigned ERP permissions.
+          </Text>
+        </div>
+      </section>
+    </main>
   );
 }
