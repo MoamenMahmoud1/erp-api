@@ -75,7 +75,6 @@ def inventory_dashboard(*, low_stock_threshold=10, site_id=None):
         )
         .order_by("name")
     )
-    # A site filter on the aggregation, rather than only on Product, prevents stock from other branches being included.
     if site_id is not None:
         stock_rows = [row for row in stock_rows if row["stock"] or row["inventory_value"]]
     total_units = sum((row["stock"] for row in stock_rows), 0)
@@ -117,24 +116,47 @@ def sales_by_employee(*, date_from=None, date_to=None, site_id=None):
 
 
 def customer_sales_ranking(*, date_from=None, date_to=None, limit=5, site_id=None):
-    items = InvoiceItem.objects.filter(invoice__status__in=SALES_STATUSES)
+    invoices = Invoice.objects.filter(status__in=SALES_STATUSES).select_related("customer").prefetch_related("items__return_items")
     if site_id is not None:
-        items = items.filter(invoice__site_id=site_id)
-    items = _range_filter(items, "invoice__created_at", date_from, date_to)
-    line_total = ExpressionWrapper(F("unit_price") * F("quantity"), output_field=DecimalField(max_digits=18, decimal_places=2))
-    sales_rows = list(items.values("invoice__customer_id", "invoice__customer__name").annotate(quantity=Coalesce(Sum("quantity"), 0), gross_revenue=Coalesce(Sum(line_total), ZERO), invoice_count=Count("invoice", distinct=True)).order_by("invoice__customer_id"))
+        invoices = invoices.filter(site_id=site_id)
+    invoices = _range_filter(invoices, "created_at", date_from, date_to)
+
+    ranked_map = {}
+    for invoice in invoices:
+        row = ranked_map.setdefault(
+            invoice.customer_id,
+            {
+                "customer_id": invoice.customer_id,
+                "customer_name": invoice.customer.name,
+                "invoice_count": 0,
+                "units_sold": 0,
+                "gross_revenue": ZERO,
+                "returns": ZERO,
+                "revenue": ZERO,
+            },
+        )
+        row["invoice_count"] += 1
+        row["units_sold"] += invoice.sold_quantity
+        # Invoice.total is the authoritative amount after coupon discounts.
+        row["gross_revenue"] += invoice.total
+
     return_queryset = InvoiceReturn.objects.all()
     if site_id is not None:
         return_queryset = return_queryset.filter(site_id=site_id)
     return_queryset = _range_filter(return_queryset, "created_at", date_from, date_to)
     return_rows = return_queryset.values("invoice__customer_id").annotate(returns=Coalesce(Sum("refund_amount"), ZERO))
     return_map = {row["invoice__customer_id"]: row["returns"] for row in return_rows}
+
     ranked = []
-    for row in sales_rows:
-        returns = return_map.get(row["invoice__customer_id"], ZERO)
-        ranked.append({"customer_id": row["invoice__customer_id"], "customer_name": row["invoice__customer__name"], "invoice_count": row["invoice_count"], "units_sold": row["quantity"], "gross_revenue": row["gross_revenue"], "returns": returns, "revenue": row["gross_revenue"] - returns})
+    for row in ranked_map.values():
+        returns = return_map.get(row["customer_id"], ZERO)
+        row["returns"] = returns
+        row["revenue"] = row["gross_revenue"] - returns
+        ranked.append(row)
+
     ranked.sort(key=lambda row: (-row["revenue"], -row["units_sold"], row["customer_id"]))
-    return ranked[:limit], sorted(ranked, key=lambda row: (row["revenue"], row["units_sold"], row["customer_id"]))[:limit]
+    bottom = sorted(ranked, key=lambda row: (row["revenue"], row["units_sold"], row["customer_id"]))[:limit]
+    return ranked[:limit], bottom
 
 
 def dashboard_overview(*, date_from=None, date_to=None, site_id=None):
