@@ -10,7 +10,7 @@ from accounting.services import get_default_company, post_sales_invoice, reverse
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
-from inventory.models import StockLocation, StockMovement, StockMovementItem
+from inventory.models import StockLocation, StockMovement, StockMovementItem, StockBatchBalance
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice
 
@@ -114,6 +114,35 @@ def confirm_invoice(invoice_id, actor=None):
     return invoice
 
 
+def _validate_cancellation_stock_position(*, sale, source_location):
+    """Prevent cancelling a sale after its stock has left the recorded source location."""
+    for sale_item in sale.items.all():
+        if sale_item.batch_id:
+            available = (
+                StockBatchBalance.objects
+                .filter(location=source_location, batch_id=sale_item.batch_id)
+                .values_list("quantity", flat=True)
+                .first()
+            ) or 0
+        else:
+            available = (
+                StockBalanceService.batch_stock(location=source_location, product=sale_item.product, include_empty=False)
+                .aggregate(quantity=Decimal("0"))["quantity"]
+                if False else None
+            )
+            available = (
+                StockLocation.objects.filter(pk=source_location.pk)
+                .values("id")
+            ) and None
+            # Legacy sale movements have no batch reference; use the aggregate product balance as a conservative guard.
+            from inventory.models import StockBalance
+            available = StockBalance.objects.filter(location=source_location, product=sale_item.product).values_list("quantity", flat=True).first() or 0
+        if available < sale_item.quantity:
+            raise InvalidBusinessOperation(
+                f"Cannot cancel invoice #{sale_item.movement_id if hasattr(sale_item, 'movement_id') else sale_item.id}: the sold stock is no longer available at the original location."
+            )
+
+
 @transaction.atomic
 def cancel_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
@@ -132,6 +161,9 @@ def cancel_invoice(invoice_id, actor=None):
         )
         if sale is None or sale.source_location is None:
             raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
+
+        _validate_cancellation_stock_position(sale=sale, source_location=sale.source_location)
+
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
