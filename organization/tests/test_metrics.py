@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -46,6 +47,20 @@ class CompanyCounterTests(TestCase):
         self.assertEqual(self.company.supplier_count, 0)
         self.assertEqual(self.company.product_count, 0)
         self.assertEqual(self.company.invoice_count, 0)
+
+    def test_counter_change_rolls_back_with_source_write(self):
+        with self.assertRaises(RuntimeError):
+            with transaction.atomic():
+                Product.objects.create(
+                    name="Rolled Back Product",
+                    purchase_price="10.00",
+                    selling_price="15.00",
+                )
+                raise RuntimeError("force rollback")
+
+        self.company.refresh_from_db()
+        self.assertEqual(Product.objects.count(), 0)
+        self.assertEqual(self.company.product_count, 0)
 
     def test_reconciliation_repairs_counter_drift(self):
         Customer.objects.create(name="Customer")
