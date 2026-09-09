@@ -11,6 +11,8 @@ from payments.querysets import PaymentTransactionQuerySet
 
 class PaymentTransaction(models.Model):
     customer = models.ForeignKey("customers.Customer", on_delete=models.PROTECT, related_name="payment_transactions")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="payment_transactions")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="payment_transactions")
     collected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="payment_collections", null=True, blank=True)
     cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
@@ -19,14 +21,15 @@ class PaymentTransaction(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=("customer", "created_at"), name="pay_tx_cust_created_idx")]
+        indexes = [
+            models.Index(fields=("customer", "created_at"), name="pay_tx_cust_created_idx"),
+            models.Index(fields=("site", "created_at"), name="pay_tx_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="pay_tx_shift_created_idx"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="payment_tx_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="payment_tx_transfer_non_negative"),
-            models.CheckConstraint(
-                condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")),
-                name="payment_tx_amount_positive",
-            ),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="payment_tx_amount_positive"),
         ]
         permissions = [
             ("process_collection", "Can process a payment collection"),
@@ -62,10 +65,7 @@ class PaymentAllocation(models.Model):
             models.UniqueConstraint(fields=("transaction", "invoice"), name="payment_alloc_unique_tx_invoice"),
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="payment_alloc_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="payment_alloc_transfer_non_negative"),
-            models.CheckConstraint(
-                condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")),
-                name="payment_alloc_amount_positive",
-            ),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="payment_alloc_amount_positive"),
         ]
 
     @property
@@ -88,6 +88,8 @@ class PaymentRefund(models.Model):
     transaction = models.ForeignKey(PaymentTransaction, on_delete=models.PROTECT, related_name="refunds")
     invoice = models.ForeignKey("invoices.Invoice", on_delete=models.PROTECT, related_name="payment_refunds")
     allocation = models.ForeignKey(PaymentAllocation, on_delete=models.PROTECT, related_name="refunds")
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="payment_refunds")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, null=True, blank=True, related_name="payment_refunds")
     cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     reason = models.CharField(max_length=255, blank=True)
@@ -96,13 +98,14 @@ class PaymentRefund(models.Model):
 
     class Meta:
         ordering = ("created_at",)
+        indexes = [
+            models.Index(fields=("site", "created_at"), name="pay_refund_site_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="pay_refund_shift_created_idx"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="payment_refund_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="payment_refund_transfer_non_negative"),
-            models.CheckConstraint(
-                condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")),
-                name="payment_refund_amount_positive",
-            ),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="payment_refund_amount_positive"),
         ]
 
     @property
@@ -122,10 +125,7 @@ class IdempotencyKey(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=("key", "user", "path"), name="idempotency_unique_key_user_path"),
-            models.CheckConstraint(
-                condition=Q(response_status=0) | Q(response_status__gte=100, response_status__lte=599),
-                name="idempotency_response_status_valid",
-            ),
+            models.CheckConstraint(condition=Q(response_status=0) | Q(response_status__gte=100, response_status__lte=599), name="idempotency_response_status_valid"),
         ]
         indexes = [models.Index(fields=("user", "path", "key"), name="idempotency_lookup_idx")]
 
