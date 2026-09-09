@@ -3,7 +3,8 @@
 from django.db import transaction
 from django.utils import timezone
 
-from common.exceptions import CouponInvalid, InvalidStateTransition
+from accounts.services.employee_shift import require_open_shift
+from common.exceptions import CouponInvalid, InvalidBusinessOperation, InvalidStateTransition
 from coupons.models import Coupon
 from invoices.calculator import InvoiceCalculator
 
@@ -24,11 +25,19 @@ def _validate_coupon(coupon, invoice):
         raise CouponInvalid("The invoice does not meet the coupon's minimum amount.")
 
 
+def _validate_shift(invoice, actor):
+    shift = require_open_shift(actor) if actor is not None else None
+    if shift is not None and invoice.site_id != shift.site_id:
+        raise InvalidBusinessOperation("The invoice belongs to a different site than the current shift.")
+    return shift
+
+
 @transaction.atomic
 def apply_coupon(*, invoice_id, code, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status != invoice.Status.DRAFT:
         raise InvalidStateTransition("A coupon can only be applied to a draft invoice.")
+    _validate_shift(invoice, actor)
     try:
         coupon = Coupon.objects.get(code=code)
     except Coupon.DoesNotExist as exc:
