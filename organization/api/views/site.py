@@ -15,10 +15,7 @@ class SiteViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        user = self.request.user
-        if user.is_superuser:
-            return queryset
-        site_ids = visible_site_ids(user)
+        site_ids = visible_site_ids(self.request.user)
         if site_ids is None:
             return queryset
         return queryset.filter(pk__in=site_ids)
