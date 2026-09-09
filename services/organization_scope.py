@@ -1,6 +1,6 @@
 from django.db.models import Q, Subquery
 
-from accounts.models import Employee
+from accounts.models import Employee, Role
 
 
 def visible_employee_user_ids(user):
@@ -11,35 +11,48 @@ def visible_employee_user_ids(user):
 
 
 def visible_site_ids(user):
-    """Return sites an employee can operate on, including child stores of a branch."""
-    if not user or not user.is_authenticated:
-        return Subquery(Employee.objects.none().values("work_site_id"))
+    """Return the site ids an actor may access from their role scope."""
+    if not user or not user.is_authenticated or user.is_superuser:
+        return None
+
+    role_scope = Role.scope_for_user(user)
+    if role_scope == Role.Scope.COMPANY:
+        return None
+
     employee = getattr(user, "employee", None)
     if employee is None or employee.work_site_id is None:
-        return None
+        return Subquery(Employee.objects.none().values("work_site_id"))
+
+    from organization.models import Site
+
     site = employee.work_site
-    if site.site_type == "branch":
-        from organization.models import Site
-        return Subquery(Site.objects.filter(Q(pk=site.pk) | Q(parent_id=site.pk)).values("pk"))
-    if site.site_type == "head_office":
-        from organization.models import Site
-        return Subquery(Site.objects.filter(company_id=site.company_id).values("pk"))
-    return Subquery(Employee.objects.filter(pk=employee.pk).values("work_site_id"))
+    if role_scope == Role.Scope.BRANCH:
+        branch_id = site.pk if site.site_type == Site.Type.BRANCH else site.parent_id
+        if branch_id is None:
+            return Subquery(Site.objects.filter(pk=site.pk).values("pk"))
+        return Subquery(
+            Site.objects.filter(Q(pk=branch_id) | Q(parent_id=branch_id)).values("pk")
+        )
+
+    return Subquery(Site.objects.filter(pk=site.pk).values("pk"))
 
 
 def filter_by_actor_scope(queryset, *, user, owner_field="created_by_id", site_field=None):
-    """Scope records to the actor's employee tree and, when applicable, their site."""
+    """Scope records by company/branch/site policy and actor ownership."""
     if not user or not user.is_authenticated:
         return queryset.none()
     if user.is_superuser:
         return queryset
 
-    visible_ids = Subquery(visible_employee_user_ids(user))
-    queryset = queryset.filter(Q(**{owner_field: user.pk}) | Q(**{f"{owner_field}__in": visible_ids}))
-
-    if site_field:
+    role_scope = Role.scope_for_user(user)
+    if site_field and role_scope != Role.Scope.COMPANY:
         sites = visible_site_ids(user)
-        if sites is not None:
-            queryset = queryset.filter(**{f"{site_field}__in": sites})
+        if sites is None:
+            return queryset
+        return queryset.filter(**{f"{site_field}__in": sites})
 
-    return queryset
+    visible_ids = Subquery(visible_employee_user_ids(user))
+    return queryset.filter(
+        Q(**{owner_field: user.pk})
+        | Q(**{f"{owner_field}__in": visible_ids})
+    )
