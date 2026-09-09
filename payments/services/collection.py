@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 
+from accounts.services.employee_shift import employee_for_user, require_open_shift
 from accounting.services import get_default_company, post_customer_collection
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
@@ -34,10 +35,11 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     if total_received == 0:
         return None
 
-    invoices = Invoice.objects.filter(
-        customer=customer,
-        status=Invoice.Status.CONFIRMED,
-    )
+    shift = require_open_shift(actor) if actor is not None else None
+    employee = employee_for_user(actor) if actor is not None else None
+    site_id = shift.site_id if shift else (employee.work_site_id if employee else None)
+
+    invoices = Invoice.objects.filter(customer=customer, status=Invoice.Status.CONFIRMED)
     if actor is not None:
         invoices = invoices.visible_to(actor)
     invoices = list(
@@ -55,14 +57,14 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
             total_outstanding += due
 
     if not outstanding:
-        raise NoConfirmableInvoicesError(
-            "The customer has no outstanding confirmed invoices."
-        )
+        raise NoConfirmableInvoicesError("The customer has no outstanding confirmed invoices.")
     if total_received > total_outstanding:
         raise OverpaymentError("The received amount exceeds the outstanding balance.")
 
     payment = PaymentTransaction.objects.create(
         customer=customer,
+        site_id=site_id,
+        shift_id=shift.pk if shift else None,
         collected_by_id=collected_by_id,
         cash_amount=cash,
         transfer_amount=transfer,
@@ -94,25 +96,13 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         if cash_remaining == 0 and transfer_remaining == 0:
             break
 
-    post_customer_collection(
-        payment=payment,
-        actor_id=collected_by_id,
-        company=get_default_company(),
-    )
-    log_operation(
-        "payment.collection",
-        user=collected_by_id,
-        customer=customer.pk,
-        invoices_allocated=allocated_invoices,
-    )
+    post_customer_collection(payment=payment, actor_id=collected_by_id, company=get_default_company())
+    log_operation("payment.collection", user=collected_by_id, customer=customer.pk, invoices_allocated=allocated_invoices)
     record_event(
         action="payment.collection",
         entity_type="PaymentTransaction",
         entity_id=payment.pk,
         actor_id=collected_by_id,
-        metadata={
-            "customer_id": customer.pk,
-            "invoices_allocated": allocated_invoices,
-        },
+        metadata={"customer_id": customer.pk, "site_id": site_id, "shift_id": payment.shift_id, "invoices_allocated": allocated_invoices},
     )
     return payment
