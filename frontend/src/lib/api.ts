@@ -13,11 +13,8 @@ function getAccessToken() {
 }
 
 function setAccessToken(token: string | null) {
-  if (token) {
-    localStorage.setItem(ACCESS_KEY, token);
-  } else {
-    localStorage.removeItem(ACCESS_KEY);
-  }
+  if (token) localStorage.setItem(ACCESS_KEY, token);
+  else localStorage.removeItem(ACCESS_KEY);
 }
 
 function notifyAuthExpired() {
@@ -167,6 +164,7 @@ export const api = {
     update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body),
     delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
     currentShift: () => request<EmployeeShift | null>('/shifts/current/'),
+    vehicleOptions: () => request<EmployeeVehicleOption[]>('/shifts/vehicles/'),
     startShift: (body: { opening_cash?: number; vehicle?: number | null }) => jsonRequest<EmployeeShift>('/shifts/start/', 'POST', body),
     closeShift: (body: { closing_cash: number; closing_transfer: number; closing_notes?: string }) => jsonRequest<EmployeeShiftCloseResponse>('/shifts/close/', 'POST', body),
     shifts: (query = '') => request<Paginated>(`/shifts/${query}`),
@@ -220,7 +218,7 @@ export const api = {
     journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`),
     createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body),
     postJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/post/`, { method: 'POST' }),
-    expenses: (query = '') => request<Paginated>(`/accounting/expenses/${query}`),
+    expenses: (query = '') => request(`/accounting/expenses/${query}`),
     createExpense: (body: Json) => jsonRequest('/accounting/expenses/', 'POST', body),
     periods: (query = '') => request<Paginated>(`/accounting/periods/${query}`),
     createPeriod: (body: Json) => jsonRequest('/accounting/periods/', 'POST', body),
@@ -246,6 +244,7 @@ export const api = {
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
 export type EmployeeRole = { code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
+export type EmployeeVehicleOption = { id: number; name: string };
 export type EmployeeShift = {
   id: number;
   employee: number;
