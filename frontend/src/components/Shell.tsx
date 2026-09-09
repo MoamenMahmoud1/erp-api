@@ -2,40 +2,10 @@ import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ActionIcon,
-  AppShell,
-  Avatar,
-  Burger,
-  Divider,
-  Group,
-  Menu,
-  NavLink,
-  ScrollArea,
-  Stack,
-  Text,
-  TextInput,
-  ThemeIcon,
-  Tooltip,
-  useMantineColorScheme,
+  ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme,
 } from '@mantine/core';
 import {
-  IconBook,
-  IconBox,
-  IconBuilding,
-  IconChartBar,
-  IconChevronDown,
-  IconDashboard,
-  IconFileInvoice,
-  IconMoon,
-  IconPackage,
-  IconPower,
-  IconReceipt,
-  IconSearch,
-  IconShoppingCart,
-  IconSun,
-  IconTruck,
-  IconUsers,
-  IconWallet,
+  IconBook, IconBox, IconBuilding, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet,
 } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
@@ -49,6 +19,7 @@ const sections: NavSection[] = [
     { label: 'Dashboard', to: '/', icon: <IconDashboard size={17} />, permission: 'accounting.view_financial_reports' },
     { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
     { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
+    { label: 'My Shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift' },
   ] },
   { label: 'Master data', items: [
     { label: 'Products', to: '/products', icon: <IconBox size={17} />, permission: 'products.view_product' },
@@ -85,7 +56,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     [user],
   );
   const allItems = useMemo(() => visibleSections.flatMap((section) => section.items), [visibleSections]);
-
   const searchMatches = useMemo(() => {
     const value = search.trim().toLowerCase();
     if (!value) return [];
@@ -102,72 +72,35 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     setSearch('');
   }
 
+  const roleLabel = user.role?.name || (user.is_superuser ? 'Administrator' : 'User');
+  const siteLabel = user.employee?.site?.name || 'Company-wide';
+
   return (
     <div className="app-bg">
-      <div className="aurora-orb one" />
-      <div className="aurora-orb two" />
-      <div className="aurora-orb three" />
-      <AppShell
-        padding="lg"
-        navbar={{ width: 238, breakpoint: 'md', collapsed: { mobile: !opened } }}
-        header={{ height: 74 }}
-        styles={{
-          main: { background: 'transparent' },
-          header: {
-            background: dark ? 'rgba(8, 13, 25, 0.88)' : 'rgba(255, 255, 255, 0.92)',
-            backdropFilter: 'blur(12px)',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)',
-          },
-          navbar: {
-            background: dark ? 'rgba(8, 13, 25, 0.94)' : 'rgba(255, 255, 255, 0.95)',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)',
-          },
-        }}
-      >
+      <div className="aurora-orb one" /><div className="aurora-orb two" /><div className="aurora-orb three" />
+      <AppShell padding="lg" navbar={{ width: 238, breakpoint: 'md', collapsed: { mobile: !opened } }} header={{ height: 74 }} styles={{
+        main: { background: 'transparent' },
+        header: { background: dark ? 'rgba(8, 13, 25, 0.88)' : 'rgba(255, 255, 255, 0.92)', backdropFilter: 'blur(12px)', borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)' },
+        navbar: { background: dark ? 'rgba(8, 13, 25, 0.94)' : 'rgba(255, 255, 255, 0.95)', borderColor: dark ? 'rgba(148, 163, 184, 0.10)' : 'rgba(15, 23, 42, 0.07)' },
+      }}>
         <AppShell.Header>
           <Group h="100%" px="lg" justify="space-between" gap="lg">
             <Group gap="sm" miw={230}>
               <Burger opened={opened} onClick={() => setOpened((value) => !value)} hiddenFrom="md" size="sm" />
               <Group gap="sm">
                 <ThemeIcon variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }} size={36} radius="xl">E</ThemeIcon>
-                <div>
-                  <Text fw={850} size="sm" lh={1.1}>ERP Command Center</Text>
-                  <Text size="xs" c="dimmed" mt={3}>Sales & operations</Text>
-                </div>
+                <div><Text fw={850} size="sm" lh={1.1}>ERP Command Center</Text><Text size="xs" c="dimmed" mt={3}>Sales & operations</Text></div>
               </Group>
             </Group>
-            <TextInput
-              className="topbar-search"
-              leftSection={<IconSearch size={17} />}
-              rightSection={<Text size="xs" c="dimmed" className="shortcut-hint">⌘ K</Text>}
-              placeholder="Search modules…"
-              value={search}
-              onChange={(event) => setSearch(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') submitSearch();
-                if (event.key === 'Escape') setSearch('');
-              }}
-              visibleFrom="sm"
-              styles={{ input: { borderRadius: 999 } }}
-            />
+            <TextInput className="topbar-search" leftSection={<IconSearch size={17} />} rightSection={<Text size="xs" c="dimmed" className="shortcut-hint">⌘ K</Text>} placeholder="Search modules…" value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitSearch(); if (event.key === 'Escape') setSearch(''); }} visibleFrom="sm" styles={{ input: { borderRadius: 999 } }} />
             <Group gap="xs">
-              <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
-                <ActionIcon variant="subtle" radius="xl" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
-                  {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
-                </ActionIcon>
-              </Tooltip>
-              <Menu shadow="md" width={210} position="bottom-end">
-                <Menu.Target>
-                  <button className="user-chip" type="button">
-                    <Avatar radius="xl" size="sm" color="indigo">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
-                    <span className="user-chip-copy">
-                      <Text size="sm" fw={750}>{user.first_name || user.username}</Text>
-                      <Text size="xs" c="dimmed">{user.email}</Text>
-                    </span>
-                    <IconChevronDown size={15} />
-                  </button>
-                </Menu.Target>
+              <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}><ActionIcon variant="subtle" radius="xl" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">{dark ? <IconSun size={18} /> : <IconMoon size={18} />}</ActionIcon></Tooltip>
+              <Menu shadow="md" width={230} position="bottom-end">
+                <Menu.Target><button className="user-chip" type="button"><Avatar radius="xl" size="sm" color="indigo">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar><span className="user-chip-copy"><Text size="sm" fw={750}>{user.first_name || user.username}</Text><Text size="xs" c="dimmed">{roleLabel} · {siteLabel}</Text></span><IconChevronDown size={15} /></button></Menu.Target>
                 <Menu.Dropdown>
+                  <Menu.Label>Workspace</Menu.Label>
+                  <Menu.Item closeMenuOnClick={false} disabled leftSection={<IconBuilding size={16} />} rightSection={user.current_shift ? <Badge color="teal" size="sm">Shift open</Badge> : undefined}>{siteLabel}</Menu.Item>
+                  <Menu.Divider />
                   <Menu.Label>Account</Menu.Label>
                   <Menu.Item leftSection={<IconPower size={16} />} color="red" onClick={logout}>Sign out</Menu.Item>
                 </Menu.Dropdown>
@@ -178,49 +111,12 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
         <AppShell.Navbar p="sm">
           <AppShell.Section grow component={ScrollArea} scrollbarSize={4}>
             <Stack gap="md">
-              {visibleSections.map((section) => (
-                <div key={section.label}>
-                  <Text px="sm" mb={6} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">{section.label}</Text>
-                  <Stack gap={2}>
-                    {section.items.map((item) => {
-                      const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to));
-                      return (
-                        <NavLink
-                          key={item.to}
-                          component={Link}
-                          to={item.to}
-                          active={active}
-                          label={item.label}
-                          leftSection={<span className="nav-icon">{item.icon}</span>}
-                          onClick={() => setOpened(false)}
-                          variant="light"
-                          styles={{
-                            root: { minHeight: 40, borderRadius: 10 },
-                            label: { fontWeight: active ? 750 : 600 },
-                          }}
-                        />
-                      );
-                    })}
-                  </Stack>
-                </div>
-              ))}
+              {visibleSections.map((section) => <div key={section.label}><Text px="sm" mb={6} size="xs" fw={800} tt="uppercase" c="dimmed" lts="0.08em">{section.label}</Text><Stack gap={2}>{section.items.map((item) => { const active = location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(item.to)); return <NavLink key={item.to} component={Link} to={item.to} active={active} label={item.label} leftSection={<span className="nav-icon">{item.icon}</span>} onClick={() => setOpened(false)} variant="light" styles={{ root: { minHeight: 40, borderRadius: 10 }, label: { fontWeight: active ? 750 : 600 } }} />; })}</Stack></div>)}
             </Stack>
           </AppShell.Section>
-          <AppShell.Section>
-            <Divider my="md" />
-            <Text size="xs" c="dimmed" px="sm">ERP workspace</Text>
-          </AppShell.Section>
+          <AppShell.Section><Divider my="md" /><Text size="xs" c="dimmed" px="sm">ERP workspace</Text></AppShell.Section>
         </AppShell.Navbar>
-        {searchMatches.length > 0 && (
-          <div className="search-results">
-            {searchMatches.map((item) => (
-              <button key={item.to} type="button" onClick={() => { navigate(item.to); setSearch(''); }}>
-                <span className="nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </div>
-        )}
+        {searchMatches.length > 0 && <div className="search-results">{searchMatches.map((item) => <button key={item.to} type="button" onClick={() => { navigate(item.to); setSearch(''); }}><span className="nav-icon">{item.icon}</span><span>{item.label}</span></button>)}</div>}
         <AppShell.Main className="page-enter">{children}</AppShell.Main>
       </AppShell>
     </div>
