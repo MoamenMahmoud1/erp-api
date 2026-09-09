@@ -21,6 +21,7 @@ type Props = {
   list: (query: string) => Promise<Paginated>;
   actions?: Action[];
   details?: Details;
+  topContent?: ReactNode;
   reloadKey?: number;
   clientPaginated?: boolean;
 };
@@ -46,7 +47,7 @@ function GenericDetails({ data }: { data: Record<string, unknown> }) {
   );
 }
 
-export function RecordsPage({ eyebrow, title, subtitle, columns, list, actions = [], details, reloadKey = 0, clientPaginated = false }: Props) {
+export function RecordsPage({ eyebrow, title, subtitle, columns, list, actions = [], details, topContent, reloadKey = 0, clientPaginated = false }: Props) {
   const [data, setData] = useState<Paginated>({ count: 0, next: null, previous: null, results: [] });
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -96,7 +97,15 @@ export function RecordsPage({ eyebrow, title, subtitle, columns, list, actions =
 
   return (
     <Stack gap="xl">
-      <Group justify="space-between" align="flex-end"><div><Text size="sm" c="indigo.3" fw={800}>{eyebrow}</Text><Title order={1} mt={4}>{title}</Title><Text c="dimmed" mt={4}>{subtitle}</Text></div><Button variant="light" leftSection={<IconRefresh size={16} />} loading={loading} onClick={() => void load()}>Refresh</Button></Group>
+      <Group justify="space-between" align="flex-end" wrap="wrap">
+        <div>
+          <Text size="sm" c="indigo.3" fw={800}>{eyebrow}</Text>
+          <Title order={1} mt={4}>{title}</Title>
+          <Text c="dimmed" mt={4}>{subtitle}</Text>
+        </div>
+        {topContent ? <Group gap="xs" justify="flex-end">{topContent}</Group> : <div />}
+        <Button variant="light" leftSection={<IconRefresh size={16} />} loading={loading} onClick={() => void load()}>Refresh</Button>
+      </Group>
       <Paper className="glass bento-card" radius="lg" withBorder>
         <ScrollArea><Table miw={900} highlightOnHover>
           <Table.Thead><Table.Tr>{columns.map((column) => <Table.Th key={column.key}>{column.label}</Table.Th>)}{showActionColumn && <Table.Th ta="right">Actions</Table.Th>}</Table.Tr></Table.Thead>
