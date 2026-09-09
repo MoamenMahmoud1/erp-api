@@ -16,13 +16,7 @@ class Purchase(models.Model):
         CANCELLED = "CANCELLED", "Cancelled"
 
     supplier = models.ForeignKey("suppliers.Supplier", on_delete=models.PROTECT, related_name="purchases")
-    site = models.ForeignKey(
-        "organization.Site",
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True,
-        related_name="purchases",
-    )
+    site = models.ForeignKey("organization.Site", on_delete=models.PROTECT, null=True, blank=True, related_name="purchases")
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     reference = models.CharField(max_length=100, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_purchases")
@@ -52,11 +46,7 @@ class PurchaseItem(models.Model):
     purchase = models.ForeignKey(Purchase, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="purchase_items")
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    unit_purchase_price = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal("0"))],
-    )
+    unit_purchase_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
 
     class Meta:
         constraints = [
@@ -113,19 +103,11 @@ class SupplierPayment(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [
-            models.Index(
-                fields=("supplier", "created_at"),
-                name="suppay_supplier_created_idx",
-            )
-        ]
+        indexes = [models.Index(fields=("supplier", "created_at"), name="suppay_supplier_created_idx")]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_transfer_non_negative"),
-            models.CheckConstraint(
-                condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")),
-                name="supplier_payment_amount_positive",
-            ),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="supplier_payment_amount_positive"),
         ]
 
     @property
@@ -139,7 +121,7 @@ class SupplierPayment(models.Model):
 class SupplierPaymentAllocation(models.Model):
     payment = models.ForeignKey(SupplierPayment, on_delete=models.CASCADE, related_name="allocations")
     purchase = models.ForeignKey(Purchase, on_delete=models.PROTECT, related_name="supplier_payment_allocations")
-    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0")))])
+    cash_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     transfer_amount = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -149,10 +131,7 @@ class SupplierPaymentAllocation(models.Model):
             models.UniqueConstraint(fields=("payment", "purchase"), name="supplier_payment_alloc_payment_purchase_unique"),
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="supplier_payment_alloc_cash_non_negative"),
             models.CheckConstraint(condition=Q(transfer_amount__gte=Decimal("0")), name="supplier_payment_alloc_transfer_non_negative"),
-            models.CheckConstraint(
-                condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")),
-                name="supplier_payment_alloc_amount_positive",
-            ),
+            models.CheckConstraint(condition=Q(cash_amount__gt=Decimal("0")) | Q(transfer_amount__gt=Decimal("0")), name="supplier_payment_alloc_amount_positive"),
         ]
 
     @property
