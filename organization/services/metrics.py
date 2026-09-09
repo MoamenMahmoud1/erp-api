@@ -48,15 +48,19 @@ def reconcile_company_counters():
     from products.models import Product
     from suppliers.models import Supplier
 
-    counts = {
-        "product_count": Product.objects.count(),
-        "invoice_count": Invoice.objects.count(),
-        "customer_count": Customer.objects.count(),
-        "supplier_count": Supplier.objects.count(),
-    }
-
     with transaction.atomic():
+        # Lock the counter row before reading source tables. Normal counter
+        # writes also update this row, so reconciliation cannot overwrite a
+        # just-applied increment/decrement with an older snapshot.
         company = Company.objects.select_for_update().get(singleton_marker=True)
+
+        counts = {
+            "product_count": Product.objects.count(),
+            "invoice_count": Invoice.objects.count(),
+            "customer_count": Customer.objects.count(),
+            "supplier_count": Supplier.objects.count(),
+        }
+
         for field, value in counts.items():
             setattr(company, field, value)
         company.counters_reconciled_at = timezone.now()
