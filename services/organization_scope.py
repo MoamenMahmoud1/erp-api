@@ -38,7 +38,11 @@ def visible_site_ids(user):
 
 
 def filter_by_actor_scope(queryset, *, user, owner_field="created_by_id", site_field=None):
-    """Scope records by company/branch/site policy and actor ownership."""
+    """Scope records by company/branch/site policy and actor ownership.
+
+    Explicit ownership is retained for legacy rows that predate site assignment;
+    this never grants access to another user's unassigned row.
+    """
     if not user or not user.is_authenticated:
         return queryset.none()
     if user.is_superuser:
@@ -49,7 +53,10 @@ def filter_by_actor_scope(queryset, *, user, owner_field="created_by_id", site_f
         sites = visible_site_ids(user)
         if sites is None:
             return queryset
-        return queryset.filter(**{f"{site_field}__in": sites})
+        return queryset.filter(
+            Q(**{owner_field: user.pk})
+            | Q(**{f"{site_field}__in": sites})
+        )
 
     visible_ids = Subquery(visible_employee_user_ids(user))
     return queryset.filter(
