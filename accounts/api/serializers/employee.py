@@ -41,20 +41,29 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if manager and not Employee.objects.visible_to(actor).filter(pk=manager.pk).exists():
             raise ValidationError({"manager": "You cannot assign a manager outside your visible employee tree."})
 
+        # Validate the internal organization relationship first. This gives a
+        # useful field-specific error when a partial update leaves an existing
+        # department incompatible with the newly requested site.
+        if department and department.site_id and work_site and department.site_id != work_site.pk:
+            allowed = False
+            if work_site.parent_id:
+                allowed = department.site_id == work_site.parent_id
+            if not allowed:
+                raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
+
         site_ids = visible_site_ids(actor) if actor else None
         actor_scope = Role.scope_for_user(actor) if actor else Role.Scope.SITE
         if work_site and actor_scope != Role.Scope.COMPANY:
             if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk).filter(pk__in=site_ids).exists():
                 raise ValidationError({"work_site": "The work site is outside your allowed scope."})
 
-        if department and department.site_id and work_site and department.site_id != work_site.pk:
-            allowed = department.site_id in {work_site.pk}
-            if work_site.parent_id:
-                allowed = allowed or department.site_id == work_site.parent_id
-            if not allowed:
-                raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
-
-        candidate = Employee(pk=getattr(self.instance, "pk", None), user=user, manager=manager, work_site=work_site, department=department)
+        candidate = Employee(
+            pk=getattr(self.instance, "pk", None),
+            user=user,
+            manager=manager,
+            work_site=work_site,
+            department=department,
+        )
         try:
             candidate.clean()
         except DjangoValidationError as exc:
