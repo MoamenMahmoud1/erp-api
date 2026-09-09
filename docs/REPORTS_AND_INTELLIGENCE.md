@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The ERP reporting layer is read-only and builds on the existing transactional domains. It does not become a second source of truth: invoices, purchases, stock balances, payments and accounting journals remain authoritative.
+The reporting layer is read-only and builds on the existing transactional domains. It does not become a second source of truth: invoices, purchases, stock balances, payments and accounting journals remain authoritative.
 
 ## Architecture
 
@@ -19,23 +19,45 @@ HTTP/API
           |
           +--> products/services/intelligence.py
 
-Celery worker
+Dashboard
   |
-  +--> accounting/tasks.py ------> analytics/report services
-  +--> products/tasks.py --------> product intelligence service
+  +--> live report calculations for changing operational data
+  +--> Company master-data counters for cheap global counts
 
-Celery Beat
+Company counters
   |
-  +--> every 15 minutes: warm common analytics dashboard
-  +--> hourly: refresh default product intelligence
+  +--> Product / Invoice / Customer / Supplier writes update counters in O(1)
+  +--> daily Celery reconciliation repairs any drift
 
-Redis
+Celery
   |
-  +--> short-lived report cache
-  +--> one-hour product-intelligence cache
+  +--> currently used only for the daily counter-integrity check
+  +--> reserved for heavy historical analytics and intelligence jobs later
 ```
 
-The same domain services are used by HTTP requests and background jobs. Celery is orchestration only; business calculations remain in domain services.
+The dashboard is intentionally live. It does not wait for a cache refresh and does not depend on Celery for freshness.
+
+## Master-data counters
+
+The `organization.Company` singleton stores these operational counters:
+
+- `product_count`
+- `invoice_count`
+- `customer_count`
+- `supplier_count`
+
+Domain app signals update the relevant counter when a record is created or deleted. Updates use database-side `F()` expressions so concurrent writes do not require a read-modify-write race-prone sequence.
+
+These counters are used only for cheap global counts. They do not replace date-filtered analytics such as sales for a selected period, P&L, cash flow, inventory valuation, or top products; those reports remain live and query their authoritative transactional data.
+
+## Counter integrity
+
+A daily Celery Beat job runs at **02:00 UTC** and recomputes the counters from the authoritative tables. It then writes the corrected values and records `counters_reconciled_at`.
+
+This gives the system two protections:
+
+1. normal writes maintain counters immediately and cheaply;
+2. the daily reconciliation catches drift caused by bulk ORM operations, data repair scripts, imports, or other code paths that bypass model signals.
 
 ## Reports and analytics
 
@@ -48,7 +70,7 @@ Existing accounting analytics provide:
 - sales by employee
 - cross-domain dashboard overview with P&L, cash flow and balances
 
-These functions use a short Redis cache controlled by `REPORT_CACHE_TTL`. The scheduled task pre-computes the standard dashboard window without making users pay the query cost on the first request.
+These reports are intentionally live because operational dashboard values can change immediately after a transaction.
 
 ## Product intelligence v1
 
@@ -70,6 +92,8 @@ For active products it calculates:
 - recommended reorder quantity
 - plain-language recommendation
 
+The v1 calculation is live and deterministic. It does not use the dashboard cache and it does not create purchase orders automatically.
+
 ### Reorder heuristic
 
 The first version intentionally avoids pretending that the ERP has supplier lead-time data when it does not. It uses a target stock coverage window instead:
@@ -80,7 +104,7 @@ target_units = ceil(average_daily_sales * target_stock_days)
 reorder_quantity = max(0, target_units - current_stock)
 ```
 
-This is a planning recommendation only. It does not create a purchase order.
+This is a planning recommendation only.
 
 ### Slow-moving heuristic
 
@@ -88,7 +112,7 @@ A product is marked slow-moving when it has no sales in the current window, or w
 
 ### Cost and margin
 
-Historical invoice `cost_price` is used when captured; otherwise the current product purchase price is used as an explicit fallback. Product intelligence therefore exposes its profitability fields as **estimated** values.
+Historical invoice `cost_price` is used when captured; otherwise the current product purchase price is used as an explicit fallback. Product intelligence therefore exposes profitability fields as **estimated** values.
 
 ## API
 
@@ -114,34 +138,27 @@ The endpoint is read-only and uses the existing authenticated/staff-read permiss
 
 ## Celery local development
 
-Install dependencies from `requirements.txt`, make sure Redis is running, then start two processes:
+Install dependencies from `requirements.txt`, make sure Redis is running, then start the worker and Beat scheduler when you want to exercise the scheduled integrity check:
 
 ```bash
 celery -A core.celery:app worker -l INFO
 celery -A core.celery:app beat -l INFO
 ```
 
-The worker and beat processes use the same Django settings selected by the environment. For local development this is normally `core.settings.settings_dev`.
+The current Beat schedule contains only the daily counter reconciliation. Heavy historical analytics jobs are intentionally deferred until their query/model design is finalized.
 
 ## Tests
 
-Focused tests follow the existing domain-based test architecture:
+Focused tests include:
 
 ```bash
-python manage.py test accounting.tests.test_tasks
-python manage.py test products.tests.test_intelligence
-python manage.py test products.tests.test_tasks
+python manage.py test organization.tests.test_metrics
 python manage.py test core.tests.test_celery
+python manage.py test products.tests.test_intelligence
 ```
 
-The product-intelligence tests use real Django models and database relationships. Celery task tests call task bodies directly so local validation does not require a live broker.
+The counter tests verify transactional create/delete updates and daily-style drift repair. Product-intelligence tests continue to use real Django models and database relationships.
 
 ## Next intelligence steps
 
-The deterministic layer should remain the foundation. Future ML/forecasting work should consume these stable features rather than replace the transactional domain:
-
-1. stronger demand forecasting using seasonality and trend
-2. supplier lead-time and safety-stock inputs
-3. anomaly detection for unusual sales or stock behavior
-4. purchase recommendations with explainable confidence scores
-5. customer and product segmentation
+Celery should be introduced into the intelligence layer only for work that is materially too expensive for a request, such as multi-year historical sales calculations and more advanced forecasting. The deterministic live layer remains the foundation.
