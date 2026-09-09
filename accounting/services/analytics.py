@@ -8,6 +8,7 @@ from django.db.models.functions import Coalesce, TruncDate
 from invoices.models import Invoice, InvoiceItem
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
+from organization.services.metrics import company_master_data_counts
 
 ZERO = Decimal("0.00")
 SALES_STATUSES = (Invoice.Status.CONFIRMED, Invoice.Status.PAID)
@@ -77,4 +78,4 @@ def dashboard_overview(*, date_from=None, date_to=None):
     from accounting.services.statements import cash_flow, profit_and_loss
 
     company = get_default_company()
-    return {"sales": sales_dashboard(date_from=date_from, date_to=date_to), "purchases": purchase_dashboard(date_from=date_from, date_to=date_to), "inventory": inventory_dashboard(), "pnl": profit_and_loss(date_from=date_from, date_to=date_to, company=company), "cash_flow": cash_flow(date_from=date_from, date_to=date_to, company=company), "top_products": top_products(date_from=date_from, date_to=date_to, limit=6), "sales_by_employee": sales_by_employee(date_from=date_from, date_to=date_to), "customer_balances": customer_balances(as_of=date_to), "supplier_balances": supplier_balances(as_of=date_to)}
+    return {"counts": company_master_data_counts(), "sales": sales_dashboard(date_from=date_from, date_to=date_to), "purchases": purchase_dashboard(date_from=date_from, date_to=date_to), "inventory": inventory_dashboard(), "pnl": profit_and_loss(date_from=date_from, date_to=date_to, company=company), "cash_flow": cash_flow(date_from=date_from, date_to=date_to, company=company), "top_products": top_products(date_from=date_from, date_to=date_to, limit=6), "sales_by_employee": sales_by_employee(date_from=date_from, date_to=date_to), "customer_balances": customer_balances(as_of=date_to), "supplier_balances": supplier_balances(as_of=date_to)}
