@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from accounts.services.employee_shift import employee_for_user, require_open_shift
 from common.exceptions import InvalidBusinessOperation
 from purchases.models import Purchase, PurchaseItem
 
@@ -50,8 +51,16 @@ def create_purchase(*, created_by, validated_data):
     _validate_items(items)
     if not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
-    data["site"] = _resolve_site(created_by=created_by, site=data.get("site"))
-    purchase = Purchase.objects.create(created_by_id=created_by.pk, **data)
+
+    shift = require_open_shift(created_by)
+    employee = employee_for_user(created_by)
+    data["site"] = _resolve_site(created_by=created_by, site=data.get("site") or (shift.site if shift else None))
+    data.pop("shift", None)
+    purchase = Purchase.objects.create(
+        created_by_id=created_by.pk,
+        shift_id=shift.pk if shift else None,
+        **data,
+    )
     PurchaseItem.objects.bulk_create([PurchaseItem(purchase=purchase, **item) for item in items])
     return purchase
 
@@ -63,6 +72,7 @@ def update_purchase(*, purchase_id, validated_data, actor):
         raise InvalidBusinessOperation("Only draft purchases can be edited.")
     data = validated_data.copy()
     items = data.pop("items", None)
+    data.pop("shift", None)
     if "supplier" in data and not data["supplier"].is_active:
         raise InvalidBusinessOperation("Supplier is inactive.")
     if "site" in data:
