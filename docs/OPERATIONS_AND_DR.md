@@ -10,11 +10,13 @@ Every request emits a structured `erp.metrics` log containing method, path, stat
 
 ## Report scaling
 
-Management reports use a short Redis-backed cache controlled by `REPORT_CACHE_TTL` (default 30 seconds). The `accounting.tasks.warm_analytics_reports` Celery task can pre-populate the standard dashboard window, and Celery Beat schedules it every 15 minutes. Report calculations remain in `accounting/services/` and are reused by HTTP endpoints and background jobs.
+The operational dashboard is intentionally live. It does not wait for a Redis report cache or a periodic dashboard refresh, because sales, payments, purchases and stock values can change immediately after a transaction.
 
-Product intelligence uses its own one-hour cache and is refreshed by `products.tasks.refresh_product_intelligence` every hour through Celery Beat.
+Cheap global master-data counts are stored transactionally on the singleton `organization.Company` as `product_count`, `invoice_count`, `customer_count`, and `supplier_count`. Normal create/delete operations update those counters with database-side expressions. A Celery Beat job reconciles them daily at 02:00 UTC so imports, bulk ORM operations, scripts, or other bypasses cannot leave them stale indefinitely.
 
-For production, run at least one dedicated Celery worker and one Beat scheduler process alongside the web application. Redis is the configured broker by default and may be overridden with `CELERY_BROKER_URL`.
+Celery is not used to keep the dashboard fresh today. It is reserved for materially expensive background work such as multi-year historical analytics, forecasting, and other intelligence calculations that should not execute in request time.
+
+For production, run a dedicated Celery worker and Beat scheduler if the scheduled integrity check is enabled. Redis is the configured broker by default and may be overridden with `CELERY_BROKER_URL`.
 
 ## Database backups
 
