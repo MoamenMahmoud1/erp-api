@@ -7,6 +7,7 @@ from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from common.observability import log_operation
+from common.report_events import schedule_report_refresh
 from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentTransaction
 
@@ -115,4 +116,5 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
             "invoices_allocated": allocated_invoices,
         },
     )
+    schedule_report_refresh()
     return payment
