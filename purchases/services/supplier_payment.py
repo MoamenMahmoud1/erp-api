@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Prefetch
 
-from accounts.services.employee_shift import employee_for_user, require_open_shift
+from accounts.services.employee_shift import operation_context
 from accounting.services import get_default_company, post_supplier_payment
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
@@ -18,14 +18,6 @@ class SupplierPaymentError(InvalidBusinessOperation):
 
 class SupplierPaymentOverpaymentError(SupplierPaymentError):
     pass
-
-
-def _purchase_return_total(purchase):
-    return sum((item.line_total for item in purchase_return_items(purchase)), Decimal("0"))
-
-
-def purchase_return_items(purchase):
-    return PurchaseReturnItem.objects.filter(purchase_return__purchase_id=purchase.pk).select_related("purchase_item")
 
 
 def _allocated_amount(purchase):
@@ -43,26 +35,30 @@ def pay_supplier(*, supplier, cash_amount, transfer_amount, paid_by_id, referenc
     if total_received <= 0:
         raise InvalidMoney("Supplier payment must be greater than zero.")
 
-    shift = require_open_shift(actor) if actor is not None else None
-    employee = employee_for_user(actor) if actor is not None else None
-    site_id = shift.site_id if shift else (employee.work_site_id if employee else None)
+    site = None
+    shift = None
+    if actor is not None:
+        _employee, site, shift = operation_context(actor)
+    site_id = site.pk if site else None
 
     purchases = (
         Purchase.objects.filter(supplier=supplier, status=Purchase.Status.CONFIRMED)
         .visible_to(actor) if actor is not None else Purchase.objects.filter(supplier=supplier, status=Purchase.Status.CONFIRMED)
     )
-    purchases = (
-        purchases.select_for_update()
-        .prefetch_related("items", "supplier_payment_allocations", Prefetch("returns__items", queryset=PurchaseReturnItem.objects.select_related("purchase_item")))
-        .order_by("created_at", "id")
-    )
+    purchases = purchases.select_for_update().prefetch_related(
+        "items",
+        "supplier_payment_allocations",
+        Prefetch("returns__items", queryset=PurchaseReturnItem.objects.select_related("purchase_item")),
+    ).order_by("created_at", "id")
 
     outstanding = []
     total_outstanding = Decimal("0")
     for purchase in purchases:
-        returned = sum((item.unit_price * item.quantity for purchase_return in purchase.returns.all() for item in purchase_return.items.all()), Decimal("0"))
-        allocated = _allocated_amount(purchase)
-        due = quantize_money(purchase.total_amount - returned - allocated)
+        returned = sum(
+            (item.unit_price * item.quantity for purchase_return in purchase.returns.all() for item in purchase_return.items.all()),
+            Decimal("0"),
+        )
+        due = quantize_money(purchase.total_amount - returned - _allocated_amount(purchase))
         if due > 0:
             outstanding.append((purchase, due))
             total_outstanding += due
