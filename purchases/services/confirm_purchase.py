@@ -4,7 +4,7 @@ from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_purchase
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
-from inventory.models import StockLocation, StockMovement, StockMovementItem
+from inventory.models import InventoryBatch, StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase
 
@@ -59,8 +59,43 @@ class ConfirmPurchaseService:
             reference=purchase.reference,
         )
         for item in sorted(items, key=lambda value: value.product_id):
-            StockBalanceService.increase(location=warehouse, product=item.product, quantity=item.quantity, unit_cost=item.unit_purchase_price)
-            StockMovementItem.objects.create(movement=movement, product=item.product, quantity=item.quantity, unit_cost=item.unit_purchase_price)
+            batch = None
+            batch_number = (item.batch_number or "").strip()
+            if batch_number or item.manufactured_date or item.expiry_date:
+                batch, _created = InventoryBatch.objects.get_or_create(
+                    product=item.product,
+                    batch_number=batch_number or None,
+                    defaults={
+                        "manufactured_date": item.manufactured_date,
+                        "expiry_date": item.expiry_date,
+                    },
+                )
+                if (
+                    batch.manufactured_date != item.manufactured_date
+                    or batch.expiry_date != item.expiry_date
+                ):
+                    raise InvalidBusinessOperation(
+                        f"Batch {batch.batch_number or batch.pk} for {item.product.name} already exists with different dates."
+                    )
+            else:
+                batch = InventoryBatch.objects.create(product=item.product)
+
+            item.batch = batch
+            item.save(update_fields=("batch",))
+            StockBalanceService.increase(
+                location=warehouse,
+                product=item.product,
+                quantity=item.quantity,
+                unit_cost=item.unit_purchase_price,
+                batch=batch,
+            )
+            StockMovementItem.objects.create(
+                movement=movement,
+                product=item.product,
+                batch=batch,
+                quantity=item.quantity,
+                unit_cost=item.unit_purchase_price,
+            )
 
         post_purchase(purchase=purchase, actor_id=actor.pk, company=get_default_company())
         if shift is not None and purchase.shift_id is None:
@@ -72,6 +107,11 @@ class ConfirmPurchaseService:
             entity_type="Purchase",
             entity_id=purchase.pk,
             actor_id=actor.pk,
-            metadata={"warehouse_id": warehouse.pk, "stock_movement_id": movement.pk, "site_id": purchase.site_id, "shift_id": movement.shift_id},
+            metadata={
+                "warehouse_id": warehouse.pk,
+                "stock_movement_id": movement.pk,
+                "site_id": purchase.site_id,
+                "shift_id": movement.shift_id,
+            },
         )
         return purchase
