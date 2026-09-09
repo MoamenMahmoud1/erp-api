@@ -130,12 +130,12 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
         styles={{
           main: { background: 'transparent' },
           header: {
-            background: dark ? '#0f172a' : '#ffffff',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(15, 23, 42, 0.10)',
+            background: 'var(--erp-surface)',
+            borderColor: 'var(--erp-border)',
           },
           navbar: {
-            background: dark ? '#0f172a' : '#ffffff',
-            borderColor: dark ? 'rgba(148, 163, 184, 0.14)' : 'rgba(15, 23, 42, 0.10)',
+            background: 'var(--erp-surface)',
+            borderColor: 'var(--erp-border)',
           },
         }}
       >
@@ -144,7 +144,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
             <Group gap="sm" miw={{ base: 'auto', sm: 220 }}>
               <Burger opened={opened} onClick={() => setOpened((value) => !value)} hiddenFrom="md" size="sm" aria-label="Open navigation" />
               <Group gap="sm">
-                <ThemeIcon color="blue" variant="light" size={34} radius="md">E</ThemeIcon>
+                <ThemeIcon color="erp" variant="light" size={34} radius="sm">E</ThemeIcon>
                 <div className="brand-copy">
                   <Text fw={750} size="sm" lh={1.1}>ERP Workspace</Text>
                   <Text size="xs" c="dimmed" mt={2}>Sales & operations</Text>
@@ -161,18 +161,18 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               onKeyDown={(event) => { if (event.key === 'Enter') submitSearch(); if (event.key === 'Escape') setSearch(''); }}
               visibleFrom="sm"
               aria-label="Search modules"
-              styles={{ input: { borderRadius: 7 } }}
+              styles={{ input: { borderRadius: 'var(--erp-radius-sm)' } }}
             />
             <Group gap="xs">
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
-                <ActionIcon variant="subtle" radius="md" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
+                <ActionIcon variant="subtle" radius="sm" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
                 </ActionIcon>
               </Tooltip>
               <Menu shadow="md" width={280} position="bottom-end">
                 <Menu.Target>
                   <button className="user-chip" type="button" aria-label="Open account menu">
-                    <Avatar radius="md" size="sm" color="blue">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
+                    <Avatar radius="sm" size="sm" color="erp">{(user.first_name || user.username).slice(0, 1).toUpperCase()}</Avatar>
                     <span className="user-chip-copy">
                       <Text size="sm" fw={700}>{user.first_name || user.username}</Text>
                       <Text size="xs" c="dimmed">{roleLabel} · {siteLabel}</Text>
@@ -213,7 +213,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                           leftSection={<span className="nav-icon">{item.icon}</span>}
                           onClick={() => setOpened(false)}
                           variant="subtle"
-                          styles={{ root: { minHeight: 38, borderRadius: 7 }, label: { fontWeight: active ? 700 : 550 } }}
+                          styles={{ root: { minHeight: 38, borderRadius: 'var(--erp-radius-sm)' }, label: { fontWeight: active ? 700 : 550 } }}
                         />
                       );
                     })}
