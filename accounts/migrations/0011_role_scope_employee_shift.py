@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
@@ -5,20 +6,16 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
     dependencies = [
         ("accounts", "0010_employee_department_employee_work_site"),
-        ("inventory", "0011_stocklocation_site"),
+        ("inventory", "0010_grant_inventory_read_permissions_to_transfer_groups"),
         ("organization", "0005_company_metrics_counters"),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
             model_name="role",
             name="scope",
-            field=models.CharField(
-                choices=[("company", "Company"), ("branch", "Branch"), ("site", "Site")],
-                db_index=True,
-                default="company",
-                max_length=20,
-            ),
+            field=models.CharField(choices=[("company", "Company"), ("branch", "Branch"), ("site", "Site")], db_index=True, default="site", max_length=20),
         ),
         migrations.AddField(
             model_name="role",
@@ -45,7 +42,11 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ("-business_date", "-opened_at"),
-                "permissions": [("start_employee_shift", "Can start an employee shift"), ("close_employee_shift", "Can close an employee shift"), ("view_all_employee_shifts", "Can view all employee shifts")],
+                "permissions": [
+                    ("start_employee_shift", "Can start an employee shift"),
+                    ("close_employee_shift", "Can close an employee shift"),
+                    ("view_all_employee_shifts", "Can view all employee shifts"),
+                ],
             },
         ),
         migrations.AddConstraint(
