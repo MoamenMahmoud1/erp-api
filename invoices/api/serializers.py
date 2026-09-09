@@ -47,7 +47,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "returned_amount", "outstanding_amount", "sold_quantity", "gross_profit", "items", "created_at", "updated_at",
         )
         read_only_fields = (
-            "id", "created_by", "customer_name", "site", "site_name", "shift_id", "created_by_name", "created_by_username", "salesperson_name", "coupon", "coupon_discount", "status",
+            "id", "created_by", "customer_name", "site_name", "shift_id", "created_by_name", "created_by_username", "salesperson_name", "coupon", "coupon_discount", "status",
             "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount", "sold_quantity",
             "gross_profit", "created_at", "updated_at",
         )
@@ -60,9 +60,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
 
     def get_salesperson_name(self, obj):
         employee = getattr(obj.created_by, "employee", None)
-        if employee is not None:
-            return str(employee)
-        return obj.created_by.get_full_name() or obj.created_by.username
+        return str(employee) if employee is not None else obj.created_by.get_full_name() or obj.created_by.username
 
     def get_gross_profit(self, obj):
         return sum(((item.unit_price - item.cost_price) * item.quantity for item in obj.items.all() if item.cost_price is not None), Decimal("0"))
@@ -96,9 +94,7 @@ class InvoiceSummarySerializer(serializers.ModelSerializer):
 
     def get_salesperson_name(self, obj):
         employee = getattr(obj.created_by, "employee", None)
-        if employee is not None:
-            return str(employee)
-        return obj.created_by.get_full_name() or obj.created_by.username
+        return str(employee) if employee is not None else obj.created_by.get_full_name() or obj.created_by.username
 
 
 class InvoiceReturnItemInputSerializer(serializers.ModelSerializer):
