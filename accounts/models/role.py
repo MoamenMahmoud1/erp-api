@@ -2,7 +2,6 @@ from django.contrib.auth.models import Group
 from django.db import models
 
 SUPERUSER_ROLE_LEVEL = 1000
-GLOBAL_EMPLOYEE_VISIBILITY_LEVEL = 60
 
 
 class Role(models.Model):
@@ -31,7 +30,7 @@ class Role(models.Model):
     def highest_for_user(cls, user):
         if not user or not user.is_authenticated:
             return None
-        return cls.objects.filter(group__user=user).order_by("-level").first()
+        return cls.objects.filter(group__user_id=user.pk).order_by("-level").first()
 
     @classmethod
     def level_for_user(cls, user):
@@ -47,8 +46,6 @@ class Role(models.Model):
 
     @classmethod
     def highest_role_for_user(cls, user):
-        if not user or not user.is_authenticated:
-            return None
         return cls.highest_for_user(user)
 
     @classmethod
