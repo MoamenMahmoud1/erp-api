@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db.models import IntegerField, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
@@ -6,7 +7,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.api.serializers import EmployeeSerializer, UserSummarySerializer
+from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, UserSummarySerializer
 from accounts.models import Employee, Role
 from accounts.permissions import EmployeeAccessPermission
 from common.pagination import StandardPagination
@@ -85,6 +86,33 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         page = self.paginate_queryset(users)
         rows = page if page is not None else users
         data = UserSummarySerializer(rows, many=True, context={"request": request}).data
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=("get",), url_path="groups")
+    def groups(self, request):
+        """Return role-backed groups the current actor is allowed to assign."""
+        groups = (
+            Group.objects.filter(role_profile__isnull=False)
+            .select_related("role_profile")
+            .order_by("-role_profile__level", "name", "pk")
+        )
+
+        if not request.user.is_superuser:
+            groups = groups.filter(role_profile__level__lt=Role.level_for_user(request.user))
+
+        search = request.query_params.get("search", "").strip()
+        if search:
+            groups = groups.filter(
+                Q(name__icontains=search)
+                | Q(role_profile__code__icontains=search)
+                | Q(role_profile__description__icontains=search)
+            )
+
+        page = self.paginate_queryset(groups)
+        rows = page if page is not None else groups
+        data = GroupSummarySerializer(rows, many=True, context={"request": request}).data
         if page is not None:
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
