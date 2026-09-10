@@ -1,11 +1,11 @@
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import RoleProfile
 from accounts.services.employee_shift import require_open_shift
+from accounts.models import RoleProfile
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
-from inventory.models import StockLocation, StockTransferRequest, StockTransferRequestItem
+from inventory.models import StockLocation, StockMovement, StockTransferRequest, StockTransferRequestItem
 from inventory.services.approval import can_approve_stock_request
 from inventory.services.transfer_stock import TransferStock
 from invoices.services.returns import create_sales_return
@@ -39,11 +39,9 @@ def _validate_warehouse_manager(*, warehouse, manager, requested_by):
     if manager is None or not manager.is_active:
         raise StockTransferRequestError("The selected warehouse manager is invalid.")
     if manager.pk == requested_by.pk:
-        raise StockTransferRequestError("The requester cannot approve their own stock request.")
+        raise StockTransferRequestError("The representative cannot approve their own stock request.")
     if not warehouse.warehouse_managers.filter(pk=manager.pk).exists():
         raise StockTransferRequestError("The selected user is not assigned as a manager for this warehouse.")
-    if not manager.is_superuser and not manager.has_perm("inventory.approve_stock_transfer"):
-        raise StockTransferRequestError("The selected warehouse manager is not authorized to approve stock requests.")
     if not can_approve_stock_request(approver=manager, requester=requested_by):
         raise StockTransferRequestError("The warehouse manager must have a higher role level than the requester.")
 
@@ -148,8 +146,11 @@ def approve_stock_transfer_request(*, request_id, approver):
         raise StockTransferRequestError("Only pending stock requests can be approved.")
     if request.warehouse_manager_id != approver.pk:
         raise StockTransferRequestError("Only the selected warehouse manager can approve this request.")
-    if not can_approve_stock_request(approver=approver, requester=request.requested_by):
-        raise StockTransferRequestError("Approval requires a higher role level than the requester.")
+    _validate_warehouse_manager(
+        warehouse=request.warehouse,
+        manager=approver,
+        requested_by=request.requested_by,
+    )
 
     if request.request_type == StockTransferRequest.RequestType.WAREHOUSE_TO_VEHICLE:
         movement = TransferStock()(
@@ -205,13 +206,21 @@ def approve_stock_transfer_request(*, request_id, approver):
 
 @transaction.atomic
 def reject_stock_transfer_request(*, request_id, approver, reason=""):
-    request = StockTransferRequest.objects.select_for_update().select_related("warehouse_manager", "requested_by").get(pk=request_id)
+    request = (
+        StockTransferRequest.objects
+        .select_for_update()
+        .select_related("warehouse", "warehouse_manager", "requested_by")
+        .get(pk=request_id)
+    )
     if request.status != StockTransferRequest.Status.PENDING:
         raise StockTransferRequestError("Only pending stock requests can be rejected.")
     if request.warehouse_manager_id != approver.pk:
         raise StockTransferRequestError("Only the selected warehouse manager can reject this request.")
-    if not can_approve_stock_request(approver=approver, requester=request.requested_by):
-        raise StockTransferRequestError("Rejection requires a higher role level than the requester.")
+    _validate_warehouse_manager(
+        warehouse=request.warehouse,
+        manager=approver,
+        requested_by=request.requested_by,
+    )
 
     request.status = StockTransferRequest.Status.REJECTED
     request.approved_by = approver
@@ -228,7 +237,9 @@ def reject_stock_transfer_request(*, request_id, approver, reason=""):
             "requested_by_id": request.requested_by_id,
             "warehouse_id": request.warehouse_id,
             "reviewed_at": request.reviewed_at.isoformat() if request.reviewed_at else None,
-            "reason": request.rejection_reason,
+            "approver_role_level": RoleProfile.level_for_user(approver),
+            "requester_role_level": RoleProfile.level_for_user(request.requested_by),
+            "reason": reason.strip(),
         },
     )
     return request
