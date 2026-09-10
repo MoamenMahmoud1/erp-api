@@ -4,7 +4,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 
-from .models import Role
+from .models import GroupPolicy
 
 User = get_user_model()
 
@@ -77,36 +77,32 @@ class CustomUserAdmin(BaseUserAdmin):
     readonly_fields = ("updated_at", "password_changed_at")
 
 
+class GroupPolicyInline(admin.StackedInline):
+    model = GroupPolicy
+    extra = 1
+    max_num = 1
+    fields = ("level", "scope", "requires_shift", "description")
+
+
 @admin.register(Group)
 class GroupAdmin(BaseGroupAdmin):
     search_fields = ("name",)
     ordering = ("name",)
+    inlines = (GroupPolicyInline,)
 
 
-@admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+@admin.register(GroupPolicy)
+class GroupPolicyAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
-        "code",
         "group",
         "level",
-        "is_system",
+        "scope",
+        "requires_shift",
         "updated_at",
     )
-    search_fields = (
-        "code",
-        "group__name",
-    )
-    list_filter = (
-        "is_system",
-    )
-    ordering = (
-        "-level",
-        "code",
-    )
+    search_fields = ("group__name", "description")
+    list_filter = ("scope", "requires_shift")
+    ordering = ("-level", "group__name")
     list_select_related = ("group",)
     autocomplete_fields = ("group",)
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-    )
+    readonly_fields = ("created_at", "updated_at")

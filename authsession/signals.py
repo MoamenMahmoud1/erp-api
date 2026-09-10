@@ -3,7 +3,7 @@ from django.contrib.auth.models import Group
 from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
-from accounts.models import Role
+from accounts.models import GroupPolicy
 from authsession.cache import delete_all_auth_session_caches, delete_auth_session_caches
 from authsession.models import AuthSession
 
@@ -59,16 +59,22 @@ def invalidate_user_session_cache(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Group)
 def invalidate_new_group_session_caches(sender, instance, created, **kwargs):
-    """Drop authorization snapshots when a new RBAC group is introduced."""
+    """Drop authorization snapshots when a new Group/Role is introduced."""
     if created:
         delete_all_auth_session_caches()
 
 
-@receiver(post_save, sender=Role)
-def invalidate_role_level_cache(sender, instance, **kwargs):
+@receiver(post_delete, sender=Group)
+def invalidate_deleted_group_session_caches(sender, instance, **kwargs):
+    """Drop authorization snapshots when a Role/Group is deleted."""
+    delete_all_auth_session_caches()
+
+
+@receiver(post_save, sender=GroupPolicy)
+def invalidate_group_policy_cache(sender, instance, **kwargs):
     _invalidate_group_users(instance.group_id)
 
 
-@receiver(post_delete, sender=Role)
-def invalidate_deleted_role_cache(sender, instance, **kwargs):
+@receiver(post_delete, sender=GroupPolicy)
+def invalidate_deleted_group_policy_cache(sender, instance, **kwargs):
     _invalidate_group_users(instance.group_id)

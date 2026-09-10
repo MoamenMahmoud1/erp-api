@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q, Subquery
 
-from accounts.models.role import Role
+from accounts.models.role import GroupPolicy
 
 
 class EmployeeQuerySet(models.QuerySet):
@@ -12,8 +12,8 @@ class EmployeeQuerySet(models.QuerySet):
             return self
 
         highest_role_scope = (
-            Role.objects.filter(group__user__pk=user.pk)
-            .order_by("-level")
+            GroupPolicy.objects.filter(group__user__pk=user.pk)
+            .order_by("-level", "group__name", "pk")
             .values("scope")[:1]
         )
         employee_rows = list(
@@ -31,9 +31,9 @@ class EmployeeQuerySet(models.QuerySet):
         )
 
         actor = next((row for row in employee_rows if row["user_id"] == user.pk), None)
-        role_scope = (actor or {}).get("_actor_role_scope") or Role.Scope.SITE
+        role_scope = (actor or {}).get("_actor_role_scope") or GroupPolicy.Scope.SITE
 
-        if role_scope == Role.Scope.COMPANY:
+        if role_scope == GroupPolicy.Scope.COMPANY:
             return self
 
         if actor is None:
@@ -56,7 +56,7 @@ class EmployeeQuerySet(models.QuerySet):
         if actor["work_site_id"] is None:
             return self.filter(pk__in=visible_ids)
 
-        if role_scope == Role.Scope.BRANCH:
+        if role_scope == GroupPolicy.Scope.BRANCH:
             branch_id = (
                 actor["work_site_id"]
                 if actor["work_site__site_type"] == "branch"

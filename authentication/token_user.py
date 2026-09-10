@@ -43,6 +43,20 @@ class ERPTokenUser(TokenUser):
         except (TypeError, ValueError):
             return 0
 
+    @property
+    def role_scope(self):
+        value = self._snapshot.get("role_scope", "site")
+        return value if value in {"company", "branch", "site"} else "site"
+
+    @property
+    def requires_shift(self):
+        return bool(self._snapshot.get("requires_shift", False))
+
+    @property
+    def role(self):
+        value = self._snapshot.get("role")
+        return value if isinstance(value, dict) else None
+
     def get_all_permissions(self, obj=None):
         permissions = self._snapshot.get("permissions", ())
         if not isinstance(permissions, (list, tuple, set)):

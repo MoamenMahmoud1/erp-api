@@ -5,7 +5,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.utils import timezone
 
-from accounts.models import Employee, EmployeeShift, Role
+from accounts.models import Employee, EmployeeShift, GroupPolicy
 from accounts.services.employee_shift import ShiftError, start_shift
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
@@ -30,7 +30,7 @@ class EmployeeShiftTests(TestCase):
         )
         self.user = User.objects.create_user(username="shop-user", email="shop@test.com", password="StrongPass123!")
         group = Group.objects.create(name="Test Shop Manager")
-        self.role = Role.objects.create(group=group, code="test-shop-manager", level=50, scope=Role.Scope.SITE, requires_shift=True)
+        GroupPolicy.objects.create(group=group, level=50, scope=GroupPolicy.Scope.SITE, requires_shift=True)
         self.user.groups.add(group)
         self.employee = Employee.objects.create(user=self.user, work_site=self.branch)
 
@@ -77,7 +77,7 @@ class SiteScopeTests(TestCase):
         self.branch_b = Site.objects.create(company=self.company, code="BR-B", name="Branch B", site_type=Site.Type.BRANCH, address_line_1="Address", city="Cairo", country_code="EG")
         self.user = User.objects.create_user(username="branch-user", email="branch@test.com", password="StrongPass123!")
         group = Group.objects.create(name="Test Branch Manager")
-        Role.objects.create(group=group, code="test-branch-manager", level=60, scope=Role.Scope.BRANCH)
+        GroupPolicy.objects.create(group=group, level=60, scope=GroupPolicy.Scope.BRANCH)
         self.user.groups.add(group)
         Employee.objects.create(user=self.user, work_site=self.branch_a)
         customer = Customer.objects.create(name="Customer")

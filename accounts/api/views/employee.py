@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, RoleSummarySerializer, UserSummarySerializer
-from accounts.models import Employee, Role
+from accounts.models import Employee, GroupPolicy
 from accounts.permissions import EmployeeAccessPermission
 from common.pagination import StandardPagination
 
@@ -45,8 +45,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 "department",
             )
             .prefetch_related(
-                "user__groups__role_profile",
-                "manager__user__groups__role_profile",
+                "user__groups__policy",
+                "manager__user__groups__policy",
             )
             .order_by(*self.ordering)
         )
@@ -57,12 +57,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = User.objects.filter(
             is_active=True,
             employee__isnull=True,
-        ).prefetch_related("groups__role_profile")
+        ).prefetch_related("groups__policy")
 
         if not request.user.is_superuser:
-            actor_level = Role.level_for_user(request.user)
+            actor_level = GroupPolicy.level_for_user(request.user)
             target_role_level = Subquery(
-                Role.objects.filter(group__user=OuterRef("pk"))
+                GroupPolicy.objects.filter(group__user=OuterRef("pk"))
                 .order_by("-level")
                 .values("level")[:1],
                 output_field=IntegerField(),
@@ -92,22 +92,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=("get",), url_path="groups")
     def groups(self, request):
-        """Return role-backed groups for legacy employee clients."""
-        groups = (
-            Group.objects.filter(role_profile__isnull=False)
-            .select_related("role_profile")
-            .order_by("-role_profile__level", "name", "pk")
-        )
-
+        """Legacy alias: every Django Group is a Role now."""
+        groups = Group.objects.select_related("policy").order_by("name", "pk")
         if not request.user.is_superuser:
-            groups = groups.filter(role_profile__level__lt=Role.level_for_user(request.user))
+            groups = groups.annotate(
+                _role_level=Coalesce("policy__level", Value(0), output_field=IntegerField())
+            ).filter(_role_level__lt=GroupPolicy.level_for_user(request.user))
 
         search = request.query_params.get("search", "").strip()
         if search:
             groups = groups.filter(
                 Q(name__icontains=search)
-                | Q(role_profile__code__icontains=search)
-                | Q(role_profile__description__icontains=search)
+                | Q(policy__description__icontains=search)
             )
 
         page = self.paginate_queryset(groups)
@@ -119,18 +115,18 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
 
 class RoleViewSet(viewsets.ReadOnlyModelViewSet):
-    """Expose ERP roles directly; each role owns its linked Django Group."""
+    """Expose Django Groups directly as ERP roles."""
 
     serializer_class = RoleSummarySerializer
     permission_classes = (EmployeeAccessPermission,)
     pagination_class = StandardPagination
     filter_backends = (filters.SearchFilter, filters.OrderingFilter)
-    search_fields = ("group__name", "code", "description")
-    ordering_fields = ("level", "code", "group__name")
-    ordering = ("-level", "code")
+    search_fields = ("name", "policy__description")
 
     def get_queryset(self):
-        roles = Role.objects.select_related("group").all()
+        groups = Group.objects.select_related("policy")
         if not self.request.user.is_superuser:
-            roles = roles.filter(level__lt=Role.level_for_user(self.request.user))
-        return roles.order_by(*self.ordering)
+            groups = groups.annotate(
+                _role_level=Coalesce("policy__level", Value(0), output_field=IntegerField())
+            ).filter(_role_level__lt=GroupPolicy.level_for_user(self.request.user))
+        return groups.order_by("name", "pk")

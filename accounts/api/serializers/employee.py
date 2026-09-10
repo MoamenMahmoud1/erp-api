@@ -2,10 +2,12 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import IntegerField, Value
+from django.db.models.functions import Coalesce
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from accounts.models import Employee, Role
+from accounts.models import Employee, GroupPolicy
 from organization.models import Department, Site
 from services.organization_scope import visible_site_ids
 
@@ -14,21 +16,40 @@ User = get_user_model()
 
 
 class RoleSummarySerializer(serializers.ModelSerializer):
-    name = serializers.CharField(source="group.name", read_only=True)
+    level = serializers.SerializerMethodField()
+    scope = serializers.SerializerMethodField()
+    requires_shift = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
 
     class Meta:
-        model = Role
-        fields = ("id", "code", "name", "level", "scope", "requires_shift")
+        model = Group
+        fields = ("id", "name", "level", "scope", "requires_shift", "description")
         read_only_fields = fields
+
+    def get_level(self, obj):
+        return GroupPolicy.level_for_group(obj)
+
+    def get_scope(self, obj):
+        return GroupPolicy.scope_for_group(obj)
+
+    def get_requires_shift(self, obj):
+        return GroupPolicy.requires_shift_for_group(obj)
+
+    def get_description(self, obj):
+        policy = getattr(obj, "policy", None)
+        return policy.description if policy else ""
 
 
 class GroupSummarySerializer(serializers.ModelSerializer):
-    role = RoleSummarySerializer(source="role_profile", read_only=True)
+    role = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
         fields = ("id", "name", "role")
         read_only_fields = fields
+
+    def get_role(self, obj):
+        return RoleSummarySerializer(obj, context=self.context).data
 
 
 class UserSummarySerializer(serializers.ModelSerializer):
@@ -53,20 +74,18 @@ class UserSummarySerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _get_roles(obj):
-        roles = []
-        for group in obj.groups.all():
-            role = getattr(group, "role_profile", None)
-            if role is not None:
-                roles.append(role)
-        return sorted(roles, key=lambda item: (-item.level, item.code))
+        return list(
+            obj.groups.select_related("policy")
+            .annotate(_role_level=Coalesce("policy__level", Value(0), output_field=IntegerField()))
+            .order_by("-_role_level", "name", "pk")
+        )
 
     def get_roles(self, obj):
-        return RoleSummarySerializer(self._get_roles(obj), many=True).data
+        return RoleSummarySerializer(self._get_roles(obj), many=True, context=self.context).data
 
     def get_role(self, obj):
-        roles = self._get_roles(obj)
-        role = roles[0] if roles else None
-        return RoleSummarySerializer(role).data if role else None
+        groups = self._get_roles(obj)
+        return RoleSummarySerializer(groups[0], context=self.context).data if groups else None
 
 
 class SiteSummarySerializer(serializers.ModelSerializer):
@@ -92,14 +111,14 @@ class EmployeeSerializer(serializers.ModelSerializer):
     groups = GroupSummarySerializer(source="user.groups", many=True, read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(
         source="_role_assignment",
-        queryset=Role.objects.select_related("group"),
+        queryset=Group.objects.all().select_related("policy"),
         allow_null=True,
         required=False,
         write_only=True,
     )
     group_ids = serializers.PrimaryKeyRelatedField(
         many=True,
-        queryset=Group.objects.filter(role_profile__isnull=False).select_related("role_profile"),
+        queryset=Group.objects.all(),
         required=False,
         write_only=True,
     )
@@ -144,16 +163,11 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _highest_role(user):
-        roles = []
-        for group in user.groups.all():
-            role = getattr(group, "role_profile", None)
-            if role is not None:
-                roles.append(role)
-        return sorted(roles, key=lambda item: (-item.level, item.code))[0] if roles else None
+        return GroupPolicy.highest_for_user(user)
 
     def get_role(self, obj):
-        role = self._highest_role(obj.user)
-        return RoleSummarySerializer(role).data if role else None
+        group = self._highest_role(obj.user)
+        return RoleSummarySerializer(group, context=self.context).data if group else None
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -168,21 +182,20 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if requested_role is not serializers.empty and requested_groups is not serializers.empty:
             raise ValidationError({"role_id": "Use role_id instead of group_ids when assigning an employee role."})
 
-        if actor and user and not Role.can_manage_user(actor, user):
+        if actor and user and not GroupPolicy.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
 
         if requested_role is not serializers.empty and requested_role is not None and actor and not actor.is_superuser:
-            actor_level = Role.level_for_user(actor)
-            if requested_role.level >= actor_level:
+            actor_level = GroupPolicy.level_for_user(actor)
+            if GroupPolicy.level_for_group(requested_role) >= actor_level:
                 raise ValidationError({"role_id": "You can only assign a role below your own role level."})
 
         if requested_groups is not serializers.empty and actor and not actor.is_superuser:
-            actor_level = Role.level_for_user(actor)
+            actor_level = GroupPolicy.level_for_user(actor)
             invalid_groups = [
                 group
                 for group in requested_groups
-                if getattr(group, "role_profile", None) is None
-                or group.role_profile.level >= actor_level
+                if GroupPolicy.level_for_group(group) >= actor_level
             ]
             if invalid_groups:
                 raise ValidationError({"group_ids": "You can only assign groups whose roles are below your own role level."})
@@ -196,8 +209,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
 
         site_ids = visible_site_ids(actor) if actor else None
-        actor_scope = Role.scope_for_user(actor) if actor else Role.Scope.SITE
-        if work_site and actor_scope != Role.Scope.COMPANY:
+        actor_scope = GroupPolicy.scope_for_user(actor) if actor else GroupPolicy.Scope.SITE
+        if work_site and actor_scope != GroupPolicy.Scope.COMPANY:
             if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk, pk__in=site_ids).exists():
                 raise ValidationError({"work_site": "The work site is outside your allowed scope."})
 
@@ -215,15 +228,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return attrs
 
     @staticmethod
-    def _set_role_groups(user, role):
-        non_role_groups = user.groups.filter(role_profile__isnull=True)
-        role_group = role.group if role is not None else None
-        user.groups.set([*non_role_groups, role_group] if role_group is not None else non_role_groups)
+    def _set_role_groups(user, group):
+        user.groups.set([group] if group is not None else [])
 
     @staticmethod
     def _set_legacy_role_groups(user, groups):
-        non_role_groups = user.groups.filter(role_profile__isnull=True)
-        user.groups.set([*non_role_groups, *groups])
+        user.groups.set(groups)
 
     @transaction.atomic
     def create(self, validated_data):

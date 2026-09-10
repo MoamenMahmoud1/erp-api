@@ -2,7 +2,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import Employee, EmployeeShift, Role
+from accounts.models import Employee, EmployeeShift, GroupPolicy
 
 
 class CurrentUserView(APIView):
@@ -15,7 +15,7 @@ class CurrentUserView(APIView):
             .filter(user_id=user.pk)
             .first()
         )
-        role = Role.highest_role_for_user(user)
+        role = GroupPolicy.summary_for_user(user)
         current_shift = None
         if employee:
             current_shift = (
@@ -33,19 +33,9 @@ class CurrentUserView(APIView):
                 "last_name": user.last_name,
                 "is_staff": user.is_staff,
                 "is_superuser": user.is_superuser,
-                "role_level": Role.level_for_user(user),
+                "role_level": GroupPolicy.level_for_user(user),
                 "permissions": sorted(user.get_all_permissions()),
-                "role": (
-                    {
-                        "code": role.code,
-                        "name": role.group.name,
-                        "level": role.level,
-                        "scope": role.scope,
-                        "requires_shift": role.requires_shift,
-                    }
-                    if role
-                    else None
-                ),
+                "role": role,
                 "employee": (
                     {
                         "id": employee.pk,
