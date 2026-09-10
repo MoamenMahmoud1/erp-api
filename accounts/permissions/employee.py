@@ -30,7 +30,14 @@ class EmployeeAccessPermission(BasePermission):
 
         request._employee_role_level = Role.level_for_user(request.user)
 
-        codename = self.permission_map.get(getattr(view, "action", None))
+        action = getattr(view, "action", None)
+        if action in {"groups", "agroups"}:
+            return (
+                request.user.has_perm("accounts.add_employee")
+                or request.user.has_perm("accounts.change_employee")
+            )
+
+        codename = self.permission_map.get(action)
         if not codename:
             return False
 
