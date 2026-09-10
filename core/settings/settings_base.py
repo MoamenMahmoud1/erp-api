@@ -110,7 +110,6 @@ REST_FRAMEWORK = {
         "login_burst": "5/min",
         "login_sustained": "30/hour",
         "refresh_burst": "30/min",
-        "refresh_sustained": "30/hour",
         "password_reset": "5/min",
         "signup": "5/hour",
         "email_action": "5/min",
