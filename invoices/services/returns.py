@@ -142,6 +142,7 @@ def create_sales_return(
         created_by_id=created_by_id,
         reason=reason or f"Sales return for invoice #{invoice.pk}",
         actor=actor,
+        processing_shift=processing_shift,
     )
 
     sale = (
