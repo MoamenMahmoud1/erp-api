@@ -11,9 +11,22 @@ media/
 .vscode/
 AGENTS.md
 CHANGELOG.md
+*.log
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# Frontend
+# Local / generated frontend files
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
+
+# Django migrations are kept local for this development workflow
+migrations/
