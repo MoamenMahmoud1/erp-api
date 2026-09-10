@@ -11,7 +11,7 @@ from common.money import quantize_money
 from inventory.models import StockLocation
 from organization.models import Site
 
-from accounts.models import Employee, EmployeeShift, GroupPolicy
+from accounts.models import Employee, EmployeeShift, RoleProfile
 from services.organization_scope import visible_site_ids
 
 
@@ -37,8 +37,8 @@ def current_shift_for_user(user):
 
 
 def require_open_shift(user):
-    """Return the current shift when the actor's group policy requires one."""
-    if not GroupPolicy.requires_shift_for_user(user):
+    """Return the current shift when the actor's role profile requires one."""
+    if not RoleProfile.requires_shift_for_user(user):
         return current_shift_for_user(user)
     shift = current_shift_for_user(user)
     if shift is None:
@@ -49,10 +49,10 @@ def require_open_shift(user):
 def operation_context(user, *, requested_site=None):
     """Resolve employee, permitted site and optional current shift for a mutation."""
     employee = employee_for_user(user, required=False)
-    role_scope = GroupPolicy.scope_for_user(user)
+    role_scope = RoleProfile.scope_for_user(user)
     shift = current_shift_for_user(user)
 
-    if role_scope == GroupPolicy.Scope.COMPANY:
+    if role_scope == RoleProfile.Scope.COMPANY:
         if requested_site is not None:
             site = Site.objects.filter(pk=requested_site.pk, is_active=True).first()
             if site is None:
@@ -71,7 +71,7 @@ def operation_context(user, *, requested_site=None):
         if site is None or (allowed_sites is not None and not Site.objects.filter(pk=site.pk).filter(pk__in=allowed_sites).exists()):
             raise ShiftError("The selected site is outside the user's allowed scope.")
 
-    if GroupPolicy.requires_shift_for_user(user):
+    if RoleProfile.requires_shift_for_user(user):
         if shift is None:
             raise ShiftError("An open shift is required for this operation.")
         if site is None:
