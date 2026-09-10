@@ -7,13 +7,13 @@ from django.db.models.functions import Coalesce
 SUPERUSER_ROLE_LEVEL = 1000
 
 
-class GroupPolicy(models.Model):
+class RoleProfile(models.Model):
     class Scope(models.TextChoices):
         COMPANY = "company", "Company"
         BRANCH = "branch", "Branch"
         SITE = "site", "Site"
 
-    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="policy")
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="role_profile")
     name = models.CharField(max_length=150, default="")
     level = models.PositiveSmallIntegerField(default=0, db_index=True)
     scope = models.CharField(max_length=20, choices=Scope.choices, default=Scope.SITE, db_index=True)
@@ -24,8 +24,8 @@ class GroupPolicy(models.Model):
 
     class Meta:
         ordering = ("-level", "name", "pk")
-        verbose_name = "Group policy"
-        verbose_name_plural = "Group policies"
+        verbose_name = "Role profile"
+        verbose_name_plural = "Role profiles"
 
     def __str__(self):
         return self.name or self.group.name
@@ -34,38 +34,44 @@ class GroupPolicy(models.Model):
     def level_for_group(cls, group):
         if not group:
             return 0
-        policy = getattr(group, "policy", None)
-        return int(policy.level) if policy else 0
+        profile = getattr(group, "role_profile", None)
+        return int(profile.level) if profile else 0
 
     @classmethod
     def scope_for_group(cls, group):
         if not group:
             return cls.Scope.SITE
-        policy = getattr(group, "policy", None)
-        return policy.scope if policy else cls.Scope.SITE
+        profile = getattr(group, "role_profile", None)
+        return profile.scope if profile else cls.Scope.SITE
 
     @classmethod
     def requires_shift_for_group(cls, group):
         if not group:
             return False
-        policy = getattr(group, "policy", None)
-        return bool(policy and policy.requires_shift)
+        profile = getattr(group, "role_profile", None)
+        return bool(profile and profile.requires_shift)
 
     @classmethod
     def name_for_group(cls, group):
         if not group:
             return ""
-        policy = getattr(group, "policy", None)
-        return (policy.name or group.name) if policy else group.name
+        profile = getattr(group, "role_profile", None)
+        return (profile.name or group.name) if profile else group.name
 
     @classmethod
     def highest_for_user(cls, user):
         if not user or not user.is_authenticated:
             return None
         return (
-            user.groups.select_related("policy")
-            .annotate(_role_level=Coalesce("policy__level", Value(0), output_field=IntegerField()))
-            .order_by("-_role_level", "policy__name", "name", "pk")
+            user.groups.select_related("role_profile")
+            .annotate(
+                _role_level=Coalesce(
+                    "role_profile__level",
+                    Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-_role_level", "role_profile__name", "name", "pk")
             .first()
         )
 
@@ -113,14 +119,14 @@ class GroupPolicy(models.Model):
         group = cls.highest_for_user(user)
         if group is None:
             return None
-        policy = getattr(group, "policy", None)
+        profile = getattr(group, "role_profile", None)
         return {
             "id": group.pk,
             "name": cls.name_for_group(group),
             "level": cls.level_for_group(group),
             "scope": cls.scope_for_group(group),
             "requires_shift": cls.requires_shift_for_group(group),
-            "description": policy.description if policy else "",
+            "description": profile.description if profile else "",
         }
 
     @classmethod
@@ -130,6 +136,3 @@ class GroupPolicy(models.Model):
         if actor.pk == target_user.pk or actor.is_superuser:
             return True
         return cls.level_for_user(actor) > cls.level_for_user(target_user)
-
-
-Role = GroupPolicy
