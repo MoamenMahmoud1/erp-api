@@ -18,7 +18,7 @@ class RoleSummarySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Role
-        fields = ("code", "name", "level", "scope", "requires_shift")
+        fields = ("id", "code", "name", "level", "scope", "requires_shift")
         read_only_fields = fields
 
 
@@ -88,7 +88,15 @@ class DepartmentSummarySerializer(serializers.ModelSerializer):
 class EmployeeSerializer(serializers.ModelSerializer):
     user_details = UserSummarySerializer(source="user", read_only=True)
     manager_details = UserSummarySerializer(source="manager.user", read_only=True)
+    role = serializers.SerializerMethodField()
     groups = GroupSummarySerializer(source="user.groups", many=True, read_only=True)
+    role_id = serializers.PrimaryKeyRelatedField(
+        source="_role_assignment",
+        queryset=Role.objects.select_related("group"),
+        allow_null=True,
+        required=False,
+        write_only=True,
+    )
     group_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Group.objects.filter(role_profile__isnull=False).select_related("role_profile"),
@@ -106,6 +114,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_details",
+            "role",
+            "role_id",
             "groups",
             "group_ids",
             "manager",
@@ -128,8 +138,22 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "department_details",
             "manager_details",
             "user_details",
+            "role",
             "groups",
         )
+
+    @staticmethod
+    def _highest_role(user):
+        roles = []
+        for group in user.groups.all():
+            role = getattr(group, "role_profile", None)
+            if role is not None:
+                roles.append(role)
+        return sorted(roles, key=lambda item: (-item.level, item.code))[0] if roles else None
+
+    def get_role(self, obj):
+        role = self._highest_role(obj.user)
+        return RoleSummarySerializer(role).data if role else None
 
     def validate(self, attrs):
         request = self.context.get("request")
@@ -138,10 +162,19 @@ class EmployeeSerializer(serializers.ModelSerializer):
         manager = attrs.get("manager", getattr(self.instance, "manager", None))
         work_site = attrs.get("work_site", getattr(self.instance, "work_site", None))
         department = attrs.get("department", getattr(self.instance, "department", None))
+        requested_role = attrs.get("_role_assignment", serializers.empty)
         requested_groups = attrs.get("group_ids", serializers.empty)
+
+        if requested_role is not serializers.empty and requested_groups is not serializers.empty:
+            raise ValidationError({"role_id": "Use role_id instead of group_ids when assigning an employee role."})
 
         if actor and user and not Role.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
+
+        if requested_role is not serializers.empty and requested_role is not None and actor and not actor.is_superuser:
+            actor_level = Role.level_for_user(actor)
+            if requested_role.level >= actor_level:
+                raise ValidationError({"role_id": "You can only assign a role below your own role level."})
 
         if requested_groups is not serializers.empty and actor and not actor.is_superuser:
             actor_level = Role.level_for_user(actor)
@@ -182,22 +215,34 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return attrs
 
     @staticmethod
-    def _set_role_groups(user, groups):
+    def _set_role_groups(user, role):
+        non_role_groups = user.groups.filter(role_profile__isnull=True)
+        role_group = role.group if role is not None else None
+        user.groups.set([*non_role_groups, role_group] if role_group is not None else non_role_groups)
+
+    @staticmethod
+    def _set_legacy_role_groups(user, groups):
         non_role_groups = user.groups.filter(role_profile__isnull=True)
         user.groups.set([*non_role_groups, *groups])
 
     @transaction.atomic
     def create(self, validated_data):
+        role = validated_data.pop("_role_assignment", serializers.empty)
         groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().create(validated_data)
-        if groups is not serializers.empty:
-            self._set_role_groups(employee.user, groups)
+        if role is not serializers.empty:
+            self._set_role_groups(employee.user, role)
+        elif groups is not serializers.empty:
+            self._set_legacy_role_groups(employee.user, groups)
         return employee
 
     @transaction.atomic
     def update(self, instance, validated_data):
+        role = validated_data.pop("_role_assignment", serializers.empty)
         groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().update(instance, validated_data)
-        if groups is not serializers.empty:
-            self._set_role_groups(employee.user, groups)
+        if role is not serializers.empty:
+            self._set_role_groups(employee.user, role)
+        elif groups is not serializers.empty:
+            self._set_legacy_role_groups(employee.user, groups)
         return employee

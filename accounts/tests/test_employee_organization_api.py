@@ -184,6 +184,61 @@ class EmployeeOrganizationAPITests(TestCase):
         self.assertNotIn(self.admin_role.group.pk, groups)
         self.assertEqual(groups[self.secondary_role.group.pk]["role"]["code"], self.secondary_role.code)
 
+    def test_roles_endpoint_returns_roles_directly(self):
+        response = self.client.get(reverse("accounts:role-list"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        roles = {item["id"]: item for item in response.data["results"]}
+        self.assertIn(self.employee_role.pk, roles)
+        self.assertIn(self.secondary_role.pk, roles)
+        self.assertNotIn(self.admin_role.pk, roles)
+        self.assertEqual(roles[self.secondary_role.pk]["name"], self.secondary_role.group.name)
+
+    def test_create_and_update_employee_role_directly(self):
+        target_user = self.create_target_user(suffix="direct-role")
+
+        response = self.client.post(
+            self.employee_list_url,
+            {
+                "user": target_user.pk,
+                "manager": self.actor.pk,
+                "work_site": self.branch.pk,
+                "department": self.branch_department.pk,
+                "role_id": self.secondary_role.pk,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["role"]["id"], self.secondary_role.pk)
+        target_user.refresh_from_db()
+        self.assertTrue(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
+        self.assertFalse(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
+
+        employee = Employee.objects.get(user=target_user)
+        response = self.client.patch(
+            reverse("accounts:employee-detail", kwargs={"pk": employee.pk}),
+            {"role_id": self.employee_role.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["role"]["id"], self.employee_role.pk)
+        target_user.refresh_from_db()
+        self.assertTrue(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
+        self.assertFalse(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
+
+        response = self.client.patch(
+            reverse("accounts:employee-detail", kwargs={"pk": employee.pk}),
+            {"role_id": None},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["role"])
+        target_user.refresh_from_db()
+        self.assertFalse(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
+
     def test_create_and_update_employee_groups(self):
         target_user = self.create_target_user(suffix="groups")
 

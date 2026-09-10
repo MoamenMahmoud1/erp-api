@@ -21,7 +21,7 @@ type EmployeePageOptions = {
   employees: Paginated;
   sites: Paginated;
   departments: Paginated;
-  groups: Paginated;
+  roles: Paginated;
 };
 
 function EmployeePageLoading() {
@@ -44,11 +44,11 @@ export function EmployeesPage() {
       api.employees.list('?page_size=50'),
       api.organization.sites('?page_size=50'),
       api.organization.departments('?page_size=50'),
-      api.employees.groups('?page_size=100'),
+      api.roles.list('?page_size=100'),
     ])
-      .then(([users, employees, sites, departments, groups]) => {
+      .then(([users, employees, sites, departments, roles]) => {
         if (!active) return;
-        setOptions({ users, employees, sites, departments, groups });
+        setOptions({ users, employees, sites, departments, roles });
       })
       .catch((requestError) => {
         if (!active) return;
@@ -93,14 +93,12 @@ export function EmployeesPage() {
     }));
   }, [options]);
 
-  const groupOptions = useMemo<CrudOption[]>(() => {
+  const roleOptions = useMemo<CrudOption[]>(() => {
     if (!options) return [];
-    return options.groups.results.map((group) => {
-      const role = group.role as Record<string, unknown> | null;
-      const groupName = String(group.name || 'Unnamed group');
-      const roleName = String(role?.name || role?.code || '');
-      return { value: String(group.id), label: roleName || groupName };
-    });
+    return options.roles.results.map((role) => ({
+      value: String(role.id),
+      label: String(role.name || role.code || `Role #${role.id}`),
+    }));
   }, [options]);
 
   if (error) {
@@ -125,7 +123,18 @@ export function EmployeesPage() {
       remove={api.employees.delete}
       fields={[
         { key: 'user', label: 'User', type: 'select', options: userOptions, required: true, createOnly: true },
-        { key: 'group_ids', label: 'Role', type: 'multiselect', options: groupOptions, clearable: true, editValue: (row) => Array.isArray(row.groups) ? (row.groups as Record<string, unknown>[]).map((group) => String(group.id)) : [] },
+        {
+          key: 'role_id',
+          label: 'Role',
+          type: 'select',
+          options: roleOptions,
+          clearable: true,
+          editValue: (row) => {
+            const role = row.role as Record<string, unknown> | null;
+            const userRole = (row.user_details as Record<string, unknown> | null)?.role as Record<string, unknown> | null;
+            return role?.id ?? userRole?.id ?? '';
+          },
+        },
         { key: 'manager', label: 'Manager', type: 'select', options: managerOptions, clearable: true },
         { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions, clearable: true },
         { key: 'department', label: 'Department', type: 'select', options: departmentOptions, clearable: true },
