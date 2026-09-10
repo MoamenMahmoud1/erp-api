@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -17,6 +19,15 @@ class RoleSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Role
         fields = ("code", "name", "level", "scope", "requires_shift")
+        read_only_fields = fields
+
+
+class GroupSummarySerializer(serializers.ModelSerializer):
+    role = RoleSummarySerializer(source="role_profile", read_only=True)
+
+    class Meta:
+        model = Group
+        fields = ("id", "name", "role")
         read_only_fields = fields
 
 
@@ -77,6 +88,13 @@ class DepartmentSummarySerializer(serializers.ModelSerializer):
 class EmployeeSerializer(serializers.ModelSerializer):
     user_details = UserSummarySerializer(source="user", read_only=True)
     manager_details = UserSummarySerializer(source="manager.user", read_only=True)
+    groups = GroupSummarySerializer(source="user.groups", many=True, read_only=True)
+    group_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Group.objects.filter(role_profile__isnull=False).select_related("role_profile"),
+        required=False,
+        write_only=True,
+    )
     work_site_name = serializers.CharField(source="work_site.name", read_only=True, allow_null=True)
     work_site_details = SiteSummarySerializer(source="work_site", read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True, allow_null=True)
@@ -88,6 +106,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_details",
+            "groups",
+            "group_ids",
             "manager",
             "manager_details",
             "work_site",
@@ -108,6 +128,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "department_details",
             "manager_details",
             "user_details",
+            "groups",
         )
 
     def validate(self, attrs):
@@ -117,27 +138,34 @@ class EmployeeSerializer(serializers.ModelSerializer):
         manager = attrs.get("manager", getattr(self.instance, "manager", None))
         work_site = attrs.get("work_site", getattr(self.instance, "work_site", None))
         department = attrs.get("department", getattr(self.instance, "department", None))
+        requested_groups = attrs.get("group_ids", serializers.empty)
 
         if actor and user and not Role.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
 
+        if requested_groups is not serializers.empty and actor and not actor.is_superuser:
+            actor_level = Role.level_for_user(actor)
+            invalid_groups = [
+                group
+                for group in requested_groups
+                if getattr(group, "role_profile", None) is None
+                or group.role_profile.level >= actor_level
+            ]
+            if invalid_groups:
+                raise ValidationError({"group_ids": "You can only assign groups whose roles are below your own role level."})
+
         if manager and not Employee.objects.visible_to(actor).filter(pk=manager.pk).exists():
             raise ValidationError({"manager": "You cannot assign a manager outside your visible employee tree."})
 
-        # Validate the internal organization relationship first. This gives a
-        # useful field-specific error when a partial update leaves an existing
-        # department incompatible with the newly requested site.
         if department and department.site_id and work_site and department.site_id != work_site.pk:
-            allowed = False
-            if work_site.parent_id:
-                allowed = department.site_id == work_site.parent_id
+            allowed = bool(work_site.parent_id and department.site_id == work_site.parent_id)
             if not allowed:
                 raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
 
         site_ids = visible_site_ids(actor) if actor else None
         actor_scope = Role.scope_for_user(actor) if actor else Role.Scope.SITE
         if work_site and actor_scope != Role.Scope.COMPANY:
-            if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk).filter(pk__in=site_ids).exists():
+            if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk, pk__in=site_ids).exists():
                 raise ValidationError({"work_site": "The work site is outside your allowed scope."})
 
         candidate = Employee(
@@ -152,3 +180,19 @@ class EmployeeSerializer(serializers.ModelSerializer):
         except DjangoValidationError as exc:
             raise ValidationError(exc.message_dict) from exc
         return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        groups = validated_data.pop("group_ids", serializers.empty)
+        employee = super().create(validated_data)
+        if groups is not serializers.empty:
+            employee.user.groups.set(groups)
+        return employee
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        groups = validated_data.pop("group_ids", serializers.empty)
+        employee = super().update(instance, validated_data)
+        if groups is not serializers.empty:
+            employee.user.groups.set(groups)
+        return employee
