@@ -7,7 +7,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, UserSummarySerializer
+from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, RoleSummarySerializer, UserSummarySerializer
 from accounts.models import Employee, Role
 from accounts.permissions import EmployeeAccessPermission
 from common.pagination import StandardPagination
@@ -92,7 +92,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=("get",), url_path="groups")
     def groups(self, request):
-        """Return role-backed groups the current actor is allowed to assign."""
+        """Return role-backed groups for legacy employee clients."""
         groups = (
             Group.objects.filter(role_profile__isnull=False)
             .select_related("role_profile")
@@ -116,3 +116,21 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if page is not None:
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
+
+
+class RoleViewSet(viewsets.ReadOnlyModelViewSet):
+    """Expose ERP roles directly; each role owns its linked Django Group."""
+
+    serializer_class = RoleSummarySerializer
+    permission_classes = (EmployeeAccessPermission,)
+    pagination_class = StandardPagination
+    filter_backends = (filters.SearchFilter, filters.OrderingFilter)
+    search_fields = ("group__name", "code", "description")
+    ordering_fields = ("level", "code", "group__name")
+    ordering = ("-level", "code")
+
+    def get_queryset(self):
+        roles = Role.objects.select_related("group").all()
+        if not self.request.user.is_superuser:
+            roles = roles.filter(level__lt=Role.level_for_user(self.request.user))
+        return roles.order_by(*self.ordering)
