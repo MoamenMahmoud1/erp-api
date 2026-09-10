@@ -1,13 +1,14 @@
 from django.db import transaction
 from django.utils import timezone
 
+from accounts.models import RoleProfile
+from accounts.services.employee_shift import require_open_shift
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from inventory.models import StockLocation, StockTransferRequest, StockTransferRequestItem
 from inventory.services.approval import can_approve_stock_request
 from inventory.services.transfer_stock import TransferStock
 from invoices.services.returns import create_sales_return
-from accounts.services.employee_shift import require_open_shift
 
 
 class StockTransferRequestError(InvalidBusinessOperation):
@@ -195,7 +196,7 @@ def approve_stock_transfer_request(*, request_id, approver):
             "approved_movement_id": request.approved_movement_id,
             "invoice_return_id": request.invoice_return_id,
             "reviewed_at": request.reviewed_at.isoformat() if request.reviewed_at else None,
-            "approver_role_level": request.approved_by and RoleProfile.level_for_user(approver),
+            "approver_role_level": RoleProfile.level_for_user(approver),
             "requester_role_level": RoleProfile.level_for_user(request.requested_by),
         },
     )
