@@ -1,1 +1,1 @@
-from .employee import EmployeeViewSet
+from .employee import EmployeeViewSet, RoleViewSet
