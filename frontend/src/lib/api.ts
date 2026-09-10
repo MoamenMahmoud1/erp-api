@@ -161,7 +161,7 @@ export const api = {
 };
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
-export type EmployeeRole = { id: number; code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
+export type EmployeeRole = { id: number; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean; description: string };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
 export type EmployeeVehicleOption = { id: number; name: string };
 export type EmployeeShift = { id: number; employee: number; employee_name: string; site: number; site_name: string; vehicle: number | null; vehicle_name: string | null; business_date: string; status: 'open' | 'closed'; opened_at: string; closed_at: string | null; opening_cash: number | string; closing_cash: number | string | null; closing_transfer: number | string | null; closing_notes: string };
@@ -182,5 +182,3 @@ export type DashboardOverview = {
   customer_balances: { customer_id: number; customer_name: string; balance: number | string }[];
   supplier_balances: { supplier_id: number; supplier_name: string; balance: number | string }[];
 };
-
-export function query(params: Record<string, string | number | undefined>) { const search = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); }); const value = search.toString(); return value ? `?${value}` : ''; }
