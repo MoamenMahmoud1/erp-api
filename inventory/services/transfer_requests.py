@@ -1,11 +1,13 @@
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.services.employee_shift import require_open_shift
+from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
-from inventory.models import StockLocation, StockMovement, StockTransferRequest, StockTransferRequestItem
+from inventory.models import StockLocation, StockTransferRequest, StockTransferRequestItem
+from inventory.services.approval import can_approve_stock_request
 from inventory.services.transfer_stock import TransferStock
 from invoices.services.returns import create_sales_return
+from accounts.services.employee_shift import require_open_shift
 
 
 class StockTransferRequestError(InvalidBusinessOperation):
@@ -36,11 +38,13 @@ def _validate_warehouse_manager(*, warehouse, manager, requested_by):
     if manager is None or not manager.is_active:
         raise StockTransferRequestError("The selected warehouse manager is invalid.")
     if manager.pk == requested_by.pk:
-        raise StockTransferRequestError("The representative cannot approve their own stock request.")
+        raise StockTransferRequestError("The requester cannot approve their own stock request.")
     if not warehouse.warehouse_managers.filter(pk=manager.pk).exists():
         raise StockTransferRequestError("The selected user is not assigned as a manager for this warehouse.")
     if not manager.is_superuser and not manager.has_perm("inventory.approve_stock_transfer"):
         raise StockTransferRequestError("The selected warehouse manager is not authorized to approve stock requests.")
+    if not can_approve_stock_request(approver=manager, requester=requested_by):
+        raise StockTransferRequestError("The warehouse manager must have a higher role level than the requester.")
 
     employee = getattr(manager, "employee", None)
     if employee is not None and warehouse.site_id and employee.work_site_id != warehouse.site_id:
@@ -113,6 +117,20 @@ def create_stock_transfer_request(*, requested_by, request_type, warehouse_id, w
             invoice_item=item.get("invoice_item"),
         )
 
+    record_event(
+        action="inventory.transfer_request.created",
+        entity_type="StockTransferRequest",
+        entity_id=request.pk,
+        actor_id=requested_by.pk,
+        metadata={
+            "request_type": request_type,
+            "warehouse_id": warehouse.pk,
+            "warehouse_manager_id": manager.pk,
+            "shift_id": shift.pk,
+            "item_count": len(items),
+            "reference": reference.strip(),
+        },
+    )
     return request
 
 
@@ -129,8 +147,8 @@ def approve_stock_transfer_request(*, request_id, approver):
         raise StockTransferRequestError("Only pending stock requests can be approved.")
     if request.warehouse_manager_id != approver.pk:
         raise StockTransferRequestError("Only the selected warehouse manager can approve this request.")
-    if not approver.is_superuser and not approver.has_perm("inventory.approve_stock_transfer"):
-        raise StockTransferRequestError("You are not authorized to approve stock requests.")
+    if not can_approve_stock_request(approver=approver, requester=request.requested_by):
+        raise StockTransferRequestError("Approval requires a higher role level than the requester.")
 
     if request.request_type == StockTransferRequest.RequestType.WAREHOUSE_TO_VEHICLE:
         movement = TransferStock()(
@@ -165,22 +183,51 @@ def approve_stock_transfer_request(*, request_id, approver):
     request.reviewed_at = timezone.now()
     request.rejection_reason = ""
     request.save(update_fields=("status", "approved_by", "reviewed_at", "approved_movement", "invoice_return", "rejection_reason"))
+    record_event(
+        action="inventory.transfer_request.approved",
+        entity_type="StockTransferRequest",
+        entity_id=request.pk,
+        actor_id=approver.pk,
+        metadata={
+            "request_type": request.request_type,
+            "requested_by_id": request.requested_by_id,
+            "warehouse_id": request.warehouse_id,
+            "approved_movement_id": request.approved_movement_id,
+            "invoice_return_id": request.invoice_return_id,
+            "reviewed_at": request.reviewed_at.isoformat() if request.reviewed_at else None,
+            "approver_role_level": request.approved_by and RoleProfile.level_for_user(approver),
+            "requester_role_level": RoleProfile.level_for_user(request.requested_by),
+        },
+    )
     return request
 
 
 @transaction.atomic
 def reject_stock_transfer_request(*, request_id, approver, reason=""):
-    request = StockTransferRequest.objects.select_for_update().select_related("warehouse_manager").get(pk=request_id)
+    request = StockTransferRequest.objects.select_for_update().select_related("warehouse_manager", "requested_by").get(pk=request_id)
     if request.status != StockTransferRequest.Status.PENDING:
         raise StockTransferRequestError("Only pending stock requests can be rejected.")
     if request.warehouse_manager_id != approver.pk:
         raise StockTransferRequestError("Only the selected warehouse manager can reject this request.")
-    if not approver.is_superuser and not approver.has_perm("inventory.approve_stock_transfer"):
-        raise StockTransferRequestError("You are not authorized to reject stock requests.")
+    if not can_approve_stock_request(approver=approver, requester=request.requested_by):
+        raise StockTransferRequestError("Rejection requires a higher role level than the requester.")
 
     request.status = StockTransferRequest.Status.REJECTED
     request.approved_by = approver
     request.reviewed_at = timezone.now()
     request.rejection_reason = reason.strip()
     request.save(update_fields=("status", "approved_by", "reviewed_at", "rejection_reason"))
+    record_event(
+        action="inventory.transfer_request.rejected",
+        entity_type="StockTransferRequest",
+        entity_id=request.pk,
+        actor_id=approver.pk,
+        metadata={
+            "request_type": request.request_type,
+            "requested_by_id": request.requested_by_id,
+            "warehouse_id": request.warehouse_id,
+            "reviewed_at": request.reviewed_at.isoformat() if request.reviewed_at else None,
+            "reason": request.rejection_reason,
+        },
+    )
     return request
