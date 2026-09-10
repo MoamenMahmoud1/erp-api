@@ -174,6 +174,71 @@ class EmployeeOrganizationAPITests(TestCase):
             {self.employee_role.code, self.secondary_role.code},
         )
 
+    def test_employee_groups_endpoint_returns_assignable_groups(self):
+        response = self.client.get(reverse("accounts:employee-groups"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        groups = {item["id"]: item for item in response.data["results"]}
+        self.assertIn(self.employee_role.group.pk, groups)
+        self.assertIn(self.secondary_role.group.pk, groups)
+        self.assertNotIn(self.admin_role.group.pk, groups)
+        self.assertEqual(groups[self.secondary_role.group.pk]["role"]["code"], self.secondary_role.code)
+
+    def test_create_and_update_employee_groups(self):
+        target_user = self.create_target_user(suffix="groups")
+
+        response = self.client.post(
+            self.employee_list_url,
+            {
+                "user": target_user.pk,
+                "manager": self.actor.pk,
+                "work_site": self.branch.pk,
+                "department": self.branch_department.pk,
+                "group_ids": [self.secondary_role.group.pk],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            {group["id"] for group in response.data["groups"]},
+            {self.secondary_role.group.pk},
+        )
+        target_user.refresh_from_db()
+        self.assertTrue(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
+        self.assertFalse(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
+
+        employee = Employee.objects.get(user=target_user)
+        response = self.client.patch(
+            reverse("accounts:employee-detail", kwargs={"pk": employee.pk}),
+            {"group_ids": []},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        target_user.refresh_from_db()
+        self.assertFalse(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
+        self.assertEqual(response.data["groups"], [])
+
+    def test_create_employee_rejects_equal_or_higher_group_role(self):
+        target_user = self.create_target_user(suffix="elevated")
+
+        response = self.client.post(
+            self.employee_list_url,
+            {
+                "user": target_user.pk,
+                "manager": self.actor.pk,
+                "work_site": self.branch.pk,
+                "department": self.branch_department.pk,
+                "group_ids": [self.admin_role.group.pk],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("group_ids", response.data)
+        self.assertFalse(Employee.objects.filter(user=target_user).exists())
+
     def test_create_rejects_department_from_unrelated_site(self):
         target_user = self.create_target_user(suffix="invalid")
 
