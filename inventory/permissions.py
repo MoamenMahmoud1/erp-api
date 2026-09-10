@@ -37,3 +37,17 @@ class InventoryApprovedTransferPermission(BasePermission):
             and user.is_authenticated
             and (user.is_superuser or user.has_perm("inventory.approve_stock_transfer"))
         )
+
+
+class InventoryTransferRequestPermission(BasePermission):
+    """Representatives create requests; warehouse approvers can also read them."""
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return user.has_perm("inventory.transfer_stock") or user.has_perm("inventory.approve_stock_transfer")
+        return user.has_perm("inventory.transfer_stock")
