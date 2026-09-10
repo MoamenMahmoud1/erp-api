@@ -181,12 +181,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
             raise ValidationError(exc.message_dict) from exc
         return attrs
 
+    @staticmethod
+    def _set_role_groups(user, groups):
+        non_role_groups = user.groups.filter(role_profile__isnull=True)
+        user.groups.set([*non_role_groups, *groups])
+
     @transaction.atomic
     def create(self, validated_data):
         groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().create(validated_data)
         if groups is not serializers.empty:
-            employee.user.groups.set(groups)
+            self._set_role_groups(employee.user, groups)
         return employee
 
     @transaction.atomic
@@ -194,5 +199,5 @@ class EmployeeSerializer(serializers.ModelSerializer):
         groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().update(instance, validated_data)
         if groups is not serializers.empty:
-            employee.user.groups.set(groups)
+            self._set_role_groups(employee.user, groups)
         return employee
