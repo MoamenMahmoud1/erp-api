@@ -2,13 +2,14 @@
 
 from django.contrib.auth.models import Group, Permission
 
-from accounts.models import GroupPolicy
+from accounts.models import RoleProfile
 
 
-def create_role(*, code, level, permissions=(), scope=GroupPolicy.Scope.SITE, requires_shift=False):
+def create_role(*, code, level, permissions=(), scope=RoleProfile.Scope.SITE, requires_shift=False):
     group = Group.objects.create(name=f"Test {code.title()}")
-    policy = GroupPolicy.objects.create(
+    profile = RoleProfile.objects.create(
         group=group,
+        name=code.title(),
         level=level,
         scope=scope,
         requires_shift=requires_shift,
@@ -23,4 +24,4 @@ def create_role(*, code, level, permissions=(), scope=GroupPolicy.Scope.SITE, re
             )
         )
 
-    return policy
+    return profile
