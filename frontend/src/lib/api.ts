@@ -131,12 +131,16 @@ export const api = {
     createSite: (body: Json) => jsonRequest('/organization/sites/', 'POST', body), updateSite: (id: number, body: Json) => jsonRequest(`/organization/sites/${id}/`, 'PATCH', body), deleteSite: (id: number) => request(`/organization/sites/${id}/`, { method: 'DELETE' }),
     createDepartment: (body: Json) => jsonRequest('/organization/departments/', 'POST', body), updateDepartment: (id: number, body: Json) => jsonRequest(`/organization/departments/${id}/`, 'PATCH', body), deleteDepartment: (id: number) => request(`/organization/departments/${id}/`, { method: 'DELETE' }),
   },
+  roles: {
+    list: (query = '') => request<Paginated>(`/roles/${query}`),
+    get: (id: number) => request(`/roles/${id}/`),
+  },
   products: {
     list: (query = '') => request<Paginated>(`/products/${query}`), get: (id: number) => request(`/products/${id}/`), create: (body: Json) => jsonRequest('/products/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/products/${id}/`, 'PATCH', body), delete: (id: number) => request(`/products/${id}/`, { method: 'DELETE' }),
     cartonPricings: (query = '') => request<Paginated>(`/carton-pricings/${query}`), createCartonPricing: (body: Json) => jsonRequest('/carton-pricings/', 'POST', body), updateCartonPricing: (id: number, body: Json) => jsonRequest(`/carton-pricings/${id}/`, 'PATCH', body), deleteCartonPricing: (id: number) => request(`/carton-pricings/${id}/`, { method: 'DELETE' }),
   },
   customers: { list: (query = '') => request<Paginated>(`/customers/${query}`), get: (id: number) => request(`/customers/${id}/`), create: (body: Json) => jsonRequest('/customers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/customers/${id}/`, 'PATCH', body), delete: (id: number) => request(`/customers/${id}/`, { method: 'DELETE' }) },
-  suppliers: { list: (query = '') => request<Paginated>(`/suppliers/${query}`), get: (id: number) => request(`/suppliers/${id}/`), create: (body: Json) => jsonRequest('/suppliers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body) },
+  suppliers: { list: (query = '') => request<Paginated>(`/suppliers/${query}`), get: (id: number) => request(`/suppliers/${id}/`), update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body) },
   coupons: { list: (query = '') => request<Paginated>(`/coupons/${query}`), get: (id: number) => request(`/coupons/${id}/`), create: (body: Json) => jsonRequest('/coupons/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/`, 'PATCH', body), delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }) },
   employees: {
     list: (query = '') => request<Paginated>(`/employees/${query}`), get: (id: number) => request(`/employees/${id}/`), options: (query = '') => request<Paginated>(`/employees/options/${query}`), groups: (query = '') => request<Paginated>(`/employees/groups/${query}`), create: (body: Json) => jsonRequest('/employees/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body), delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
@@ -157,7 +161,7 @@ export const api = {
 };
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
-export type EmployeeRole = { code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
+export type EmployeeRole = { id: number; code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
 export type EmployeeVehicleOption = { id: number; name: string };
 export type EmployeeShift = { id: number; employee: number; employee_name: string; site: number; site_name: string; vehicle: number | null; vehicle_name: string | null; business_date: string; status: 'open' | 'closed'; opened_at: string; closed_at: string | null; opening_cash: number | string; closing_cash: number | string | null; closing_transfer: number | string | null; closing_notes: string };
