@@ -8,6 +8,7 @@ from payments.models import PaymentAllocation, PaymentRefund, PaymentTransaction
 
 class CollectionSerializer(serializers.Serializer):
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
+    invoice = serializers.IntegerField(min_value=1, required=False, allow_null=True)
     cash_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"), default=Decimal("0"))
     transfer_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0"), default=Decimal("0"))
 
