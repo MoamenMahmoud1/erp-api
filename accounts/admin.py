@@ -3,10 +3,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
-from django.urls import reverse
-from django.utils.html import format_html
 
-from .models import Employee, Role
+from .models import Role
 
 User = get_user_model()
 
@@ -83,61 +81,6 @@ class CustomUserAdmin(BaseUserAdmin):
 class GroupAdmin(BaseGroupAdmin):
     search_fields = ("name",)
     ordering = ("name",)
-
-
-@admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "user_link",
-        "manager",
-        "department",
-        "work_site",
-        "created_at",
-    )
-
-    search_fields = (
-        "user__username",
-        "user__email",
-        "user__first_name",
-        "user__last_name",
-    )
-
-    list_filter = (
-        "department",
-        "work_site",
-        "created_at",
-    )
-
-    ordering = ("-created_at",)
-
-    list_select_related = (
-        "user",
-        "manager",
-        "manager__user",
-        "department",
-        "work_site",
-    )
-
-    autocomplete_fields = (
-        "user",
-        "manager",
-        "department",
-        "work_site",
-    )
-
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-    )
-
-    @admin.display(description="User", ordering="user__username")
-    def user_link(self, obj):
-        url = reverse(
-            "admin:accounts_customusermodel_change",
-            args=[obj.user_id],
-        )
-        return format_html('<a href="{}">{}</a>', url, obj.user)
 
 
 @admin.register(Role)
