@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import Employee, EmployeeShift
+from customers.models import Customer
 from inventory.api.transfer_requests import (
     StockTransferRequestApproveView,
     StockTransferRequestListCreateView,
@@ -104,7 +105,7 @@ class StockTransferRequestAPITests(TestCase):
         )
         Employee.objects.create(user=self.rep, work_site=site)
         Employee.objects.create(user=self.manager, work_site=site)
-        self.customer = __import__("customers.models", fromlist=["Customer"]).Customer.objects.create(name="Return Customer")
+        self.customer = Customer.objects.create(name="Return Customer")
         self.product = Product.objects.create(
             name="Approved Widget",
             purchase_price="50.00",
