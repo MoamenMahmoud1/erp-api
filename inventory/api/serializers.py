@@ -55,13 +55,17 @@ class StockBatchBalanceSerializer(serializers.ModelSerializer):
 
 class StockBalanceSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
+    selling_price = serializers.DecimalField(source="product.selling_price", max_digits=12, decimal_places=2, read_only=True)
     location_name = serializers.CharField(source="location.name", read_only=True)
     site_name = serializers.CharField(source="location.site.name", read_only=True, allow_null=True)
     average_unit_cost = serializers.DecimalField(max_digits=14, decimal_places=2, read_only=True)
 
     class Meta:
         model = StockBalance
-        fields = ("id", "product", "product_name", "location", "location_name", "site_name", "quantity", "total_cost", "average_unit_cost", "updated_at")
+        fields = (
+            "id", "product", "product_name", "selling_price", "location", "location_name",
+            "site_name", "quantity", "total_cost", "average_unit_cost", "updated_at",
+        )
         read_only_fields = fields
 
 
