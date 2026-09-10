@@ -191,7 +191,7 @@ def create_sales_return(
         raise InvalidBusinessOperation("Return source and destination must be different locations.")
 
     movement = StockMovement.objects.create(
-        movement_type=StockMovement.MovementType.SALEABLE_RETURN,
+        movement_type=StockMovement.MovementType.TRANSFER if source is not None else StockMovement.MovementType.SALEABLE_RETURN,
         source_location=source,
         destination_location=return_destination,
         shift=shift or invoice.shift,
