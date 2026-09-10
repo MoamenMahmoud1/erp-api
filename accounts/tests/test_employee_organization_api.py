@@ -68,6 +68,11 @@ class EmployeeOrganizationAPITests(TestCase):
             level=10,
             permissions=("view_employee",),
         )
+        cls.secondary_role = create_role(
+            code="organization-supervisor",
+            level=30,
+            permissions=("view_employee",),
+        )
 
         cls.actor_user = User.objects.create_user(
             username="organization-admin",
@@ -129,6 +134,45 @@ class EmployeeOrganizationAPITests(TestCase):
         employee = Employee.objects.get(user=target_user)
         self.assertEqual(employee.work_site, self.branch)
         self.assertEqual(employee.department, self.branch_department)
+
+    def test_employee_list_returns_roles_and_organization_details(self):
+        target_user = self.create_target_user(suffix="details")
+        target_user.groups.add(self.secondary_role.group)
+        employee = Employee.objects.create(
+            user=target_user,
+            manager=self.actor,
+            work_site=self.branch,
+            department=self.branch_department,
+        )
+
+        response = self.client.get(self.employee_list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(item for item in response.data["results"] if item["id"] == employee.pk)
+
+        self.assertEqual(row["user_details"]["role"]["code"], self.secondary_role.code)
+        self.assertEqual(
+            {role["code"] for role in row["user_details"]["roles"]},
+            {self.employee_role.code, self.secondary_role.code},
+        )
+        self.assertEqual(row["work_site_details"]["id"], self.branch.pk)
+        self.assertEqual(row["work_site_details"]["code"], self.branch.code)
+        self.assertEqual(row["department_details"]["id"], self.branch_department.pk)
+        self.assertEqual(row["department_details"]["code"], self.branch_department.code)
+
+    def test_employee_options_returns_user_roles(self):
+        target_user = self.create_target_user(suffix="options")
+        target_user.groups.add(self.secondary_role.group)
+
+        response = self.client.get(reverse("accounts:employee-options"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        row = next(item for item in response.data["results"] if item["id"] == target_user.pk)
+        self.assertEqual(row["role"]["code"], self.secondary_role.code)
+        self.assertEqual(
+            {role["code"] for role in row["roles"]},
+            {self.employee_role.code, self.secondary_role.code},
+        )
 
     def test_create_rejects_department_from_unrelated_site(self):
         target_user = self.create_target_user(suffix="invalid")
