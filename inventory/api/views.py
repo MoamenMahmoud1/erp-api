@@ -7,7 +7,7 @@ from common.pagination import StandardPagination
 from inventory.api.filters import StockBalanceFilter, StockBatchBalanceFilter, StockMovementFilter
 from inventory.api.serializers import StockBalanceSerializer, StockBatchBalanceSerializer, StockLocationSerializer, StockMovementSerializer, TransferInputSerializer
 from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement
-from inventory.permissions import InventoryReadPermission, InventoryTransferPermission
+from inventory.permissions import InventoryApprovedTransferPermission, InventoryReadPermission
 from inventory.services.transfer_stock import TransferStock
 
 
@@ -71,7 +71,7 @@ class MovementListView(generics.ListAPIView):
 
 class TransferView(generics.GenericAPIView):
     serializer_class = TransferInputSerializer
-    permission_classes = (InventoryTransferPermission,)
+    permission_classes = (InventoryApprovedTransferPermission,)
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
