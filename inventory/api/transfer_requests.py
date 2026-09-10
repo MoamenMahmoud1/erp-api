@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from inventory.models import StockTransferRequest, StockTransferRequestItem
 from inventory.permissions import InventoryTransferRequestPermission, InventoryReadPermission
+from inventory.services.approval import can_approve_stock_request
 from inventory.services.transfer_requests import (
     StockTransferRequestError,
     approve_stock_transfer_request,
@@ -135,7 +136,8 @@ class WarehouseManagerOptionsView(generics.ListAPIView):
         managers = [
             user
             for user in warehouse.warehouse_managers.all()
-            if user.is_active and (user.is_superuser or user.has_perm("inventory.approve_stock_transfer"))
+            if user.is_active
+            and can_approve_stock_request(approver=user, requester=self.request.user)
         ]
         return managers
 
