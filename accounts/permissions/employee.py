@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-from accounts.models import GroupPolicy
+from accounts.models import RoleProfile
 
 
 class EmployeeAccessPermission(BasePermission):
@@ -30,7 +30,7 @@ class EmployeeAccessPermission(BasePermission):
         if request.user.is_superuser:
             return True
 
-        request._employee_role_level = GroupPolicy.level_for_user(request.user)
+        request._employee_role_level = RoleProfile.level_for_user(request.user)
 
         action = getattr(view, "action", None)
         codename = self.permission_map.get(action)
@@ -51,6 +51,6 @@ class EmployeeAccessPermission(BasePermission):
             "destroy",
             "adestroy",
         }:
-            return GroupPolicy.can_manage_user(request.user, obj.user)
+            return RoleProfile.can_manage_user(request.user, obj.user)
 
         return True
