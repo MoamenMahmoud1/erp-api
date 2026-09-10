@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 
-from accounts.models import GroupPolicy
+from accounts.models import RoleProfile
 from authsession.cache import auth_session_cache_key
 from authsession.models import AuthSession
 
@@ -64,15 +64,15 @@ class PermissionInvalidationTests(TestCase):
 
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
 
-    def test_group_policy_change_invalidates_member_session_cache(self):
+    def test_role_profile_change_invalidates_member_session_cache(self):
         group = Group.objects.create(name="Managed Role")
         group.user_set.add(self.user)
-        policy = GroupPolicy.objects.create(group=group, level=10)
+        profile = RoleProfile.objects.create(group=group, level=10)
         session_id = self._session()
         self.assertIsNotNone(cache.get(auth_session_cache_key(session_id)))
 
-        policy.level = 20
-        policy.save(update_fields=("level", "updated_at"))
+        profile.level = 20
+        profile.save(update_fields=("level", "updated_at"))
 
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
 
