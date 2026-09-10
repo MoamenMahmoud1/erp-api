@@ -6,6 +6,7 @@ from authentication.throttling import SensitiveActionThrottle
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.pagination import StandardPagination
 from common.observability import log_operation
+from invoices.models import Invoice
 from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer, RefundInputSerializer
 from payments.models import PaymentTransaction
 from payments.permissions import CollectionPermission, RefundPermission, TransactionReadPermission
@@ -25,13 +26,25 @@ class CollectionView(generics.GenericAPIView):
             return Response({"detail": "Idempotency-Key header is required for payment collections.", "code": "idempotency_key_required"}, status=400)
         data = serializer.validated_data
         customer = data["customer"]
+        invoice_id = data.get("invoice")
+        if invoice_id is not None:
+            invoice = Invoice.objects.filter(pk=invoice_id, customer=customer).first()
+            if invoice is None:
+                return Response({"detail": "The selected invoice does not belong to this customer.", "code": "invoice_customer_mismatch"}, status=400)
+
         try:
             result = process_idempotent(
                 key=key,
                 user_id=request.user.pk,
                 path=request.path,
-                data={"customer": customer.pk, "cash_amount": str(data["cash_amount"]), "transfer_amount": str(data["transfer_amount"])},
+                data={
+                    "customer": customer.pk,
+                    "invoice": invoice_id,
+                    "cash_amount": str(data["cash_amount"]),
+                    "transfer_amount": str(data["transfer_amount"]),
+                },
                 customer=customer,
+                invoice_id=invoice_id,
                 cash_amount=data["cash_amount"],
                 transfer_amount=data["transfer_amount"],
                 actor=request.user,
