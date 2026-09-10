@@ -16,10 +16,24 @@ class InventoryReadPermission(BasePermission):
 
 
 class InventoryTransferPermission(BasePermission):
+    """Legacy permission kept for callers that can initiate transfer operations."""
+
     def has_permission(self, request, view):
         user = getattr(request, "user", None)
         return bool(
             user
             and user.is_authenticated
             and (user.is_superuser or user.has_perm("inventory.transfer_stock"))
+        )
+
+
+class InventoryApprovedTransferPermission(BasePermission):
+    """Only warehouse approvers can execute a direct stock movement endpoint."""
+
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        return bool(
+            user
+            and user.is_authenticated
+            and (user.is_superuser or user.has_perm("inventory.approve_stock_transfer"))
         )
