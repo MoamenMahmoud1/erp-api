@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import Employee, EmployeeShift
@@ -9,7 +10,7 @@ from inventory.api.transfer_requests import (
     StockTransferRequestListCreateView,
 )
 from inventory.api.views import LocationListView, MovementListView, StockBalanceListView, TransferView
-from inventory.models import StockBalance, StockTransferRequest
+from inventory.models import StockBalance, StockLocation, StockTransferRequest
 from organization.models import Company, Site
 from products.models import Product
 
@@ -118,7 +119,7 @@ class StockTransferRequestAPITests(TestCase):
             employee=self.rep.employee,
             site=site,
             vehicle=self.vehicle,
-            business_date="2026-09-10",
+            business_date=timezone.localdate(),
             status=EmployeeShift.Status.OPEN,
             opening_cash="0.00",
         )
