@@ -7,7 +7,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from accounts.models import Employee, Role
+from accounts.models import Employee, RoleProfile
 from organization.api.serializers import DepartmentSerializer, SiteSerializer
 from organization.models import Company, Department, Site
 
@@ -46,11 +46,11 @@ class OrganizationAPITestBase(TestCase):
         )
 
         cls.group = Group.objects.create(name="Organization API Test Group")
-        Role.objects.create(
+        RoleProfile.objects.create(
             group=cls.group,
-            code="organization-api-branch",
+            name="Organization API Branch",
             level=20,
-            scope=Role.Scope.BRANCH,
+            scope=RoleProfile.Scope.BRANCH,
         )
         cls.user = User.objects.create_user(
             username="organization-api-user",
