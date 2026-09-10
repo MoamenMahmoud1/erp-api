@@ -14,7 +14,7 @@ def _json_safe(value):
 
 
 @transaction.atomic
-def process_idempotent(*, key, user_id, path, data, customer, cash_amount, transfer_amount, actor=None):
+def process_idempotent(*, key, user_id, path, data, customer, cash_amount, transfer_amount, invoice_id=None, actor=None):
     record, matches = load_or_create_key(key=key, user_id=user_id, path=path, data=data)
     if not matches:
         return "mismatch"
@@ -26,6 +26,7 @@ def process_idempotent(*, key, user_id, path, data, customer, cash_amount, trans
         cash_amount=cash_amount,
         transfer_amount=transfer_amount,
         collected_by_id=user_id,
+        invoice_id=invoice_id,
         actor=actor,
     )
     if payment is None:
