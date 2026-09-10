@@ -1,6 +1,6 @@
 from django.db.models import Q, Subquery
 
-from accounts.models import Employee, GroupPolicy
+from accounts.models import Employee, RoleProfile
 
 
 def visible_employee_user_ids(user):
@@ -11,12 +11,12 @@ def visible_employee_user_ids(user):
 
 
 def visible_site_ids(user):
-    """Return the site ids an actor may access from their group policy scope."""
+    """Return the site ids an actor may access from their role scope."""
     if not user or not user.is_authenticated or user.is_superuser:
         return None
 
-    role_scope = GroupPolicy.scope_for_user(user)
-    if role_scope == GroupPolicy.Scope.COMPANY:
+    role_scope = RoleProfile.scope_for_user(user)
+    if role_scope == RoleProfile.Scope.COMPANY:
         return None
 
     employee = getattr(user, "employee", None)
@@ -26,7 +26,7 @@ def visible_site_ids(user):
     from organization.models import Site
 
     site = employee.work_site
-    if role_scope == GroupPolicy.Scope.BRANCH:
+    if role_scope == RoleProfile.Scope.BRANCH:
         branch_id = site.pk if site.site_type == Site.Type.BRANCH else site.parent_id
         if branch_id is None:
             return Subquery(Site.objects.filter(pk=site.pk).values("pk"))
@@ -38,7 +38,7 @@ def visible_site_ids(user):
 
 
 def filter_by_actor_scope(queryset, *, user, owner_field="created_by_id", site_field=None):
-    """Scope records by company/branch/site policy and actor ownership.
+    """Scope records by company/branch/site role scope and actor ownership.
 
     Explicit ownership is retained for legacy rows that predate site assignment;
     this never grants access to another user's site-bound row.
@@ -48,8 +48,8 @@ def filter_by_actor_scope(queryset, *, user, owner_field="created_by_id", site_f
     if user.is_superuser:
         return queryset
 
-    role_scope = GroupPolicy.scope_for_user(user)
-    if site_field and role_scope != GroupPolicy.Scope.COMPANY:
+    role_scope = RoleProfile.scope_for_user(user)
+    if site_field and role_scope != RoleProfile.Scope.COMPANY:
         sites = visible_site_ids(user)
         if sites is None:
             return queryset
