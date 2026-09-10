@@ -97,7 +97,7 @@ export function EmployeesPage() {
     if (!options) return [];
     return options.roles.results.map((role) => ({
       value: String(role.id),
-      label: String(role.name || role.code || `Role #${role.id}`),
+      label: String(role.name || `Role #${role.id}`),
     }));
   }, [options]);
 
@@ -148,7 +148,7 @@ export function EmployeesPage() {
             if (!user) return '—';
             const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || String(user.username || '—');
             const role = user.role as Record<string, unknown> | null;
-            const roleName = String(role?.name || role?.code || '');
+            const roleName = String(role?.name || '');
             return (
               <Stack gap={2}>
                 <Text size="sm" fw={600}>{name}</Text>
