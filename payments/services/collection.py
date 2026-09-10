@@ -25,7 +25,7 @@ class NoConfirmableInvoicesError(PaymentError):
 
 
 @transaction.atomic
-def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=None):
+def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=None, invoice_id=None):
     cash = quantize_money(cash_amount)
     transfer = quantize_money(transfer_amount)
     if cash < 0 or transfer < 0:
@@ -42,6 +42,8 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     site_id = site.pk if site else None
 
     invoices = Invoice.objects.filter(customer=customer, status=Invoice.Status.CONFIRMED)
+    if invoice_id is not None:
+        invoices = invoices.filter(pk=invoice_id)
     if actor is not None:
         invoices = invoices.visible_to(actor)
     invoices = list(
@@ -59,6 +61,8 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
             total_outstanding += due
 
     if not outstanding:
+        if invoice_id is not None:
+            raise NoConfirmableInvoicesError("The selected invoice has no outstanding balance or is not accessible.")
         raise NoConfirmableInvoicesError("The customer has no outstanding confirmed invoices.")
     if total_received > total_outstanding:
         raise OverpaymentError("The received amount exceeds the outstanding balance.")
@@ -105,6 +109,12 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         entity_type="PaymentTransaction",
         entity_id=payment.pk,
         actor_id=collected_by_id,
-        metadata={"customer_id": customer.pk, "site_id": site_id, "shift_id": payment.shift_id, "invoices_allocated": allocated_invoices},
+        metadata={
+            "customer_id": customer.pk,
+            "invoice_id": invoice_id,
+            "site_id": site_id,
+            "shift_id": payment.shift_id,
+            "invoices_allocated": allocated_invoices,
+        },
     )
     return payment
