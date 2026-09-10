@@ -81,7 +81,7 @@ class GroupPolicyInline(admin.StackedInline):
     model = GroupPolicy
     extra = 1
     max_num = 1
-    fields = ("level", "scope", "requires_shift", "description")
+    fields = ("name", "level", "scope", "requires_shift", "description")
 
 
 @admin.register(Group)
@@ -94,15 +94,16 @@ class GroupAdmin(BaseGroupAdmin):
 @admin.register(GroupPolicy)
 class GroupPolicyAdmin(admin.ModelAdmin):
     list_display = (
+        "name",
         "group",
         "level",
         "scope",
         "requires_shift",
         "updated_at",
     )
-    search_fields = ("group__name", "description")
+    search_fields = ("name", "group__name", "description")
     list_filter = ("scope", "requires_shift")
-    ordering = ("-level", "group__name")
+    ordering = ("name", "-level", "group__name")
     list_select_related = ("group",)
     autocomplete_fields = ("group",)
     readonly_fields = ("created_at", "updated_at")
