@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Center, Loader, Text } from '@mantine/core';
+import { Badge, Card, Center, Loader, Stack, Text } from '@mantine/core';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
 import { api, type Paginated } from '../lib/api';
@@ -125,7 +125,17 @@ export function EmployeesPage() {
             const user = row.user_details as Record<string, unknown> | null;
             if (!user) return '—';
             const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || String(user.username || '—');
-            return `${name} (@${user.username})`;
+            const role = user.role as Record<string, unknown> | null;
+            const roleName = String(role?.name || role?.code || '');
+            return (
+              <Stack gap={2}>
+                <Text size="sm" fw={600}>{name}</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text size="xs" c="dimmed">@{String(user.username || '—')}</Text>
+                  {roleName && <Badge size="xs" variant="light" color="erp">{roleName}</Badge>}
+                </div>
+              </Stack>
+            );
           },
         },
         {
