@@ -6,7 +6,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.api.serializers import EmployeeSerializer
+from accounts.api.serializers import EmployeeSerializer, UserSummarySerializer
 from accounts.models import Employee, Role
 from accounts.permissions import EmployeeAccessPermission
 from common.pagination import StandardPagination
@@ -43,6 +43,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 "work_site",
                 "department",
             )
+            .prefetch_related(
+                "user__groups__role_profile",
+                "manager__user__groups__role_profile",
+            )
             .order_by(*self.ordering)
         )
 
@@ -52,7 +56,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = User.objects.filter(
             is_active=True,
             employee__isnull=True,
-        )
+        ).prefetch_related("groups__role_profile")
 
         if not request.user.is_superuser:
             actor_level = Role.level_for_user(request.user)
@@ -80,17 +84,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = users.order_by("first_name", "last_name", "username", "pk")
         page = self.paginate_queryset(users)
         rows = page if page is not None else users
-        data = [
-            {
-                "id": user.pk,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "is_staff": user.is_staff,
-            }
-            for user in rows
-        ]
+        data = UserSummarySerializer(rows, many=True, context={"request": request}).data
         if page is not None:
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
