@@ -157,7 +157,7 @@ class EmployeeOrganizationAPITests(TestCase):
         )
         self.assertEqual(row["work_site_details"]["id"], self.branch.pk)
         self.assertEqual(row["work_site_details"]["code"], self.branch.code)
-        self.assertEqual(row["department_details"]["id"], self.branch_department.code if False else self.branch_department.pk)
+        self.assertEqual(row["department_details"]["id"], self.branch_department.pk)
         self.assertEqual(row["department_details"]["code"], self.branch_department.code)
 
     def test_employee_options_returns_user_roles(self):
