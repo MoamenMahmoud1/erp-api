@@ -14,6 +14,7 @@ class GroupPolicy(models.Model):
         SITE = "site", "Site"
 
     group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name="policy")
+    name = models.CharField(max_length=150, default="")
     level = models.PositiveSmallIntegerField(default=0, db_index=True)
     scope = models.CharField(max_length=20, choices=Scope.choices, default=Scope.SITE, db_index=True)
     requires_shift = models.BooleanField(default=False)
@@ -22,12 +23,12 @@ class GroupPolicy(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ("-level", "group__name", "pk")
+        ordering = ("-level", "name", "pk")
         verbose_name = "Group policy"
         verbose_name_plural = "Group policies"
 
     def __str__(self):
-        return f"{self.group.name} ({self.level})"
+        return self.name or self.group.name
 
     @classmethod
     def level_for_group(cls, group):
@@ -51,13 +52,20 @@ class GroupPolicy(models.Model):
         return bool(policy and policy.requires_shift)
 
     @classmethod
+    def name_for_group(cls, group):
+        if not group:
+            return ""
+        policy = getattr(group, "policy", None)
+        return (policy.name or group.name) if policy else group.name
+
+    @classmethod
     def highest_for_user(cls, user):
         if not user or not user.is_authenticated:
             return None
         return (
             user.groups.select_related("policy")
             .annotate(_role_level=Coalesce("policy__level", Value(0), output_field=IntegerField()))
-            .order_by("-_role_level", "name", "pk")
+            .order_by("-_role_level", "policy__name", "name", "pk")
             .first()
         )
 
@@ -108,7 +116,7 @@ class GroupPolicy(models.Model):
         policy = getattr(group, "policy", None)
         return {
             "id": group.pk,
-            "name": group.name,
+            "name": cls.name_for_group(group),
             "level": cls.level_for_group(group),
             "scope": cls.scope_for_group(group),
             "requires_shift": cls.requires_shift_for_group(group),
@@ -124,6 +132,4 @@ class GroupPolicy(models.Model):
         return cls.level_for_user(actor) > cls.level_for_user(target_user)
 
 
-# Temporary import compatibility for code outside this refactor. The database model is GroupPolicy;
-# Group itself is the role identity.
 Role = GroupPolicy
