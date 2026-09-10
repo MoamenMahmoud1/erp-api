@@ -7,7 +7,7 @@ from django.db.models.functions import Coalesce
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
-from accounts.models import Employee, GroupPolicy
+from accounts.models import Employee, RoleProfile
 from organization.models import Department, Site
 from services.organization_scope import visible_site_ids
 
@@ -28,20 +28,20 @@ class RoleSummarySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_name(self, obj):
-        return GroupPolicy.name_for_group(obj)
+        return RoleProfile.name_for_group(obj)
 
     def get_level(self, obj):
-        return GroupPolicy.level_for_group(obj)
+        return RoleProfile.level_for_group(obj)
 
     def get_scope(self, obj):
-        return GroupPolicy.scope_for_group(obj)
+        return RoleProfile.scope_for_group(obj)
 
     def get_requires_shift(self, obj):
-        return GroupPolicy.requires_shift_for_group(obj)
+        return RoleProfile.requires_shift_for_group(obj)
 
     def get_description(self, obj):
-        policy = getattr(obj, "policy", None)
-        return policy.description if policy else ""
+        profile = getattr(obj, "role_profile", None)
+        return profile.description if profile else ""
 
 
 class GroupSummarySerializer(serializers.ModelSerializer):
@@ -79,13 +79,23 @@ class UserSummarySerializer(serializers.ModelSerializer):
     @staticmethod
     def _get_roles(obj):
         return list(
-            obj.groups.select_related("policy")
-            .annotate(_role_level=Coalesce("policy__level", Value(0), output_field=IntegerField()))
-            .order_by("-_role_level", "policy__name", "name", "pk")
+            obj.groups.select_related("role_profile")
+            .annotate(
+                _role_level=Coalesce(
+                    "role_profile__level",
+                    Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("-_role_level", "role_profile__name", "name", "pk")
         )
 
     def get_roles(self, obj):
-        return RoleSummarySerializer(self._get_roles(obj), many=True, context=self.context).data
+        return RoleSummarySerializer(
+            self._get_roles(obj),
+            many=True,
+            context=self.context,
+        ).data
 
     def get_role(self, obj):
         groups = self._get_roles(obj)
@@ -115,7 +125,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     groups = GroupSummarySerializer(source="user.groups", many=True, read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(
         source="_role_assignment",
-        queryset=Group.objects.all().select_related("policy"),
+        queryset=Group.objects.all().select_related("role_profile"),
         allow_null=True,
         required=False,
         write_only=True,
@@ -167,7 +177,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def _highest_role(user):
-        return GroupPolicy.highest_for_user(user)
+        return RoleProfile.highest_for_user(user)
 
     def get_role(self, obj):
         group = self._highest_role(obj.user)
@@ -186,20 +196,20 @@ class EmployeeSerializer(serializers.ModelSerializer):
         if requested_role is not serializers.empty and requested_groups is not serializers.empty:
             raise ValidationError({"role_id": "Use role_id instead of group_ids when assigning an employee role."})
 
-        if actor and user and not GroupPolicy.can_manage_user(actor, user):
+        if actor and user and not RoleProfile.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
 
         if requested_role is not serializers.empty and requested_role is not None and actor and not actor.is_superuser:
-            actor_level = GroupPolicy.level_for_user(actor)
-            if GroupPolicy.level_for_group(requested_role) >= actor_level:
+            actor_level = RoleProfile.level_for_user(actor)
+            if RoleProfile.level_for_group(requested_role) >= actor_level:
                 raise ValidationError({"role_id": "You can only assign a role below your own role level."})
 
         if requested_groups is not serializers.empty and actor and not actor.is_superuser:
-            actor_level = GroupPolicy.level_for_user(actor)
+            actor_level = RoleProfile.level_for_user(actor)
             invalid_groups = [
                 group
                 for group in requested_groups
-                if GroupPolicy.level_for_group(group) >= actor_level
+                if RoleProfile.level_for_group(group) >= actor_level
             ]
             if invalid_groups:
                 raise ValidationError({"group_ids": "You can only assign groups whose roles are below your own role level."})
@@ -213,8 +223,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
 
         site_ids = visible_site_ids(actor) if actor else None
-        actor_scope = GroupPolicy.scope_for_user(actor) if actor else GroupPolicy.Scope.SITE
-        if work_site and actor_scope != GroupPolicy.Scope.COMPANY:
+        actor_scope = RoleProfile.scope_for_user(actor) if actor else RoleProfile.Scope.SITE
+        if work_site and actor_scope != RoleProfile.Scope.COMPANY:
             if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk, pk__in=site_ids).exists():
                 raise ValidationError({"work_site": "The work site is outside your allowed scope."})
 
