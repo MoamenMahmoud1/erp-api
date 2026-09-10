@@ -101,6 +101,29 @@ def _validate_return_destination(*, destination_location_id, invoice):
     return destination
 
 
+def _validate_return_source(*, source_location_id, invoice, shift):
+    if source_location_id is None:
+        return None
+    source = (
+        StockLocation.objects
+        .filter(
+            pk=source_location_id,
+            location_type=StockLocation.LocationType.SALES_VEHICLE,
+            is_active=True,
+        )
+        .first()
+    )
+    if source is None:
+        raise InvalidBusinessOperation("The return source must be an active sales vehicle.")
+    if invoice.site_id and source.site_id != invoice.site_id:
+        raise InvalidBusinessOperation("The return source must belong to the invoice site.")
+    if shift is not None and source.pk != shift.vehicle_id:
+        raise InvalidBusinessOperation("The return source must match the representative's stored vehicle.")
+    if source.employee_id != invoice.created_by_id:
+        raise InvalidBusinessOperation("The return source does not belong to the invoice representative.")
+    return source
+
+
 @transaction.atomic
 def create_sales_return(
     *,
@@ -111,6 +134,7 @@ def create_sales_return(
     actor=None,
     processing_shift=None,
     return_destination_location_id=None,
+    return_source_location_id=None,
 ):
     invoice_qs = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     invoice = invoice_qs.select_for_update().prefetch_related("items__return_items", "items__product").get(pk=invoice_id)
@@ -124,6 +148,11 @@ def create_sales_return(
     destination = _validate_return_destination(
         destination_location_id=return_destination_location_id,
         invoice=invoice,
+    )
+    source = _validate_return_source(
+        source_location_id=return_source_location_id,
+        invoice=invoice,
+        shift=shift,
     )
 
     cleaned, returned_subtotal = _validate_return_items(invoice, items)
@@ -158,20 +187,39 @@ def create_sales_return(
         raise InvalidBusinessOperation("Cannot return sale: original sale movement was not found.")
 
     return_destination = destination or sale.source_location
+    if source is not None and return_destination.pk == source.pk:
+        raise InvalidBusinessOperation("Return source and destination must be different locations.")
+
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.SALEABLE_RETURN,
+        source_location=source,
         destination_location=return_destination,
         shift=shift or invoice.shift,
         created_by_id=created_by_id,
         reference=f"Return Invoice #{invoice.pk}",
     )
     for line, quantity in cleaned:
-        allocations = _return_allocations(
-            invoice_id=invoice.pk,
-            sale=sale,
-            product_id=line.product_id,
-            quantity=quantity,
-        )
+        if source is not None:
+            balance = StockBalanceService.decrease(
+                location=source,
+                product=line.product,
+                quantity=quantity,
+            )
+            allocations = getattr(balance, "_stock_allocations", None) or [
+                {
+                    "batch": None,
+                    "quantity": quantity,
+                    "unit_cost": balance._removed_unit_cost,
+                }
+            ]
+        else:
+            allocations = _return_allocations(
+                invoice_id=invoice.pk,
+                sale=sale,
+                product_id=line.product_id,
+                quantity=quantity,
+            )
+
         for allocation in allocations:
             unit_cost = allocation["unit_cost"] or line.cost_price or line.product.purchase_price
             StockBalanceService.increase(
@@ -211,6 +259,7 @@ def create_sales_return(
         metadata={
             "invoice_id": invoice.pk,
             "stock_movement_id": movement.pk,
+            "source_location_id": source.pk if source else None,
             "destination_location_id": return_destination.pk,
             "site_id": sales_return.site_id,
             "shift_id": sales_return.shift_id,
@@ -232,6 +281,7 @@ class CreateSalesReturn:
         actor=None,
         processing_shift=None,
         return_destination_location_id=None,
+        return_source_location_id=None,
     ):
         return create_sales_return(
             invoice_id=invoice_id,
@@ -241,4 +291,5 @@ class CreateSalesReturn:
             actor=actor,
             processing_shift=processing_shift,
             return_destination_location_id=return_destination_location_id,
+            return_source_location_id=return_source_location_id,
         )
