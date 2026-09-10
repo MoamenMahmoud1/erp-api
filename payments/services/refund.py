@@ -18,7 +18,16 @@ class RefundAmountTooLarge(RefundError):
 
 
 @transaction.atomic
-def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason="", actor=None):
+def refund_payment(
+    *,
+    transaction_id,
+    invoice_id,
+    amount,
+    created_by_id,
+    reason="",
+    actor=None,
+    processing_shift=None,
+):
     amount = quantize_money(amount)
     if amount <= 0:
         raise InvalidMoney("Refund amount must be greater than zero.")
@@ -28,10 +37,15 @@ def refund_payment(*, transaction_id, invoice_id, amount, created_by_id, reason=
     if invoice.status not in (Invoice.Status.CONFIRMED, Invoice.Status.PAID):
         raise RefundError("Only confirmed or paid invoices can be refunded.")
 
-    shift = None
+    shift = processing_shift
     site = None
-    if actor is not None:
+    if shift is not None:
+        if actor is not None and shift.employee.user_id != actor.pk:
+            raise RefundError("The processing shift does not belong to the acting representative.")
+        site = shift.site
+    elif actor is not None:
         _employee, site, shift = operation_context(actor)
+
     site_id = site.pk if site else invoice.site_id
     if shift is not None and invoice.site_id != shift.site_id:
         raise RefundError("The invoice belongs to a different site than the current shift.")
