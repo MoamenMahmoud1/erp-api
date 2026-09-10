@@ -21,6 +21,7 @@ type EmployeePageOptions = {
   employees: Paginated;
   sites: Paginated;
   departments: Paginated;
+  groups: Paginated;
 };
 
 function EmployeePageLoading() {
@@ -43,10 +44,11 @@ export function EmployeesPage() {
       api.employees.list('?page_size=50'),
       api.organization.sites('?page_size=50'),
       api.organization.departments('?page_size=50'),
+      api.employees.groups('?page_size=100'),
     ])
-      .then(([users, employees, sites, departments]) => {
+      .then(([users, employees, sites, departments, groups]) => {
         if (!active) return;
-        setOptions({ users, employees, sites, departments });
+        setOptions({ users, employees, sites, departments, groups });
       })
       .catch((requestError) => {
         if (!active) return;
@@ -91,6 +93,16 @@ export function EmployeesPage() {
     }));
   }, [options]);
 
+  const groupOptions = useMemo<CrudOption[]>(() => {
+    if (!options) return [];
+    return options.groups.results.map((group) => {
+      const role = group.role as Record<string, unknown> | null;
+      const name = String(group.name || 'Unnamed group');
+      const roleName = String(role?.name || role?.code || '');
+      return { value: String(group.id), label: roleName ? `${name} · ${roleName}` : name };
+    });
+  }, [options]);
+
   if (error) {
     return (
       <Card className="glass" radius="xl" p="xl" withBorder>
@@ -113,6 +125,7 @@ export function EmployeesPage() {
       remove={api.employees.delete}
       fields={[
         { key: 'user', label: 'User', type: 'select', options: userOptions, required: true, createOnly: true },
+        { key: 'group_ids', label: 'Groups', type: 'multiselect', options: groupOptions, clearable: true, editValue: (row) => Array.isArray(row.groups) ? (row.groups as Record<string, unknown>[]).map((group) => String(group.id)) : [] },
         { key: 'manager', label: 'Manager', type: 'select', options: managerOptions, clearable: true },
         { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions, clearable: true },
         { key: 'department', label: 'Department', type: 'select', options: departmentOptions, clearable: true },
