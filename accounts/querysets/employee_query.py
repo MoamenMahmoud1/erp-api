@@ -13,7 +13,7 @@ class EmployeeQuerySet(models.QuerySet):
 
         highest_role_scope = (
             RoleProfile.objects.filter(group__user__pk=user.pk)
-            .order_by("-level", "role_profile__name", "group__name", "pk")
+            .order_by("-level", "name", "group__name", "pk")
             .values("scope")[:1]
         )
         employee_rows = list(
