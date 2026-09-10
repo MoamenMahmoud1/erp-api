@@ -8,6 +8,7 @@ import {
   Group,
   Loader,
   Modal,
+  MultiSelect,
   NumberInput,
   Pagination,
   Paper,
@@ -28,11 +29,12 @@ export type CrudOption = { value: string; label: string };
 export type CrudField = {
   key: string;
   label: string;
-  type?: 'text' | 'number' | 'boolean' | 'select';
+  type?: 'text' | 'number' | 'boolean' | 'select' | 'multiselect';
   options?: CrudOption[];
   required?: boolean;
   createOnly?: boolean;
   clearable?: boolean;
+  editValue?: (row: Record<string, unknown>) => unknown;
 };
 export type CrudColumn = {
   key: string;
@@ -105,7 +107,10 @@ export function CrudPage({
     if (!create) return;
     setEditing(null);
     const initial: Record<string, unknown> = {};
-    fields.forEach((field) => { initial[field.key] = field.type === 'boolean' ? true : ''; });
+    fields.forEach((field) => {
+      if (field.type === 'multiselect') initial[field.key] = [];
+      else initial[field.key] = field.type === 'boolean' ? true : '';
+    });
     setForm(initial);
     setModalOpen(true);
   }
@@ -116,7 +121,9 @@ export function CrudPage({
     const next: Record<string, unknown> = {};
     fields.forEach((field) => {
       if (field.createOnly) return;
-      next[field.key] = row[field.key] ?? (field.type === 'boolean' ? false : '');
+      if (field.editValue) next[field.key] = field.editValue(row);
+      else if (field.type === 'multiselect') next[field.key] = [];
+      else next[field.key] = row[field.key] ?? (field.type === 'boolean' ? false : '');
     });
     setForm(next);
     setModalOpen(true);
@@ -190,6 +197,7 @@ export function CrudPage({
           {visibleFields.map((field) => {
             if (field.type === 'boolean') return <Checkbox key={field.key} color="erp" label={field.label} checked={Boolean(form[field.key])} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.currentTarget.checked }))} />;
             if (field.type === 'number') return <NumberInput key={field.key} label={field.label} value={form[field.key] as number | string} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} radius="sm" />;
+            if (field.type === 'multiselect') return <MultiSelect key={field.key} label={field.label} data={field.options || []} value={Array.isArray(form[field.key]) ? (form[field.key] as unknown[]).map(String) : []} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} searchable clearable={field.clearable !== false} radius="sm" />;
             if (field.type === 'select') return <Select key={field.key} label={field.label} data={field.options || []} value={String(form[field.key] ?? '')} onChange={(value) => setForm((current) => ({ ...current, [field.key]: value }))} required={field.required} allowDeselect={field.clearable === true} clearable={field.clearable === true} radius="sm" />;
             return <TextInput key={field.key} label={field.label} value={String(form[field.key] ?? '')} onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.currentTarget.value }))} required={field.required} radius="sm" />;
           })}
