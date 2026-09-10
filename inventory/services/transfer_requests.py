@@ -83,6 +83,17 @@ def create_stock_transfer_request(*, requested_by, request_type, warehouse_id, w
     if not items:
         raise StockTransferRequestError("A stock request must contain at least one item.")
 
+    if request_type == StockTransferRequest.RequestType.VEHICLE_TO_WAREHOUSE:
+        from invoices.models import Invoice
+
+        invoice = Invoice.objects.visible_to(requested_by).filter(pk=invoice_id).first()
+        if invoice is None:
+            raise StockTransferRequestError("The selected invoice is not accessible.")
+        if invoice.shift_id != shift.pk:
+            raise StockTransferRequestError("The return invoice must belong to the current shift.")
+        if invoice.created_by_id != requested_by.pk:
+            raise StockTransferRequestError("The return invoice must belong to the requesting representative.")
+
     request = StockTransferRequest.objects.create(
         request_type=request_type,
         requested_by=requested_by,
@@ -93,15 +104,6 @@ def create_stock_transfer_request(*, requested_by, request_type, warehouse_id, w
         destination_location=destination_location,
         reference=reference.strip(),
     )
-    if request_type == StockTransferRequest.RequestType.VEHICLE_TO_WAREHOUSE:
-        from invoices.models import Invoice
-
-        invoice = Invoice.objects.visible_to(requested_by).filter(pk=invoice_id).first()
-        if invoice is None:
-            raise StockTransferRequestError("The selected invoice is not accessible.")
-        if invoice.shift_id != shift.pk:
-            raise StockTransferRequestError("The return invoice must belong to the current shift.")
-        request._invoice = invoice
 
     for item in items:
         StockTransferRequestItem.objects.create(
@@ -110,9 +112,6 @@ def create_stock_transfer_request(*, requested_by, request_type, warehouse_id, w
             quantity=item["quantity"],
             invoice_item=item.get("invoice_item"),
         )
-
-    if invoice_id is not None:
-        request._invoice_id = invoice_id
 
     return request
 
@@ -144,12 +143,10 @@ def approve_stock_transfer_request(*, request_id, approver):
         )
         request.approved_movement = movement
     else:
-        invoice_id = getattr(request, "_invoice_id", None)
-        if invoice_id is None:
-            item_invoice_ids = {item.invoice_item.invoice_id for item in request.items.all() if item.invoice_item_id}
-            if len(item_invoice_ids) != 1:
-                raise StockTransferRequestError("A return request must reference exactly one invoice.")
-            invoice_id = next(iter(item_invoice_ids))
+        item_invoice_ids = {item.invoice_item.invoice_id for item in request.items.all() if item.invoice_item_id}
+        if len(item_invoice_ids) != 1:
+            raise StockTransferRequestError("A return request must reference exactly one invoice.")
+        invoice_id = next(iter(item_invoice_ids))
 
         sales_return = create_sales_return(
             invoice_id=invoice_id,
@@ -158,7 +155,8 @@ def approve_stock_transfer_request(*, request_id, approver):
             reason=request.reference or f"Approved return request #{request.pk}",
             actor=request.requested_by,
             processing_shift=request.shift,
-            return_destination_location_id=request.warehouse_id,
+            return_source_location_id=request.source_location_id,
+            return_destination_location_id=request.destination_location_id,
         )
         request.invoice_return = sales_return
 
