@@ -97,9 +97,9 @@ export function EmployeesPage() {
     if (!options) return [];
     return options.groups.results.map((group) => {
       const role = group.role as Record<string, unknown> | null;
-      const name = String(group.name || 'Unnamed group');
+      const groupName = String(group.name || 'Unnamed group');
       const roleName = String(role?.name || role?.code || '');
-      return { value: String(group.id), label: roleName ? `${name} · ${roleName}` : name };
+      return { value: String(group.id), label: roleName || groupName };
     });
   }, [options]);
 
@@ -125,7 +125,7 @@ export function EmployeesPage() {
       remove={api.employees.delete}
       fields={[
         { key: 'user', label: 'User', type: 'select', options: userOptions, required: true, createOnly: true },
-        { key: 'group_ids', label: 'Groups', type: 'multiselect', options: groupOptions, clearable: true, editValue: (row) => Array.isArray(row.groups) ? (row.groups as Record<string, unknown>[]).map((group) => String(group.id)) : [] },
+        { key: 'group_ids', label: 'Role', type: 'multiselect', options: groupOptions, clearable: true, editValue: (row) => Array.isArray(row.groups) ? (row.groups as Record<string, unknown>[]).map((group) => String(group.id)) : [] },
         { key: 'manager', label: 'Manager', type: 'select', options: managerOptions, clearable: true },
         { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions, clearable: true },
         { key: 'department', label: 'Department', type: 'select', options: departmentOptions, clearable: true },

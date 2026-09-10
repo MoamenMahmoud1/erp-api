@@ -4,7 +4,7 @@ from django.db.models.signals import m2m_changed, post_delete, post_save
 from django.dispatch import receiver
 
 from accounts.models import Role
-from authsession.cache import delete_auth_session_caches
+from authsession.cache import delete_all_auth_session_caches, delete_auth_session_caches
 from authsession.models import AuthSession
 
 
@@ -55,6 +55,13 @@ def invalidate_group_permissions(sender, instance, action, **kwargs):
 def invalidate_user_session_cache(sender, instance, **kwargs):
     """Drop cached auth state when activation or privileged flags change."""
     _invalidate_users((instance.pk,))
+
+
+@receiver(post_save, sender=Group)
+def invalidate_new_group_session_caches(sender, instance, created, **kwargs):
+    """Drop authorization snapshots when a new RBAC group is introduced."""
+    if created:
+        delete_all_auth_session_caches()
 
 
 @receiver(post_save, sender=Role)
