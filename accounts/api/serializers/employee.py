@@ -16,6 +16,7 @@ User = get_user_model()
 
 
 class RoleSummarySerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
     level = serializers.SerializerMethodField()
     scope = serializers.SerializerMethodField()
     requires_shift = serializers.SerializerMethodField()
@@ -25,6 +26,9 @@ class RoleSummarySerializer(serializers.ModelSerializer):
         model = Group
         fields = ("id", "name", "level", "scope", "requires_shift", "description")
         read_only_fields = fields
+
+    def get_name(self, obj):
+        return GroupPolicy.name_for_group(obj)
 
     def get_level(self, obj):
         return GroupPolicy.level_for_group(obj)
@@ -77,7 +81,7 @@ class UserSummarySerializer(serializers.ModelSerializer):
         return list(
             obj.groups.select_related("policy")
             .annotate(_role_level=Coalesce("policy__level", Value(0), output_field=IntegerField()))
-            .order_by("-_role_level", "name", "pk")
+            .order_by("-_role_level", "policy__name", "name", "pk")
         )
 
     def get_roles(self, obj):
