@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from accounts.models import Employee, EmployeeShift, Role
+from accounts.models import Employee, EmployeeShift, RoleProfile
 from organization.models import Company, Site
 
 
@@ -27,7 +27,13 @@ class EmployeeShiftAPITests(TestCase):
         )
         self.user = User.objects.create_user(username="shift-user", email="shift@test.com", password="StrongPass123!")
         group = Group.objects.create(name="Test Shift Role")
-        role = Role.objects.create(group=group, code="test-shift-role", level=20, scope=Role.Scope.SITE, requires_shift=True)
+        RoleProfile.objects.create(
+            group=group,
+            name="Test Shift Role",
+            level=20,
+            scope=RoleProfile.Scope.SITE,
+            requires_shift=True,
+        )
         self.user.groups.add(group)
         permission = Permission.objects.get(codename="start_employee_shift", content_type__app_label="accounts")
         close_permission = Permission.objects.get(codename="close_employee_shift", content_type__app_label="accounts")
@@ -49,7 +55,7 @@ class EmployeeShiftAPITests(TestCase):
 
         response = self.client.get(reverse("accounts:current-user"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["role"]["code"], "test-shift-role")
+        self.assertEqual(response.data["role"]["name"], "Test Shift Role")
         self.assertEqual(response.data["employee"]["site"]["id"], self.site.pk)
         self.assertEqual(response.data["current_shift"]["id"], start.data["id"])
 
