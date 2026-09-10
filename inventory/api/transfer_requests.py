@@ -3,7 +3,7 @@ from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 
 from inventory.models import StockTransferRequest, StockTransferRequestItem
-from inventory.permissions import InventoryReadPermission
+from inventory.permissions import InventoryTransferRequestPermission, InventoryReadPermission
 from inventory.services.transfer_requests import (
     StockTransferRequestError,
     approve_stock_transfer_request,
@@ -154,8 +154,7 @@ class WarehouseManagerOptionsView(generics.ListAPIView):
 
 class StockTransferRequestListCreateView(generics.ListCreateAPIView):
     serializer_class = StockTransferRequestOutputSerializer
-    permission_classes = (InventoryReadPermission,)
-    permission_codename = "inventory.transfer_stock"
+    permission_classes = (InventoryTransferRequestPermission,)
 
     def get_queryset(self):
         user = self.request.user
