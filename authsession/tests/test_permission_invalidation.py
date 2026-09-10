@@ -2,7 +2,7 @@ import uuid
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
@@ -46,14 +46,20 @@ class PermissionInvalidationTests(TestCase):
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
 
     def test_group_permission_change_invalidates_member_session_cache(self):
-        from django.contrib.auth.models import Group
-
         group = Group.objects.create(name="Inventory Readers")
         group.user_set.add(self.user)
         session_id = self._session()
         self.assertIsNotNone(cache.get(auth_session_cache_key(session_id)))
 
         group.permissions.add(self.permission)
+
+        self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
+
+    def test_group_creation_invalidates_active_session_cache(self):
+        session_id = self._session()
+        self.assertIsNotNone(cache.get(auth_session_cache_key(session_id)))
+
+        Group.objects.create(name="New Role")
 
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
 
