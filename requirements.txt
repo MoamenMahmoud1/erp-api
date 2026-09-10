@@ -19,7 +19,7 @@ Pillow==12.3.0
 # Storage / caching
 django-storages==1.14.6
 boto3==1.43.55
-redis==8.0.1
+redis==6.4.0
 
 # Production
 Gunicorn==26.0.0
