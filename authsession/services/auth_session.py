@@ -9,7 +9,6 @@ from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from accounts.models.role import Role
 from authsession.cache import cache_active_session, delete_auth_session_cache, delete_auth_session_caches
 from authsession.http import ClientContext
 from authsession.models import AuthSession
