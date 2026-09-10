@@ -61,3 +61,13 @@ def delete_auth_session_caches(session_ids):
     cache.delete_many(
         [auth_session_cache_key(session_id) for session_id in session_ids]
     )
+
+
+def delete_all_auth_session_caches():
+    """Invalidate every active authorization snapshot after global RBAC changes."""
+    from authsession.models import AuthSession
+
+    session_ids = AuthSession.objects.filter(
+        revoked_at__isnull=True,
+    ).values_list("pk", flat=True)
+    delete_auth_session_caches(session_ids)
