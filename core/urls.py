@@ -19,6 +19,7 @@ urlpatterns = [
     path("api/v1/", include(("products.urls", "products"), namespace="products")),
     path("api/v1/", include(("coupons.urls", "coupons"), namespace="coupons")),
     path("api/v1/", include(("invoices.urls", "invoices"), namespace="invoices")),
+    path("api/v1/", include(("common.api_urls", "common"), namespace="common")),
     path("api/v1/payments/", include(("payments.urls", "payments"), namespace="payments")),
     path("api/v1/purchases/", include("purchases.urls")),
     path("api/v1/suppliers/", include("suppliers.urls")),
