@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from django.test import SimpleTestCase
 
+from accounts.models import RoleProfile
 from common.services.mutation_authorization import (
     MutationAuthorizationService,
     MutationDecision,
