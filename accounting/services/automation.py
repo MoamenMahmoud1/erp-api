@@ -8,6 +8,7 @@ from django.utils import timezone
 from accounting.models import Account, JournalEntry
 from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
 from inventory.models import StockMovement
+from inventory.services.source_reference import find_source_movement
 
 
 DEFAULT_ACCOUNTS = {
@@ -27,12 +28,28 @@ def ensure_default_accounts(company=None):
     company = company or get_default_company()
     with transaction.atomic():
         for code, name, account_type in DEFAULT_ACCOUNTS.values():
-            Account.objects.get_or_create(company=company, code=code, defaults={"name": name, "account_type": account_type})
-    return {key: Account.objects.get(company=company, code=code) for key, (code, _name, _type) in DEFAULT_ACCOUNTS.items()}
+            Account.objects.get_or_create(
+                company=company,
+                code=code,
+                defaults={"name": name, "account_type": account_type},
+            )
+    return {
+        key: Account.objects.get(company=company, code=code)
+        for key, (code, _name, _type) in DEFAULT_ACCOUNTS.items()
+    }
 
 
 def _source_entry(company, source_type, source_id):
-    return JournalEntry.objects.filter(company=company, source_type=source_type, source_id=source_id, status=JournalEntry.Status.POSTED).prefetch_related("lines").first()
+    return (
+        JournalEntry.objects.filter(
+            company=company,
+            source_type=source_type,
+            source_id=source_id,
+            status=JournalEntry.Status.POSTED,
+        )
+        .prefetch_related("lines")
+        .first()
+    )
 
 
 def post_sales_invoice(*, invoice, actor_id, company=None):
@@ -42,7 +59,14 @@ def post_sales_invoice(*, invoice, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     receivable = invoice.total
-    cogs = sum(((item.cost_price if item.cost_price is not None else item.product.purchase_price) * item.quantity for item in invoice.items.all()), Decimal("0"))
+    cogs = sum(
+        (
+            (item.cost_price if item.cost_price is not None else item.product.purchase_price)
+            * item.quantity
+            for item in invoice.items.all()
+        ),
+        Decimal("0"),
+    )
     lines = [
         {"account_id": accounts["accounts_receivable"].pk, "debit": receivable, "credit": 0},
         {"account_id": accounts["sales_revenue"].pk, "debit": 0, "credit": receivable},
@@ -52,7 +76,16 @@ def post_sales_invoice(*, invoice, actor_id, company=None):
             {"account_id": accounts["cost_of_goods_sold"].pk, "debit": cogs, "credit": 0},
             {"account_id": accounts["inventory"].pk, "debit": 0, "credit": cogs},
         ])
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(invoice.created_at), description=f"Sale for invoice #{invoice.pk}", reference=f"Invoice #{invoice.pk}", source_type="invoice.sale", source_id=invoice.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Sale for invoice #{invoice.pk}",
+        reference=f"Invoice #{invoice.pk}",
+        source_type="invoice.sale",
+        source_id=invoice.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -63,10 +96,19 @@ def post_purchase(*, purchase, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     total = purchase.total_amount
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(purchase.created_at), description=f"Purchase #{purchase.pk}", reference=purchase.reference or f"Purchase #{purchase.pk}", source_type="purchase.confirmation", source_id=purchase.pk, lines=[
-        {"account_id": accounts["inventory"].pk, "debit": total, "credit": 0},
-        {"account_id": accounts["accounts_payable"].pk, "debit": 0, "credit": total},
-    ], company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Purchase #{purchase.pk}",
+        reference=purchase.reference or f"Purchase #{purchase.pk}",
+        source_type="purchase.confirmation",
+        source_id=purchase.pk,
+        lines=[
+            {"account_id": accounts["inventory"].pk, "debit": total, "credit": 0},
+            {"account_id": accounts["accounts_payable"].pk, "debit": 0, "credit": total},
+        ],
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -82,7 +124,16 @@ def post_customer_collection(*, payment, actor_id, company=None):
     if payment.transfer_amount > 0:
         lines.append({"account_id": accounts["bank"].pk, "debit": payment.transfer_amount, "credit": 0})
     lines.append({"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": payment.total_amount})
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(payment.created_at), description=f"Customer collection #{payment.pk}", reference=f"Payment #{payment.pk}", source_type="payment.collection", source_id=payment.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Customer collection #{payment.pk}",
+        reference=f"Payment #{payment.pk}",
+        source_type="payment.collection",
+        source_id=payment.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -103,7 +154,16 @@ def post_payment_refund(*, refund, actor_id, company=None):
             {"account_id": accounts["accounts_receivable"].pk, "debit": refund.transfer_amount, "credit": 0},
             {"account_id": accounts["bank"].pk, "debit": 0, "credit": refund.transfer_amount},
         ])
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(refund.created_at), description=f"Customer payment refund #{refund.pk}", reference=f"Payment Refund #{refund.pk}", source_type="payment.refund", source_id=refund.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Customer payment refund #{refund.pk}",
+        reference=f"Payment Refund #{refund.pk}",
+        source_type="payment.refund",
+        source_id=refund.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -114,7 +174,16 @@ def post_sales_return(*, sales_return, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     refund_amount = sales_return.refund_amount
-    returned_cost = sum(((item.invoice_item.cost_price if item.invoice_item.cost_price is not None else item.invoice_item.product.purchase_price) * item.quantity for item in sales_return.items.select_related("invoice_item__product")), Decimal("0"))
+    returned_cost = sum(
+        (
+            (item.invoice_item.cost_price
+             if item.invoice_item.cost_price is not None
+             else item.invoice_item.product.purchase_price)
+            * item.quantity
+            for item in sales_return.items.select_related("invoice_item__product")
+        ),
+        Decimal("0"),
+    )
     lines = [
         {"account_id": accounts["sales_returns"].pk, "debit": refund_amount, "credit": 0},
         {"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": refund_amount},
@@ -124,7 +193,16 @@ def post_sales_return(*, sales_return, actor_id, company=None):
             {"account_id": accounts["inventory"].pk, "debit": returned_cost, "credit": 0},
             {"account_id": accounts["cost_of_goods_sold"].pk, "debit": 0, "credit": returned_cost},
         ])
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(sales_return.created_at), description=f"Sales return for invoice #{sales_return.invoice_id}", reference=f"Sales Return #{sales_return.pk}", source_type="invoice.return", source_id=sales_return.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Sales return for invoice #{sales_return.invoice_id}",
+        reference=f"Sales Return #{sales_return.pk}",
+        source_type="invoice.return",
+        source_id=sales_return.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -135,14 +213,18 @@ def post_purchase_return(*, purchase_return, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     total = purchase_return.total_amount
-    movement = (
-        StockMovement.objects.filter(reference=f"Return Purchase #{purchase_return.purchase_id}", movement_type=StockMovement.MovementType.PURCHASE_RETURN)
-        .order_by("-id")
-        .first()
+    movement = find_source_movement(
+        source_type="purchase.return",
+        source_id=purchase_return.pk,
+        movement_type=StockMovement.MovementType.PURCHASE_RETURN,
+        legacy_reference=f"Return Purchase #{purchase_return.purchase_id}",
     )
     inventory_cost = total
     if movement is not None:
-        movement_cost = sum((item.total_cost for item in movement.items.all() if item.unit_cost is not None), Decimal("0.00"))
+        movement_cost = sum(
+            (item.total_cost for item in movement.items.all() if item.unit_cost is not None),
+            Decimal("0.00"),
+        )
         if movement_cost > 0:
             inventory_cost = movement_cost
 
@@ -155,7 +237,16 @@ def post_purchase_return(*, purchase_return, actor_id, company=None):
     elif variance < 0:
         lines.append({"account_id": accounts["inventory_cost_variance"].pk, "debit": 0, "credit": -variance})
 
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(purchase_return.created_at), description=f"Purchase return for purchase #{purchase_return.purchase_id}", reference=f"Purchase Return #{purchase_return.pk}", source_type="purchase.return", source_id=purchase_return.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Purchase return for purchase #{purchase_return.purchase_id}",
+        reference=f"Purchase Return #{purchase_return.pk}",
+        source_type="purchase.return",
+        source_id=purchase_return.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -170,7 +261,16 @@ def post_supplier_payment(*, payment, actor_id, company=None):
         lines.append({"account_id": accounts["cash"].pk, "debit": 0, "credit": payment.cash_amount})
     if payment.transfer_amount > 0:
         lines.append({"account_id": accounts["bank"].pk, "debit": 0, "credit": payment.transfer_amount})
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(payment.created_at), description=f"Supplier payment #{payment.pk}", reference=payment.reference or f"Supplier Payment #{payment.pk}", source_type="payment.supplier", source_id=payment.pk, lines=lines, company=company)
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Supplier payment #{payment.pk}",
+        reference=payment.reference or f"Supplier Payment #{payment.pk}",
+        source_type="payment.supplier",
+        source_id=payment.pk,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
 
 
@@ -180,6 +280,18 @@ def reverse_source_entry(*, source_entry, actor_id, source_type, source_id, comp
     existing = _source_entry(company, reverse_type, source_id)
     if existing:
         return existing
-    lines = [{"account_id": line.account_id, "debit": line.credit, "credit": line.debit} for line in source_entry.lines.all()]
-    entry = create_journal_entry(created_by_id=actor_id, entry_date=timezone.localdate(), description=f"Reversal of {source_entry.reference or source_entry.pk}", reference=f"Reversal {source_entry.reference or source_entry.pk}", source_type=reverse_type, source_id=source_id, lines=lines, company=company)
+    lines = [
+        {"account_id": line.account_id, "debit": line.credit, "credit": line.debit}
+        for line in source_entry.lines.all()
+    ]
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Reversal of {source_entry.reference or source_entry.pk}",
+        reference=f"Reversal {source_entry.reference or source_entry.pk}",
+        source_type=reverse_type,
+        source_id=source_id,
+        lines=lines,
+        company=company,
+    )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)

@@ -2,6 +2,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 
 from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_sales_return
@@ -9,6 +10,7 @@ from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockLocation, StockMovement, StockMovementItem
+from inventory.services.source_reference import build_source_reference, find_source_movement
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice, InvoiceReturn, InvoiceReturnItem
 from payments.services.refund_invoice import refund_invoice
@@ -49,10 +51,12 @@ def _return_allocations(*, invoice_id, sale, product_id, quantity):
     if not sale_items:
         raise InvalidBusinessOperation("Cannot return sale: original product movement was not found.")
 
+    canonical_prefix = f"source:invoice.return:{invoice_id}"
+    legacy_reference = f"Return Invoice #{invoice_id}"
     previous_returned = defaultdict(int)
     previous_movements = StockMovementItem.objects.filter(
-        movement__movement_type=StockMovement.MovementType.SALEABLE_RETURN,
-        movement__reference=f"Return Invoice #{invoice_id}",
+        Q(movement__reference__startswith=canonical_prefix)
+        | Q(movement__reference=legacy_reference)
     )
     for item in previous_movements:
         if item.product_id == product_id:
@@ -137,7 +141,11 @@ def create_sales_return(
     return_source_location_id=None,
 ):
     invoice_qs = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
-    invoice = invoice_qs.select_for_update().prefetch_related("items__return_items", "items__product").get(pk=invoice_id)
+    invoice = (
+        invoice_qs.select_for_update()
+        .prefetch_related("items__return_items", "items__product")
+        .get(pk=invoice_id)
+    )
     if invoice.status != Invoice.Status.PAID:
         raise InvalidBusinessOperation("Sales returns require a paid invoice and a refund.")
 
@@ -156,7 +164,11 @@ def create_sales_return(
     )
 
     cleaned, returned_subtotal = _validate_return_items(invoice, items)
-    refund_amount = Decimal("0") if invoice.subtotal == 0 else quantize_money(returned_subtotal * invoice.total / invoice.subtotal)
+    refund_amount = (
+        Decimal("0")
+        if invoice.subtotal == 0
+        else quantize_money(returned_subtotal * invoice.total / invoice.subtotal)
+    )
     sales_return = InvoiceReturn.objects.create(
         invoice=invoice,
         site_id=shift.site_id if shift else invoice.site_id,
@@ -174,14 +186,11 @@ def create_sales_return(
         processing_shift=processing_shift,
     )
 
-    sale = (
-        StockMovement.objects.filter(
-            reference=f"Invoice #{invoice.pk}",
-            movement_type=StockMovement.MovementType.SALE,
-        )
-        .select_related("source_location")
-        .prefetch_related("items__batch", "items__product")
-        .first()
+    sale = find_source_movement(
+        source_type="invoice.sale",
+        source_id=invoice.pk,
+        movement_type=StockMovement.MovementType.SALE,
+        legacy_reference=f"Invoice #{invoice.pk}",
     )
     if sale is None or sale.source_location is None:
         raise InvalidBusinessOperation("Cannot return sale: original sale movement was not found.")
@@ -191,12 +200,20 @@ def create_sales_return(
         raise InvalidBusinessOperation("Return source and destination must be different locations.")
 
     movement = StockMovement.objects.create(
-        movement_type=StockMovement.MovementType.TRANSFER if source is not None else StockMovement.MovementType.SALEABLE_RETURN,
+        movement_type=(
+            StockMovement.MovementType.TRANSFER
+            if source is not None
+            else StockMovement.MovementType.SALEABLE_RETURN
+        ),
         source_location=source,
         destination_location=return_destination,
         shift=shift or invoice.shift,
         created_by_id=created_by_id,
-        reference=f"Return Invoice #{invoice.pk}",
+        reference=build_source_reference(
+            source_type="invoice.return",
+            source_id=invoice.pk,
+            label=f"Return #{sales_return.pk} for Invoice #{invoice.pk}",
+        ),
     )
     for line, quantity in cleaned:
         if source is not None:
