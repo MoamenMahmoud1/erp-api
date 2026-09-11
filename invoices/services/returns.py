@@ -9,7 +9,7 @@ from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
 from inventory.models import StockLocation, StockMovement, StockMovementItem
-from inventory.services.source_reference import build_source_reference
+from inventory.services.source_reference import build_source_reference, find_source_movement
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice, InvoiceReturn, InvoiceReturnItem
 from payments.services.refund_invoice import refund_invoice
@@ -182,8 +182,6 @@ def create_sales_return(
         processing_shift=processing_shift,
     )
 
-    from inventory.services.source_reference import find_source_movement
-
     sale = find_source_movement(
         source_type="invoice.sale",
         source_id=invoice.pk,
@@ -209,8 +207,8 @@ def create_sales_return(
         created_by_id=created_by_id,
         reference=build_source_reference(
             source_type="invoice.return",
-            source_id=sales_return.pk,
-            label=f"Return Invoice #{invoice.pk}",
+            source_id=invoice.pk,
+            label=f"Return #{sales_return.pk} for Invoice #{invoice.pk}",
         ),
     )
     for line, quantity in cleaned:
