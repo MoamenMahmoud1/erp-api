@@ -53,6 +53,7 @@ PROJECT_APPS = [
     "purchases.apps.PurchasesConfig",
     "suppliers.apps.SuppliersConfig",
     "accounting.apps.AccountingConfig",
+    "notifications.apps.NotificationsConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 MIDDLEWARE = [
@@ -168,6 +169,10 @@ CELERY_BEAT_SCHEDULE = {
     "reconcile-company-counters": {
         "task": "organization.tasks.reconcile_company_counters",
         "schedule": crontab(hour=2, minute=0),
+    },
+    "rebuild-recent-approval-notifications": {
+        "task": "notifications.tasks.rebuild_recent_approval_notifications",
+        "schedule": crontab(minute="*/1"),
     },
 }
 
