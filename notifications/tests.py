@@ -22,8 +22,16 @@ User = get_user_model()
 
 class NotificationTaskTests(TestCase):
     def setUp(self):
-        self.requester = User.objects.create_user(username="rep-notify", password="test-password")
-        self.manager = User.objects.create_user(username="manager-notify", password="test-password")
+        self.requester = User.objects.create_user(
+            username="rep-notify",
+            email="rep-notify@example.com",
+            password="test-password",
+        )
+        self.manager = User.objects.create_user(
+            username="manager-notify",
+            email="manager-notify@example.com",
+            password="test-password",
+        )
 
     def _event(self, action, metadata):
         return AuditEvent.objects.create(
@@ -69,8 +77,16 @@ class NotificationTaskTests(TestCase):
 
 class NotificationApiTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="notify-api", password="test-password")
-        self.other_user = User.objects.create_user(username="other-notify", password="test-password")
+        self.user = User.objects.create_user(
+            username="notify-api",
+            email="notify-api@example.com",
+            password="test-password",
+        )
+        self.other_user = User.objects.create_user(
+            username="other-notify",
+            email="other-notify@example.com",
+            password="test-password",
+        )
         self.notification = Notification.objects.create(
             user=self.user,
             notification_type=Notification.NotificationType.APPROVAL_REQUESTED,
@@ -166,7 +182,11 @@ class NotificationApiTests(TestCase):
 
 class PushDeliveryTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="push-user", password="test-password")
+        self.user = User.objects.create_user(
+            username="push-user",
+            email="push-user@example.com",
+            password="test-password",
+        )
         self.notification = Notification.objects.create(
             user=self.user,
             notification_type=Notification.NotificationType.APPROVAL_APPROVED,
