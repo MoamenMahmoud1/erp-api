@@ -9,13 +9,6 @@ FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 
-INSTALLED_APPS += [
-    'django_extensions',
-    #'silk',
-]
-
-#MIDDLEWARE.insert(1, 'silk.middleware.SilkyMiddleware')
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
