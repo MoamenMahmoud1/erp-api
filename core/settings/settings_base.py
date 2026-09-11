@@ -123,7 +123,7 @@ SIMPLE_JWT = {
     "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
-IDEMPOTENCY_RETENTION_DAYS = config("IDEMPOTENCY_RETENTION_DAYS", default=90, cast=int)
+IDEMPOTENCY_RETENTION_DAYS = config("IDEMPOTENCY_RETENTION_DAYS", default=365, cast=int)
 if IDEMPOTENCY_RETENTION_DAYS < 1:
     raise ValueError("IDEMPOTENCY_RETENTION_DAYS must be >= 1")
 AUTH_SESSION_MIN_AGE = timedelta(hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int))
@@ -164,8 +164,6 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
 
-# The dashboard stays live. Celery is used only for an inexpensive daily
-# integrity check today; heavy historical analytics will use it later.
 CELERY_BEAT_SCHEDULE = {
     "reconcile-company-counters": {
         "task": "organization.tasks.reconcile_company_counters",
