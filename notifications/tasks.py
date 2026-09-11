@@ -6,6 +6,11 @@ from django.utils import timezone
 from auditlog.models import AuditEvent
 
 from .models import Notification
+from .push import (
+    PushDeliveryPartiallyFailed,
+    PushNotificationsNotConfigured,
+    send_notification_push,
+)
 
 
 APPROVAL_ACTIONS = ("approval.requested", "approval.approved", "approval.rejected")
@@ -39,7 +44,7 @@ def create_notification_for_approval_event(approval_event_id: int) -> int:
     for recipient_id in recipient_ids:
         if not recipient_id:
             continue
-        _, created = Notification.objects.get_or_create(
+        notification, created = Notification.objects.get_or_create(
             dedupe_key=f"approval:{event.pk}:{int(recipient_id)}",
             defaults={
                 "user_id": int(recipient_id),
@@ -58,8 +63,31 @@ def create_notification_for_approval_event(approval_event_id: int) -> int:
             },
         )
         created_count += int(created)
+        send_notification_push_task.delay(notification.pk)
 
     return created_count
+
+
+@shared_task(
+    bind=True,
+    name="notifications.tasks.send_notification_push",
+    max_retries=5,
+    default_retry_delay=30,
+    ignore_result=True,
+)
+def send_notification_push_task(self, notification_id: int):
+    try:
+        return send_notification_push(notification_id)
+    except PushNotificationsNotConfigured:
+        return 0
+    except PushDeliveryPartiallyFailed as exc:
+        if self.request.retries >= self.max_retries:
+            return 0
+        raise self.retry(exc=exc, countdown=min(30 * (2 ** self.request.retries), 1800))
+    except Exception as exc:
+        if self.request.retries >= self.max_retries:
+            raise
+        raise self.retry(exc=exc, countdown=min(30 * (2 ** self.request.retries), 1800))
 
 
 @shared_task(
