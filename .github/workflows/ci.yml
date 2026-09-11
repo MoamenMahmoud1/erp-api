@@ -157,7 +157,7 @@ jobs:
         run: python manage.py test ${{ matrix.apps }}
 
   frontend:
-    name: Frontend build
+    name: Frontend build and container
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -179,3 +179,9 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Build production frontend image
+        run: docker build --tag erp-frontend:ci .
+
+      - name: Validate production Nginx configuration
+        run: docker run --rm erp-frontend:ci nginx -t
