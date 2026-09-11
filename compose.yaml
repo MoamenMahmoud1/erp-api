@@ -83,5 +83,15 @@ services:
       redis:
         condition: service_started
 
+  frontend:
+    profiles: ["frontend"]
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+
 volumes:
   postgres_data:
