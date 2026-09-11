@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework import generics, serializers, status
 from rest_framework.response import Response
 
+from common.idempotency import IdempotentResult, execute_idempotent
 from inventory.models import StockTransferRequest, StockTransferRequestItem
 from inventory.permissions import InventoryTransferRequestPermission, InventoryReadPermission
 from inventory.services.approval import can_approve_stock_request
@@ -176,21 +177,67 @@ class StockTransferRequestListCreateView(generics.ListCreateAPIView):
         serializer = StockTransferRequestCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        key = request.headers.get("Idempotency-Key", "").strip()
+        if not key or len(key) > 128:
+            return Response(
+                {"detail": "A valid Idempotency-Key header is required.", "code": "idempotency_key_required"},
+                status=400,
+            )
+        signature_body = {
+            "request_type": data["request_type"],
+            "warehouse": data["warehouse"],
+            "warehouse_manager": data["warehouse_manager"],
+            "invoice": data.get("invoice"),
+            "reference": data.get("reference", ""),
+            "items": [
+                {
+                    "product": item["product"].pk,
+                    "quantity": item["quantity"],
+                    "invoice_item": item.get("invoice_item").pk if item.get("invoice_item") else None,
+                }
+                for item in data["items"]
+            ],
+        }
+
+        def create_request():
+            try:
+                transfer_request = create_stock_transfer_request(
+                    requested_by=request.user,
+                    request_type=data["request_type"],
+                    warehouse_id=data["warehouse"],
+                    warehouse_manager_id=data["warehouse_manager"],
+                    items=data["items"],
+                    invoice_id=data.get("invoice"),
+                    reference=data.get("reference", ""),
+                )
+            except StockTransferRequestError as exc:
+                raise exc
+
+            transfer_request = self.get_queryset().get(pk=transfer_request.pk)
+            return IdempotentResult(
+                status=status.HTTP_201_CREATED,
+                body=StockTransferRequestOutputSerializer(
+                    transfer_request,
+                    context={"request": request},
+                ).data,
+            )
+
         try:
-            transfer_request = create_stock_transfer_request(
-                requested_by=request.user,
-                request_type=data["request_type"],
-                warehouse_id=data["warehouse"],
-                warehouse_manager_id=data["warehouse_manager"],
-                items=data["items"],
-                invoice_id=data.get("invoice"),
-                reference=data.get("reference", ""),
+            result = execute_idempotent(
+                key=key,
+                user_id=request.user.pk,
+                path=request.path,
+                data=signature_body,
+                operation=create_request,
             )
         except StockTransferRequestError as exc:
             return Response({"detail": str(exc), "code": "stock_request_invalid"}, status=status.HTTP_409_CONFLICT)
-
-        transfer_request = self.get_queryset().get(pk=transfer_request.pk)
-        return Response(StockTransferRequestOutputSerializer(transfer_request).data, status=status.HTTP_201_CREATED)
+        if result == "mismatch":
+            return Response(
+                {"detail": "Idempotency key used with a different request body.", "code": "idempotency_conflict"},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return Response(result.response_body, status=result.response_status)
 
 
 class StockTransferRequestApproveView(generics.GenericAPIView):
@@ -198,23 +245,42 @@ class StockTransferRequestApproveView(generics.GenericAPIView):
     permission_codename = "inventory.approve_stock_transfer"
 
     def post(self, request, pk, *args, **kwargs):
-        try:
-            transfer_request = approve_stock_transfer_request(
-                request_id=pk,
-                approver=request.user,
-            )
-        except StockTransferRequest.DoesNotExist:
-            return Response({"detail": "Stock transfer request not found."}, status=status.HTTP_404_NOT_FOUND)
-        except StockTransferRequestError as exc:
-            return Response({"detail": str(exc), "code": "stock_request_approval_invalid"}, status=status.HTTP_409_CONFLICT)
+        key = request.headers.get("Idempotency-Key", "").strip()
+        if not key or len(key) > 128:
+            return Response({"detail": "A valid Idempotency-Key header is required.", "code": "idempotency_key_required"}, status=400)
 
-        transfer_request = (
-            StockTransferRequest.objects
-            .select_related("requested_by", "warehouse_manager", "approved_by", "shift", "warehouse", "source_location", "destination_location")
-            .prefetch_related("items__product", "items__invoice_item")
-            .get(pk=transfer_request.pk)
+        def approve():
+            try:
+                transfer_request = approve_stock_transfer_request(
+                    request_id=pk,
+                    approver=request.user,
+                )
+            except StockTransferRequest.DoesNotExist:
+                return IdempotentResult(status=404, body={"detail": "Stock transfer request not found."})
+            except StockTransferRequestError as exc:
+                return IdempotentResult(status=409, body={"detail": str(exc), "code": "stock_request_approval_invalid"})
+
+            transfer_request = (
+                StockTransferRequest.objects
+                .select_related("requested_by", "warehouse_manager", "approved_by", "shift", "warehouse", "source_location", "destination_location")
+                .prefetch_related("items__product", "items__invoice_item")
+                .get(pk=transfer_request.pk)
+            )
+            return IdempotentResult(
+                status=200,
+                body=StockTransferRequestOutputSerializer(transfer_request, context={"request": request}).data,
+            )
+
+        result = execute_idempotent(
+            key=key,
+            user_id=request.user.pk,
+            path=request.path,
+            data={"request_id": pk, "decision": "approve"},
+            operation=approve,
         )
-        return Response(StockTransferRequestOutputSerializer(transfer_request).data)
+        if result == "mismatch":
+            return Response({"detail": "Idempotency key used with a different request body.", "code": "idempotency_conflict"}, status=409)
+        return Response(result.response_body, status=result.response_status)
 
 
 class StockTransferRequestRejectView(generics.GenericAPIView):
@@ -222,21 +288,41 @@ class StockTransferRequestRejectView(generics.GenericAPIView):
     permission_codename = "inventory.approve_stock_transfer"
 
     def post(self, request, pk, *args, **kwargs):
-        try:
-            transfer_request = reject_stock_transfer_request(
-                request_id=pk,
-                approver=request.user,
-                reason=(request.data or {}).get("reason", ""),
-            )
-        except StockTransferRequest.DoesNotExist:
-            return Response({"detail": "Stock transfer request not found."}, status=status.HTTP_404_NOT_FOUND)
-        except StockTransferRequestError as exc:
-            return Response({"detail": str(exc), "code": "stock_request_rejection_invalid"}, status=status.HTTP_409_CONFLICT)
+        key = request.headers.get("Idempotency-Key", "").strip()
+        if not key or len(key) > 128:
+            return Response({"detail": "A valid Idempotency-Key header is required.", "code": "idempotency_key_required"}, status=400)
+        reason = str((request.data or {}).get("reason", ""))
 
-        transfer_request = (
-            StockTransferRequest.objects
-            .select_related("requested_by", "warehouse_manager", "approved_by", "shift", "warehouse", "source_location", "destination_location")
-            .prefetch_related("items__product", "items__invoice_item")
-            .get(pk=transfer_request.pk)
+        def reject():
+            try:
+                transfer_request = reject_stock_transfer_request(
+                    request_id=pk,
+                    approver=request.user,
+                    reason=reason,
+                )
+            except StockTransferRequest.DoesNotExist:
+                return IdempotentResult(status=404, body={"detail": "Stock transfer request not found."})
+            except StockTransferRequestError as exc:
+                return IdempotentResult(status=409, body={"detail": str(exc), "code": "stock_request_rejection_invalid"})
+
+            transfer_request = (
+                StockTransferRequest.objects
+                .select_related("requested_by", "warehouse_manager", "approved_by", "shift", "warehouse", "source_location", "destination_location")
+                .prefetch_related("items__product", "items__invoice_item")
+                .get(pk=transfer_request.pk)
+            )
+            return IdempotentResult(
+                status=200,
+                body=StockTransferRequestOutputSerializer(transfer_request, context={"request": request}).data,
+            )
+
+        result = execute_idempotent(
+            key=key,
+            user_id=request.user.pk,
+            path=request.path,
+            data={"request_id": pk, "decision": "reject", "reason": reason},
+            operation=reject,
         )
-        return Response(StockTransferRequestOutputSerializer(transfer_request).data)
+        if result == "mismatch":
+            return Response({"detail": "Idempotency key used with a different request body.", "code": "idempotency_conflict"}, status=409)
+        return Response(result.response_body, status=result.response_status)
