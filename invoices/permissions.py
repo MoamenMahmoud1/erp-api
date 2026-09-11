@@ -16,6 +16,7 @@ class InvoicePermission(BasePermission):
         "apply_coupon": "invoices.apply_invoice_coupon",
         "remove_coupon": "invoices.apply_invoice_coupon",
         "returns": "inventory.approve_stock_transfer",
+        "representative_sale": "invoices.add_invoice",
     }
 
     def has_permission(self, request, view):
