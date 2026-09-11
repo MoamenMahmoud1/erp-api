@@ -4,7 +4,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 
-from .models import RoleProfile
+from .models import Employee, RoleProfile
 
 User = get_user_model()
 
@@ -75,6 +75,20 @@ class CustomUserAdmin(BaseUserAdmin):
     )
 
     readonly_fields = ("updated_at", "password_changed_at")
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "manager", "work_site", "department")
+    search_fields = (
+        "user__username",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )
+    list_filter = ("work_site", "department")
+    list_select_related = ("user", "manager", "work_site", "department")
+    autocomplete_fields = ("user", "manager", "work_site", "department")
 
 
 class RoleProfileInline(admin.StackedInline):
