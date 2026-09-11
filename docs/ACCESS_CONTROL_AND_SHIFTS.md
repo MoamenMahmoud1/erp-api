@@ -8,6 +8,7 @@ The ERP is a modular monolith. Existing domain apps remain responsible for their
 Role -> what the user may do
 Scope -> where the user may do it
 Shift -> whether the user is currently allowed to perform shift-bound operations
+Customer assignment -> which customers a field representative may transact with
 ```
 
 No separate `stores`, `shop`, or `branch` business apps are required.
@@ -86,6 +87,28 @@ Returns the employee's current open shift or `null`.
 `POST /api/v1/accounts/shifts/close/`
 
 The server calculates expected cash and transfer totals from the payment transactions and payment refunds linked to the shift, then stores the actual values and the differences in the audit event.
+
+## Customer assignments
+
+Field representatives transact only against customers that are actively assigned to their employee record.
+
+Assignments are stored in the dedicated `customer_assignments.CustomerAssignment` model. The same customer may be assigned to more than one representative, while an active `(customer, employee)` pair is unique.
+
+Assignment management is an administrative operation. It can be maintained in Django admin under **Customer assignments**; representatives do not receive an assignment-management surface.
+
+### Customer list
+
+`GET /api/v1/customers/`
+
+For shift-bound users, the server automatically returns only active assignments for the authenticated employee. The Flutter client should use this endpoint as the customer picker source and submit the returned customer's `id` when creating a sale.
+
+The server never trusts the client-side list. Supplying a different customer id directly is rejected by the invoice domain even when the id exists in the database.
+
+### Invoice authorization
+
+Customer assignment is checked before invoice creation, again before confirmation, and before representative deletion of a draft invoice. This is intentionally server-side so changing a Flutter request cannot bypass the assignment rule.
+
+A representative cannot use deletion to erase an invoice for an unauthorized customer. Confirmed invoices are never hard-deleted; cancellation/return workflows preserve the financial and audit trail. A legacy unauthorized draft is also blocked from representative deletion.
 
 ## Shift-bound operations
 
