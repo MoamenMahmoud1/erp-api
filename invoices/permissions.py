@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 
+from common.services.mutation_authorization import MutationAuthorizationService
+
 
 class InvoicePermission(BasePermission):
     ACTION_PERMISSIONS = {
@@ -19,6 +21,15 @@ class InvoicePermission(BasePermission):
         "representative_sale": "invoices.add_invoice",
     }
 
+    APPROVAL_ACTIONS = {
+        "update": "update",
+        "aupdate": "update",
+        "partial_update": "update",
+        "partial_aupdate": "update",
+        "destroy": "delete",
+        "adestroy": "delete",
+    }
+
     def has_permission(self, request, view):
         user = request.user
         if not user or not user.is_authenticated:
@@ -27,5 +38,20 @@ class InvoicePermission(BasePermission):
             return True
         if request.method in ("GET", "HEAD", "OPTIONS"):
             return user.has_perm("invoices.view_invoice")
-        codename = self.ACTION_PERMISSIONS.get(getattr(view, "action", None))
-        return bool(codename and user.has_perm(codename))
+
+        view_action = getattr(view, "action", None)
+        direct_permission = self.ACTION_PERMISSIONS.get(view_action)
+        if not direct_permission:
+            return False
+
+        approval_action = self.APPROVAL_ACTIONS.get(view_action)
+        if approval_action is None:
+            return user.has_perm(direct_permission)
+
+        decision = MutationAuthorizationService.decide(
+            actor=user,
+            resource="invoice",
+            action=approval_action,
+            direct_permission=direct_permission,
+        )
+        return decision.decision.value != "denied"
