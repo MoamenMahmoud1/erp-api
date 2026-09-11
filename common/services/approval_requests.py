@@ -5,12 +5,12 @@ from django.db import transaction
 from accounts.models import Employee, RoleProfile
 from auditlog.models import AuditEvent
 from common.exceptions import InvalidBusinessOperation
-from common.idempotency import execute_idempotent, require_idempotency_key, IdempotentResult
+from common.idempotency import IdempotentResult, execute_idempotent
+from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
 from invoices.models import Invoice
 from invoices.services import DeleteInvoice, UpdateInvoice
 from products.models import Product
-from customers.models import Customer
 
 
 REQUESTED_ACTION = "approval.requested"
@@ -33,11 +33,11 @@ def _manager_for_user(user):
     return manager
 
 
-def _event_payload(event):
+def _event_payload(event, status_override=None):
     metadata = event.metadata or {}
     return {
         "id": event.pk,
-        "status": metadata.get("status", "pending"),
+        "status": status_override or metadata.get("status", "pending"),
         "target_type": event.entity_type,
         "target_id": event.entity_id,
         "operation": metadata.get("operation"),
@@ -51,15 +51,20 @@ def _event_payload(event):
     }
 
 
-def _decision_exists(approval_id):
+def _decision_exists(approval_event_id):
     return AuditEvent.objects.filter(
         action__in=(APPROVED_ACTION, REJECTED_ACTION),
-        metadata__approval_id=approval_id,
+        metadata__approval_id=approval_event_id,
     ).exists()
 
 
-def _load_request(approval_event_id):
-    event = AuditEvent.objects.filter(pk=approval_event_id, action=REQUESTED_ACTION).first()
+def _load_request_for_update(approval_event_id):
+    event = (
+        AuditEvent.objects
+        .select_for_update()
+        .filter(pk=approval_event_id, action=REQUESTED_ACTION)
+        .first()
+    )
     if event is None:
         raise InvalidBusinessOperation("Approval request not found.")
     if _decision_exists(event.pk):
@@ -67,7 +72,7 @@ def _load_request(approval_event_id):
     return event
 
 
-def _validate_create_request(*, requester, target_type, target_id, operation, payload, reason):
+def _validate_create_request(*, requester, target_type, target_id, operation, payload):
     if operation not in {"update", "delete"}:
         raise InvalidBusinessOperation("Only update and delete approval requests are supported.")
 
@@ -86,7 +91,10 @@ def _validate_create_request(*, requester, target_type, target_id, operation, pa
         if invoice.status != Invoice.Status.DRAFT:
             raise InvalidBusinessOperation("Only draft invoices can be changed through manager approval.")
         if operation == "update":
-            customer_id = int(normalized_payload.get("customer", invoice.customer_id))
+            try:
+                customer_id = int(normalized_payload.get("customer", invoice.customer_id))
+            except (TypeError, ValueError):
+                raise InvalidBusinessOperation("Invalid customer id.")
             customer = Customer.objects.filter(pk=customer_id).first()
             if customer is None:
                 raise InvalidBusinessOperation("Customer not found.")
@@ -98,18 +106,24 @@ def _validate_create_request(*, requester, target_type, target_id, operation, pa
             for raw in raw_items:
                 if not isinstance(raw, dict):
                     raise InvalidBusinessOperation("Invalid invoice item payload.")
-                product_id = int(raw.get("product", 0))
-                quantity = int(raw.get("quantity", 0))
+                try:
+                    product_id = int(raw.get("product", 0))
+                    quantity = int(raw.get("quantity", 0))
+                except (TypeError, ValueError):
+                    raise InvalidBusinessOperation("Invalid invoice item values.")
                 product_ids.append(product_id)
                 items.append({"product": product_id, "quantity": quantity})
-            if len(product_ids) != len(set(product_ids)) or any(quantity <= 0 for quantity in [i["quantity"] for i in items]):
+            if len(product_ids) != len(set(product_ids)) or any(item["quantity"] <= 0 for item in items):
                 raise InvalidBusinessOperation("Invoice items must use unique positive quantities.")
             products = {p.pk: p for p in Product.objects.active().filter(pk__in=product_ids)}
             if len(products) != len(product_ids):
                 raise InvalidBusinessOperation("Every invoice product must exist and be active.")
             normalized_payload = {
                 "customer": customer.pk,
-                "items": [{"product": products[item["product"]].pk, "quantity": item["quantity"]} for item in items],
+                "items": [
+                    {"product": products[item["product"]].pk, "quantity": item["quantity"]}
+                    for item in items
+                ],
             }
         else:
             if invoice.net_paid_amount > 0:
@@ -119,14 +133,17 @@ def _validate_create_request(*, requester, target_type, target_id, operation, pa
     elif target_type == "vehicle":
         vehicle = (
             StockLocation.objects
-            .filter(pk=target_id, location_type=StockLocation.LocationType.SALES_VEHICLE, employee_id=requester.pk)
+            .filter(
+                pk=target_id,
+                location_type=StockLocation.LocationType.SALES_VEHICLE,
+                employee_id=requester.pk,
+            )
             .first()
         )
         if vehicle is None:
             raise InvalidBusinessOperation("Vehicle not found or not owned by the requester.")
         if operation == "update":
-            allowed = {"name"}
-            unknown = set(normalized_payload) - allowed
+            unknown = set(normalized_payload) - {"name"}
             if unknown:
                 raise InvalidBusinessOperation("Only the vehicle name can be changed by an approval request.")
             name = str(normalized_payload.get("name", "")).strip()
@@ -143,22 +160,49 @@ def _validate_create_request(*, requester, target_type, target_id, operation, pa
     return manager, normalized_payload
 
 
-@transaction.atomic
+def _has_duplicate_pending_request(*, requester_id, target_type, target_id, operation):
+    for event in AuditEvent.objects.filter(
+        action=REQUESTED_ACTION,
+        actor_id=requester_id,
+        entity_type=target_type,
+        entity_id=target_id,
+        metadata__operation=operation,
+    ).only("id"):
+        if not _decision_exists(event.pk):
+            return event
+    return None
+
+
 def request_approval(*, requester, target_type, target_id, operation, payload=None, reason="", idempotency_key=None, path="/api/v1/approvals/"):
     if not idempotency_key:
         raise InvalidBusinessOperation("Idempotency-Key is required.")
 
-    manager, normalized_payload = _validate_create_request(
-        requester=requester,
-        target_type=target_type,
-        target_id=target_id,
-        operation=operation,
-        payload=payload,
-        reason=reason,
-    )
-    approval_id = str(uuid4())
+    raw_payload = payload or {}
+    raw_data = {
+        "target_type": target_type,
+        "target_id": int(target_id),
+        "operation": operation,
+        "payload": raw_payload,
+        "reason": str(reason or "").strip(),
+    }
 
     def create():
+        manager, normalized_payload = _validate_create_request(
+            requester=requester,
+            target_type=target_type,
+            target_id=target_id,
+            operation=operation,
+            payload=raw_payload,
+        )
+        duplicate = _has_duplicate_pending_request(
+            requester_id=requester.pk,
+            target_type=target_type,
+            target_id=target_id,
+            operation=operation,
+        )
+        if duplicate is not None:
+            return IdempotentResult(status=200, body=_event_payload(duplicate))
+
         event = AuditEvent.objects.create(
             action=REQUESTED_ACTION,
             entity_type=target_type,
@@ -166,11 +210,11 @@ def request_approval(*, requester, target_type, target_id, operation, payload=No
             actor_id=requester.pk,
             request_id=idempotency_key,
             metadata={
-                "approval_id": approval_id,
+                "approval_id": str(uuid4()),
                 "operation": operation,
                 "approver_id": manager.pk,
                 "payload": normalized_payload,
-                "reason": str(reason or "").strip(),
+                "reason": raw_data["reason"],
                 "status": "pending",
             },
         )
@@ -180,125 +224,118 @@ def request_approval(*, requester, target_type, target_id, operation, payload=No
         key=idempotency_key,
         user_id=requester.pk,
         path=path,
-        data={
-            "target_type": target_type,
-            "target_id": int(target_id),
-            "operation": operation,
-            "payload": normalized_payload,
-            "reason": str(reason or "").strip(),
-        },
+        data=raw_data,
         operation=create,
     )
 
 
-@transaction.atomic
 def review_approval(*, approver, approval_event_id, decision, reason="", idempotency_key=None, path_prefix="/api/v1/approvals/"):
     if decision not in {"approve", "reject"}:
         raise InvalidBusinessOperation("Unsupported approval decision.")
     if not idempotency_key:
         raise InvalidBusinessOperation("Idempotency-Key is required.")
 
-    request_event = _load_request(approval_event_id)
-    metadata = request_event.metadata or {}
-    requester_id = request_event.actor_id
-    target_type = request_event.entity_type
-    target_id = request_event.entity_id
-    operation = metadata.get("operation")
-    payload = metadata.get("payload") or {}
-    assigned_approver_id = metadata.get("approver_id")
+    def review():
+        request_event = _load_request_for_update(approval_event_id)
+        metadata = request_event.metadata or {}
+        requester_id = request_event.actor_id
+        target_type = request_event.entity_type
+        target_id = request_event.entity_id
+        operation = metadata.get("operation")
+        payload = metadata.get("payload") or {}
+        assigned_approver_id = metadata.get("approver_id")
 
-    if assigned_approver_id != approver.pk:
-        raise InvalidBusinessOperation("Only the requester’s assigned manager can review this request.")
-    requester = Employee.objects.select_related("manager__user").filter(user_id=requester_id).first()
-    if requester is None or requester.manager is None or requester.manager.user_id != approver.pk:
-        raise InvalidBusinessOperation("The approval is no longer assigned to this manager.")
-    if not RoleProfile.can_manage_user(approver, requester.user):
-        raise InvalidBusinessOperation("Approval requires a higher role level than the requester.")
+        if assigned_approver_id != approver.pk:
+            raise InvalidBusinessOperation("Only the requester’s assigned manager can review this request.")
+        requester = Employee.objects.select_related("manager__user").filter(user_id=requester_id).first()
+        if requester is None or requester.manager is None or requester.manager.user_id != approver.pk:
+            raise InvalidBusinessOperation("The approval is no longer assigned to this manager.")
+        if not RoleProfile.can_manage_user(approver, requester.user):
+            raise InvalidBusinessOperation("Approval requires a higher role level than the requester.")
 
-    if decision == "approve":
-        if target_type == "invoice":
-            invoice = Invoice.objects.filter(pk=target_id).select_related("customer").first()
-            if invoice is None:
-                raise InvalidBusinessOperation("Invoice no longer exists.")
-            if operation == "update":
-                customer = Customer.objects.filter(pk=int(payload["customer"])).first()
-                if customer is None:
-                    raise InvalidBusinessOperation("Requested customer no longer exists.")
-                products = {p.pk: p for p in Product.objects.active().filter(pk__in=[int(i["product"]) for i in payload["items"]])}
-                if len(products) != len(payload["items"]):
-                    raise InvalidBusinessOperation("One or more requested products are no longer active.")
-                validated = {
-                    "customer": customer,
-                    "items": [
-                        {"product": products[int(item["product"])], "quantity": int(item["quantity"])}
-                        for item in payload["items"]
-                    ],
-                }
-                result = UpdateInvoice()(invoice_id=target_id, validated_data=validated, actor=approver)
-                body = {
-                    "invoice": result.pk,
-                    "operation": "update",
-                    "status": "approved",
-                }
-            elif operation == "delete":
-                DeleteInvoice()(invoice_id=target_id, actor=approver)
-                body = {"invoice": target_id, "operation": "delete", "status": "approved"}
+        if decision == "approve":
+            if target_type == "invoice":
+                invoice = Invoice.objects.filter(pk=target_id).first()
+                if invoice is None:
+                    raise InvalidBusinessOperation("Invoice no longer exists.")
+                if operation == "update":
+                    customer = Customer.objects.filter(pk=int(payload["customer"])).first()
+                    if customer is None:
+                        raise InvalidBusinessOperation("Requested customer no longer exists.")
+                    raw_items = payload.get("items") or []
+                    product_ids = [int(item["product"]) for item in raw_items]
+                    products = {p.pk: p for p in Product.objects.active().filter(pk__in=product_ids)}
+                    if len(products) != len(product_ids):
+                        raise InvalidBusinessOperation("One or more requested products are no longer active.")
+                    validated = {
+                        "customer": customer,
+                        "items": [
+                            {"product": products[int(item["product"])], "quantity": int(item["quantity"])}
+                            for item in raw_items
+                        ],
+                    }
+                    result = UpdateInvoice()(invoice_id=target_id, validated_data=validated, actor=approver)
+                    body = {"invoice": result.pk, "operation": "update", "status": "approved"}
+                elif operation == "delete":
+                    DeleteInvoice()(invoice_id=target_id, actor=approver)
+                    body = {"invoice": target_id, "operation": "delete", "status": "approved"}
+                else:
+                    raise InvalidBusinessOperation("Unsupported invoice approval operation.")
+            elif target_type == "vehicle":
+                vehicle = StockLocation.objects.filter(
+                    pk=target_id,
+                    location_type=StockLocation.LocationType.SALES_VEHICLE,
+                    employee_id=requester_id,
+                ).select_for_update().first()
+                if vehicle is None:
+                    raise InvalidBusinessOperation("Vehicle no longer exists or is no longer assigned to the requester.")
+                if operation == "update":
+                    vehicle.name = str(payload["name"]).strip()
+                    vehicle.save(update_fields=("name", "updated_at") if hasattr(vehicle, "updated_at") else ("name",))
+                    body = {"vehicle": vehicle.pk, "operation": "update", "status": "approved"}
+                elif operation == "delete":
+                    if StockBalance.objects.filter(location=vehicle, quantity__gt=0).exists():
+                        raise InvalidBusinessOperation("A vehicle with remaining stock cannot be deactivated.")
+                    vehicle.is_active = False
+                    vehicle.save(update_fields=("is_active",))
+                    body = {"vehicle": vehicle.pk, "operation": "delete", "status": "approved"}
+                else:
+                    raise InvalidBusinessOperation("Unsupported vehicle approval operation.")
             else:
-                raise InvalidBusinessOperation("Unsupported invoice approval operation.")
-        elif target_type == "vehicle":
-            vehicle = StockLocation.objects.filter(
-                pk=target_id,
-                location_type=StockLocation.LocationType.SALES_VEHICLE,
-                employee_id=requester_id,
-            ).select_for_update().first()
-            if vehicle is None:
-                raise InvalidBusinessOperation("Vehicle no longer exists or is no longer assigned to the requester.")
-            if operation == "update":
-                vehicle.name = str(payload["name"]).strip()
-                vehicle.save(update_fields=("name",))
-                body = {"vehicle": vehicle.pk, "operation": "update", "status": "approved"}
-            elif operation == "delete":
-                if StockBalance.objects.filter(location=vehicle, quantity__gt=0).exists():
-                    raise InvalidBusinessOperation("A vehicle with remaining stock cannot be deactivated.")
-                vehicle.is_active = False
-                vehicle.save(update_fields=("is_active",))
-                body = {"vehicle": vehicle.pk, "operation": "delete", "status": "approved"}
-            else:
-                raise InvalidBusinessOperation("Unsupported vehicle approval operation.")
+                raise InvalidBusinessOperation("Unsupported approval target.")
         else:
-            raise InvalidBusinessOperation("Unsupported approval target.")
-    else:
-        body = {"target_type": target_type, "target_id": target_id, "operation": operation, "status": "rejected"}
+            body = {"target_type": target_type, "target_id": target_id, "operation": operation, "status": "rejected"}
 
-    decision_action = APPROVED_ACTION if decision == "approve" else REJECTED_ACTION
-    decision_event = AuditEvent.objects.create(
-        action=decision_action,
-        entity_type=target_type,
-        entity_id=target_id,
-        actor_id=approver.pk,
-        request_id=idempotency_key,
-        metadata={
-            "approval_id": request_event.pk,
-            "request_event_id": request_event.pk,
-            "requester_id": requester_id,
-            "operation": operation,
-            "decision_reason": str(reason or "").strip(),
-            "status": "approved" if decision == "approve" else "rejected",
-        },
-    )
-    body["approval_request_id"] = request_event.pk
-    body["decision_event_id"] = decision_event.pk
-    result_status = 200
-
-    def persist_result():
-        return IdempotentResult(status=result_status, body=body)
+        decision_event = AuditEvent.objects.create(
+            action=APPROVED_ACTION if decision == "approve" else REJECTED_ACTION,
+            entity_type=target_type,
+            entity_id=target_id,
+            actor_id=approver.pk,
+            request_id=idempotency_key,
+            metadata={
+                "approval_id": request_event.pk,
+                "request_event_id": request_event.pk,
+                "requester_id": requester_id,
+                "operation": operation,
+                "decision_reason": str(reason or "").strip(),
+                "reviewed_at": request_event.created_at.isoformat(),
+                "status": "approved" if decision == "approve" else "rejected",
+            },
+        )
+        body["approval_request_id"] = request_event.pk
+        body["decision_event_id"] = decision_event.pk
+        return IdempotentResult(status=200, body=body)
 
     return execute_idempotent(
         key=idempotency_key,
         user_id=approver.pk,
         path=f"{path_prefix}{approval_event_id}/{decision}/",
-        data={"approval_event_id": int(approval_event_id), "decision": decision, "reason": str(reason or "").strip()},
-        operation=persist_result,
+        data={
+            "approval_event_id": int(approval_event_id),
+            "decision": decision,
+            "reason": str(reason or "").strip(),
+        },
+        operation=review,
     )
 
 
@@ -313,10 +350,8 @@ def list_pending_for_manager(*, manager, limit=100):
         metadata__approval_id__in=[event.pk for event in events],
     ).values_list("metadata__approval_id", "action")
     decision_by_id = {int(request_id): action for request_id, action in decisions if request_id is not None}
-    pending = []
-    for event in events:
-        if event.pk in decision_by_id:
-            continue
-        payload = _event_payload(event)
-        pending.append(payload)
-    return pending
+    return [
+        _event_payload(event)
+        for event in events
+        if event.pk not in decision_by_id
+    ]
