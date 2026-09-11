@@ -135,10 +135,7 @@ def send_notification_push(notification_id: int) -> int:
             failed_count += 1
 
             error_code = getattr(error, "code", "")
-            if error_code in {
-                "messaging/registration-token-not-registered",
-                "messaging/invalid-argument",
-            }:
+            if error_code == "messaging/registration-token-not-registered":
                 device.deactivate(error_code)
 
     if failed_count:
