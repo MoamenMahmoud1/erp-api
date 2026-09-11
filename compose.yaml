@@ -42,6 +42,11 @@ services:
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
     depends_on:
       db:
         condition: service_healthy
@@ -61,6 +66,11 @@ services:
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
     depends_on:
       db:
         condition: service_healthy
