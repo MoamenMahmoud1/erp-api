@@ -1,11 +1,12 @@
 import django.contrib.auth.models
 import django.contrib.auth.validators
+from django.conf import settings
 from django.db import migrations, models
 from django.db.models.functions import Lower
-from django.conf import settings
 from django.utils import timezone
 import django.db.models.deletion
 import phonenumber_field.modelfields
+import accounts.managers
 
 
 class Migration(migrations.Migration):
@@ -115,7 +116,7 @@ class Migration(migrations.Migration):
                 ],
             },
             managers=[
-                ("objects", "accounts.managers.CustomUserManager"),
+                ("objects", accounts.managers.CustomUserManager()),
             ],
         ),
         migrations.CreateModel(
@@ -176,7 +177,9 @@ class Migration(migrations.Migration):
                 "verbose_name": "Employee",
                 "verbose_name_plural": "Employees",
             },
-            managers=[("objects", "accounts.managers.EmployeeManager")],
+            managers=[
+                ("objects", accounts.managers.EmployeeManager()),
+            ],
         ),
         migrations.CreateModel(
             name="RoleProfile",
