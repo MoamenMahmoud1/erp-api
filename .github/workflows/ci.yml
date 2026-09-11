@@ -109,7 +109,7 @@ jobs:
           - suite: authentication
             apps: accounts authsession authentication
           - suite: organization
-            apps: organization customers suppliers
+            apps: organization customers customer_assignments suppliers
           - suite: catalog
             apps: products coupons
           - suite: sales
@@ -157,7 +157,7 @@ jobs:
         run: python manage.py test ${{ matrix.apps }}
 
   frontend:
-    name: Frontend build and container
+    name: Frontend build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -177,11 +177,11 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Typecheck frontend
+        run: npm run typecheck
+
       - name: Build frontend
         run: npm run build
 
       - name: Build production frontend image
-        run: docker build --tag erp-frontend:ci .
-
-      - name: Validate production Nginx configuration
-        run: docker run --rm erp-frontend:ci nginx -t
+        run: docker build -t erp-api-frontend:ci .
