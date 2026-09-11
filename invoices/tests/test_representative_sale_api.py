@@ -6,6 +6,7 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import Employee, EmployeeShift, RoleProfile
+from customer_assignments.models import CustomerAssignment
 from inventory.models import StockBalance, StockLocation
 from invoices.api.views import InvoiceViewSet
 from invoices.models import Invoice
@@ -81,6 +82,8 @@ class RepresentativeSaleIdempotencyTests(TestCase):
         self.rep.user_permissions.add(payment_permission)
 
         self.customer = Customer.objects.create(name="Representative Sale Customer")
+        CustomerAssignment.objects.create(customer=self.customer, employee=self.rep.employee)
+        self.unassigned_customer = Customer.objects.create(name="Unassigned Customer")
         self.product = Product.objects.create(
             name="Representative Sale Product",
             purchase_price=Decimal("50.00"),
@@ -163,3 +166,23 @@ class RepresentativeSaleIdempotencyTests(TestCase):
 
         self.assertEqual(Invoice.objects.count(), 1)
         self.assertEqual(PaymentTransaction.objects.count(), 1)
+
+    def test_unassigned_customer_is_rejected_without_side_effects(self):
+        body = {
+            "customer": self.unassigned_customer.pk,
+            "items": [{"product": self.product.pk, "quantity": 1}],
+            "payment_method": "cash",
+            "payment_amount": "100.00",
+        }
+
+        response = self._request("rep-sale-unassigned-1", body)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data["code"], "sale_invalid")
+        self.assertIn("not assigned", response.data["detail"].lower())
+        self.assertEqual(Invoice.objects.count(), 0)
+        self.assertEqual(PaymentTransaction.objects.count(), 0)
+        self.assertEqual(
+            StockBalance.objects.get(location=self.vehicle, product=self.product).quantity,
+            5,
+        )
