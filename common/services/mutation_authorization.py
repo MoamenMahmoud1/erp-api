@@ -18,12 +18,7 @@ class MutationAuthorizationDecision:
 
 
 class MutationAuthorizationService:
-    """Centralize direct-vs-approval mutation decisions.
-
-    Permissions answer whether a user can perform or request an operation.
-    This service decides whether the operation is direct, must become an
-    approval request, or must be denied.
-    """
+    """Centralize direct-vs-approval decisions for state-changing actions."""
 
     APPROVAL_SUPPORTED_ACTIONS = {
         ("invoice", "update"),
@@ -49,29 +44,26 @@ class MutationAuthorizationService:
 
         has_direct_permission = actor.is_superuser or actor.has_perm(direct_permission)
         approval_supported = (resource, action) in cls.APPROVAL_SUPPORTED_ACTIONS
-
-        manager = cls.approval_manager_for(actor) if approval_supported else None
-        can_request_approval = manager is not None
         approval_required = RoleProfile.requires_shift_for_user(actor)
+        manager = cls.approval_manager_for(actor) if approval_supported else None
 
-        if has_direct_permission and not approval_required:
-            return MutationAuthorizationDecision(MutationDecision.DIRECT)
-
-        if approval_supported and can_request_approval:
+        if approval_supported and approval_required:
+            if manager is None:
+                return MutationAuthorizationDecision(
+                    MutationDecision.DENIED,
+                    reason="This operation requires approval, but no eligible manager is assigned.",
+                )
             return MutationAuthorizationDecision(
                 MutationDecision.REQUEST_APPROVAL,
                 manager_id=manager.pk,
             )
 
         if has_direct_permission:
-            return MutationAuthorizationDecision(
-                MutationDecision.DENIED,
-                reason="This operation requires approval, but no eligible manager is assigned.",
-            )
+            return MutationAuthorizationDecision(MutationDecision.DIRECT)
 
         return MutationAuthorizationDecision(
             MutationDecision.DENIED,
-            reason="The user is not permitted to perform or request this operation.",
+            reason="The user is not permitted to perform this operation.",
         )
 
     @staticmethod
@@ -91,13 +83,7 @@ class MutationAuthorizationService:
         return manager
 
     @classmethod
-    def can_request_approval(
-        cls,
-        *,
-        actor,
-        resource: str,
-        action: str,
-    ) -> bool:
+    def can_request_approval(cls, *, actor, resource: str, action: str) -> bool:
         if (resource, action) not in cls.APPROVAL_SUPPORTED_ACTIONS:
             return False
         return cls.approval_manager_for(actor) is not None
