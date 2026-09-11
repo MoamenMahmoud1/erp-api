@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from accounts.models import RoleProfile
+from customer_assignments.services import assigned_customer_queryset
 from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
 
 
@@ -75,6 +76,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
         if RoleProfile.requires_shift_for_user(user):
+            fields["customer"].queryset = assigned_customer_queryset(user)
             fields.pop("gross_profit", None)
         return fields
 
