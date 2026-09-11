@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Center, Loader, Text } from '@mantine/core';
+import { Badge, Card, Center, Loader, Stack, Text } from '@mantine/core';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
 import { api, type Paginated } from '../lib/api';
@@ -21,6 +21,7 @@ type EmployeePageOptions = {
   employees: Paginated;
   sites: Paginated;
   departments: Paginated;
+  roles: Paginated;
 };
 
 function EmployeePageLoading() {
@@ -43,10 +44,11 @@ export function EmployeesPage() {
       api.employees.list('?page_size=50'),
       api.organization.sites('?page_size=50'),
       api.organization.departments('?page_size=50'),
+      api.roles.list('?page_size=100'),
     ])
-      .then(([users, employees, sites, departments]) => {
+      .then(([users, employees, sites, departments, roles]) => {
         if (!active) return;
-        setOptions({ users, employees, sites, departments });
+        setOptions({ users, employees, sites, departments, roles });
       })
       .catch((requestError) => {
         if (!active) return;
@@ -91,6 +93,14 @@ export function EmployeesPage() {
     }));
   }, [options]);
 
+  const roleOptions = useMemo<CrudOption[]>(() => {
+    if (!options) return [];
+    return options.roles.results.map((role) => ({
+      value: String(role.id),
+      label: String(role.name || `Role #${role.id}`),
+    }));
+  }, [options]);
+
   if (error) {
     return (
       <Card className="glass" radius="xl" p="xl" withBorder>
@@ -113,6 +123,18 @@ export function EmployeesPage() {
       remove={api.employees.delete}
       fields={[
         { key: 'user', label: 'User', type: 'select', options: userOptions, required: true, createOnly: true },
+        {
+          key: 'role_id',
+          label: 'Role',
+          type: 'select',
+          options: roleOptions,
+          clearable: true,
+          editValue: (row) => {
+            const role = row.role as Record<string, unknown> | null;
+            const userRole = (row.user_details as Record<string, unknown> | null)?.role as Record<string, unknown> | null;
+            return role?.id ?? userRole?.id ?? '';
+          },
+        },
         { key: 'manager', label: 'Manager', type: 'select', options: managerOptions, clearable: true },
         { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions, clearable: true },
         { key: 'department', label: 'Department', type: 'select', options: departmentOptions, clearable: true },
@@ -125,7 +147,17 @@ export function EmployeesPage() {
             const user = row.user_details as Record<string, unknown> | null;
             if (!user) return '—';
             const name = [user.first_name, user.last_name].filter(Boolean).join(' ') || String(user.username || '—');
-            return `${name} (@${user.username})`;
+            const role = user.role as Record<string, unknown> | null;
+            const roleName = String(role?.name || '');
+            return (
+              <Stack gap={2}>
+                <Text size="sm" fw={600}>{name}</Text>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Text size="xs" c="dimmed">@{String(user.username || '—')}</Text>
+                  {roleName && <Badge size="xs" variant="light" color="erp">{roleName}</Badge>}
+                </div>
+              </Stack>
+            );
           },
         },
         {

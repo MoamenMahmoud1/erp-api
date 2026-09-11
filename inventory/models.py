@@ -31,6 +31,11 @@ class StockLocation(models.Model):
         blank=True,
         related_name="stock_location",
     )
+    warehouse_managers = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="managed_warehouses",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     objects = StockLocationQuerySet.as_manager()
@@ -156,6 +161,7 @@ class StockMovement(models.Model):
         ordering = ("-created_at",)
         permissions = [
             ("transfer_stock", "Can transfer stock"),
+            ("approve_stock_transfer", "Can approve stock transfer requests"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -223,3 +229,69 @@ class StockBalance(models.Model):
 
     def __str__(self):
         return f"{self.location_id} - {self.product_id}: {self.quantity}"
+
+
+class StockTransferRequest(models.Model):
+    class RequestType(models.TextChoices):
+        WAREHOUSE_TO_VEHICLE = "WAREHOUSE_TO_VEHICLE", "Warehouse to vehicle"
+        VEHICLE_TO_WAREHOUSE = "VEHICLE_TO_WAREHOUSE", "Vehicle to warehouse"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    request_type = models.CharField(max_length=30, choices=RequestType.choices)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="stock_transfer_requests")
+    warehouse_manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="warehouse_transfer_requests")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_stock_transfer_requests")
+    shift = models.ForeignKey("accounts.EmployeeShift", on_delete=models.PROTECT, related_name="stock_transfer_requests")
+    warehouse = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="stock_transfer_requests", limit_choices_to={"location_type": "MAIN_WAREHOUSE"})
+    source_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="source_stock_transfer_requests")
+    destination_location = models.ForeignKey(StockLocation, on_delete=models.PROTECT, related_name="destination_stock_transfer_requests")
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    reference = models.CharField(max_length=100, blank=True)
+    rejection_reason = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    approved_movement = models.ForeignKey(StockMovement, on_delete=models.PROTECT, null=True, blank=True, related_name="approved_transfer_requests")
+    invoice_return = models.ForeignKey("invoices.InvoiceReturn", on_delete=models.PROTECT, null=True, blank=True, related_name="stock_transfer_request")
+
+    class Meta:
+        ordering = ("-created_at", "-id")
+        indexes = [
+            models.Index(fields=("warehouse_manager", "status", "created_at"), name="stock_req_mgr_status_idx"),
+            models.Index(fields=("requested_by", "status", "created_at"), name="stock_req_user_status_idx"),
+            models.Index(fields=("warehouse", "status", "created_at"), name="stock_req_wh_status_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(source_location=F("warehouse")) | Q(destination_location=F("warehouse")),
+                name="stock_req_warehouse_participates",
+            ),
+            models.CheckConstraint(
+                condition=~Q(source_location=F("destination_location")),
+                name="stock_req_locations_differ",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Stock transfer request #{self.pk}"
+
+
+class StockTransferRequestItem(models.Model):
+    request = models.ForeignKey(StockTransferRequest, on_delete=models.CASCADE, related_name="items")
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="stock_transfer_request_items")
+    quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    invoice_item = models.ForeignKey("invoices.InvoiceItem", on_delete=models.PROTECT, null=True, blank=True, related_name="stock_transfer_request_items")
+
+    class Meta:
+        ordering = ("id",)
+        constraints = [
+            models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_req_item_quantity_positive"),
+            models.UniqueConstraint(fields=("request", "product"), name="stock_req_item_unique_product"),
+        ]
+
+    def __str__(self):
+        return f"{self.product} x {self.quantity}"

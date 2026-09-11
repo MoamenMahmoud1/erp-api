@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db.models import IntegerField, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce
 from django_filters.rest_framework import DjangoFilterBackend
@@ -6,8 +7,8 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.api.serializers import EmployeeSerializer
-from accounts.models import Employee, Role
+from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, RoleSummarySerializer, UserSummarySerializer
+from accounts.models import Employee, RoleProfile
 from accounts.permissions import EmployeeAccessPermission
 from common.pagination import StandardPagination
 
@@ -43,6 +44,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 "work_site",
                 "department",
             )
+            .prefetch_related(
+                "user__groups__role_profile",
+                "manager__user__groups__role_profile",
+            )
             .order_by(*self.ordering)
         )
 
@@ -52,12 +57,12 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = User.objects.filter(
             is_active=True,
             employee__isnull=True,
-        )
+        ).prefetch_related("groups__role_profile")
 
         if not request.user.is_superuser:
-            actor_level = Role.level_for_user(request.user)
+            actor_level = RoleProfile.level_for_user(request.user)
             target_role_level = Subquery(
-                Role.objects.filter(group__user=OuterRef("pk"))
+                RoleProfile.objects.filter(group__user=OuterRef("pk"))
                 .order_by("-level")
                 .values("level")[:1],
                 output_field=IntegerField(),
@@ -80,17 +85,49 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         users = users.order_by("first_name", "last_name", "username", "pk")
         page = self.paginate_queryset(users)
         rows = page if page is not None else users
-        data = [
-            {
-                "id": user.pk,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "is_staff": user.is_staff,
-            }
-            for user in rows
-        ]
+        data = UserSummarySerializer(rows, many=True, context={"request": request}).data
         if page is not None:
             return self.get_paginated_response(data)
         return Response(data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=("get",), url_path="groups")
+    def groups(self, request):
+        """Legacy alias: every Django Group is a Role now."""
+        groups = Group.objects.select_related("role_profile").order_by("name", "pk")
+        if not request.user.is_superuser:
+            groups = groups.annotate(
+                _role_level=Coalesce("role_profile__level", Value(0), output_field=IntegerField())
+            ).filter(_role_level__lt=RoleProfile.level_for_user(request.user))
+
+        search = request.query_params.get("search", "").strip()
+        if search:
+            groups = groups.filter(
+                Q(name__icontains=search)
+                | Q(role_profile__description__icontains=search)
+                | Q(role_profile__name__icontains=search)
+            )
+
+        page = self.paginate_queryset(groups)
+        rows = page if page is not None else groups
+        data = GroupSummarySerializer(rows, many=True, context={"request": request}).data
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class RoleViewSet(viewsets.ReadOnlyModelViewSet):
+    """Expose Django Groups directly as ERP roles."""
+
+    serializer_class = RoleSummarySerializer
+    permission_classes = (EmployeeAccessPermission,)
+    pagination_class = StandardPagination
+    filter_backends = (filters.SearchFilter, filters.OrderingFilter)
+    search_fields = ("name", "role_profile__name", "role_profile__description")
+
+    def get_queryset(self):
+        groups = Group.objects.select_related("role_profile")
+        if not self.request.user.is_superuser:
+            groups = groups.annotate(
+                _role_level=Coalesce("role_profile__level", Value(0), output_field=IntegerField())
+            ).filter(_role_level__lt=RoleProfile.level_for_user(self.request.user))
+        return groups.order_by("role_profile__name", "name", "pk")

@@ -1,10 +1,12 @@
 from django.db import transaction
+
 from inventory.models import StockLocation, StockMovement, StockMovementItem
 
 from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_purchase_return
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
+from inventory.services.source_reference import build_source_reference
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
@@ -13,7 +15,12 @@ from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None):
     purchases = Purchase.objects.visible_to(actor) if actor is not None else Purchase.objects
     try:
-        purchase = purchases.select_for_update(of=("self",)).select_related("site", "shift").prefetch_related("items__return_items").get(pk=purchase_id)
+        purchase = (
+            purchases.select_for_update(of=("self",))
+            .select_related("site", "shift")
+            .prefetch_related("items__return_items")
+            .get(pk=purchase_id)
+        )
     except Purchase.DoesNotExist as exc:
         raise InvalidBusinessOperation("Purchase not found or not accessible.") from exc
 
@@ -62,7 +69,11 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
         source_location=warehouse,
         shift=shift or purchase.shift,
         created_by_id=created_by_id,
-        reference=f"Return Purchase #{purchase.pk}",
+        reference=build_source_reference(
+            source_type="purchase.return",
+            source_id=purchase_return.pk,
+            label=f"Return Purchase #{purchase.pk}",
+        ),
     )
     for line, quantity in cleaned:
         try:
@@ -74,12 +85,26 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
                 )
                 allocations = [{"batch": line.batch, "quantity": quantity, "unit_cost": unit_cost}]
             else:
-                balance = StockBalanceService.decrease(location=warehouse, product=line.product, quantity=quantity)
+                balance = StockBalanceService.decrease(
+                    location=warehouse,
+                    product=line.product,
+                    quantity=quantity,
+                )
                 allocations = getattr(balance, "_stock_allocations", None) or [
-                    {"batch": None, "quantity": quantity, "unit_cost": getattr(balance, "_removed_unit_cost", line.unit_purchase_price)}
+                    {
+                        "batch": None,
+                        "quantity": quantity,
+                        "unit_cost": getattr(
+                            balance,
+                            "_removed_unit_cost",
+                            line.unit_purchase_price,
+                        ),
+                    }
                 ]
         except ValueError as exc:
-            raise InsufficientStock(f"Insufficient stock for {line.product.name} in {warehouse.name}.") from exc
+            raise InsufficientStock(
+                f"Insufficient stock for {line.product.name} in {warehouse.name}."
+            ) from exc
 
         PurchaseReturnItem.objects.create(
             purchase_return=purchase_return,
@@ -96,17 +121,33 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
                 unit_cost=allocation["unit_cost"],
             )
 
-    post_purchase_return(purchase_return=purchase_return, actor_id=created_by_id, company=get_default_company())
+    post_purchase_return(
+        purchase_return=purchase_return,
+        actor_id=created_by_id,
+        company=get_default_company(),
+    )
     record_event(
         action="purchase.return",
         entity_type="PurchaseReturn",
         entity_id=purchase_return.pk,
         actor_id=created_by_id,
-        metadata={"purchase_id": purchase.pk, "stock_movement_id": movement.pk, "site_id": purchase_return.site_id, "shift_id": purchase_return.shift_id, "reason": reason},
+        metadata={
+            "purchase_id": purchase.pk,
+            "stock_movement_id": movement.pk,
+            "site_id": purchase_return.site_id,
+            "shift_id": purchase_return.shift_id,
+            "reason": reason,
+        },
     )
     return purchase_return
 
 
 class ReturnPurchase:
     def __call__(self, *, purchase_id, items, created_by_id, reason="", actor=None):
-        return return_purchase(purchase_id=purchase_id, items=items, created_by_id=created_by_id, reason=reason, actor=actor)
+        return return_purchase(
+            purchase_id=purchase_id,
+            items=items,
+            created_by_id=created_by_id,
+            reason=reason,
+            actor=actor,
+        )

@@ -9,7 +9,7 @@ from accounts.api.serializers.shift import (
     EmployeeShiftVehicleOptionSerializer,
     StartEmployeeShiftSerializer,
 )
-from accounts.models import EmployeeShift, Role
+from accounts.models import EmployeeShift, RoleProfile
 from accounts.permissions.shift import EmployeeShiftPermission
 from accounts.services.employee_shift import (
     ShiftError,
@@ -106,7 +106,7 @@ class EmployeeShiftListView(generics.ListAPIView):
 
     def get_queryset(self):
         queryset = EmployeeShift.objects.select_related("employee__user", "site", "vehicle").order_by("-business_date", "-opened_at")
-        if Role.scope_for_user(self.request.user) == Role.Scope.COMPANY:
+        if RoleProfile.scope_for_user(self.request.user) == RoleProfile.Scope.COMPANY:
             return queryset
         sites = visible_site_ids(self.request.user)
         if sites is None:

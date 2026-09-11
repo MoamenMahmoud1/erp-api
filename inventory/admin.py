@@ -1,77 +1,87 @@
 from django.contrib import admin
 
-from .models import InventoryBatch, StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
+from inventory.models import (
+    StockBalance,
+    StockBatchBalance,
+    StockLocation,
+    StockMovement,
+    StockMovementItem,
+    StockTransferRequest,
+    StockTransferRequestItem,
+)
 
 
-class StockMovementItemInline(admin.TabularInline):
-    model = StockMovementItem
+class StockTransferRequestItemInline(admin.TabularInline):
+    model = StockTransferRequestItem
     extra = 0
-    autocomplete_fields = ("product", "batch")
-
-
-@admin.register(InventoryBatch)
-class InventoryBatchAdmin(admin.ModelAdmin):
-    list_display = ("product", "batch_number", "manufactured_date", "expiry_date", "created_at")
-    list_filter = ("expiry_date", "manufactured_date")
-    search_fields = ("product__name", "batch_number")
-    ordering = ("expiry_date", "product__name")
-    list_select_related = ("product",)
-    autocomplete_fields = ("product",)
-    readonly_fields = ("created_at",)
-
-
-@admin.register(StockBatchBalance)
-class StockBatchBalanceAdmin(admin.ModelAdmin):
-    list_display = ("location", "product", "batch_number", "quantity", "expiry_date", "total_cost", "updated_at")
-    list_filter = ("location", "batch__expiry_date")
-    search_fields = ("location__name", "batch__batch_number", "batch__product__name")
-    ordering = ("batch__expiry_date", "location__name")
-    list_select_related = ("location", "batch__product")
-    autocomplete_fields = ("location", "batch")
-    readonly_fields = ("updated_at",)
-
-    @admin.display(description="Product")
-    def product(self, obj):
-        return obj.batch.product
-
-    @admin.display(description="Batch")
-    def batch_number(self, obj):
-        return obj.batch.batch_number or obj.batch_id
-
-    @admin.display(description="Expiry")
-    def expiry_date(self, obj):
-        return obj.batch.expiry_date
+    readonly_fields = ("product", "quantity", "invoice_item")
 
 
 @admin.register(StockLocation)
 class StockLocationAdmin(admin.ModelAdmin):
-    list_display = ("name", "location_type", "employee", "is_active", "created_at")
-    list_filter = ("location_type", "is_active")
-    search_fields = ("name", "employee__username", "employee__email")
-    ordering = ("name",)
-    list_select_related = ("employee",)
-    autocomplete_fields = ("employee",)
-    readonly_fields = ("created_at",)
+    list_display = ("name", "location_type", "site", "employee", "is_active")
+    list_filter = ("location_type", "is_active", "site")
+    search_fields = ("name", "employee__username", "employee__first_name", "employee__last_name")
+    filter_horizontal = ("warehouse_managers",)
 
 
-@admin.register(StockMovement)
-class StockMovementAdmin(admin.ModelAdmin):
-    list_display = ("id", "movement_type", "source_location", "destination_location", "created_by", "reference", "created_at")
-    list_filter = ("movement_type", "created_at")
-    search_fields = ("reference", "created_by__username")
-    ordering = ("-created_at", "-id")
-    list_select_related = ("source_location", "destination_location", "created_by")
-    autocomplete_fields = ("source_location", "destination_location", "created_by")
-    readonly_fields = ("created_at",)
-    inlines = (StockMovementItemInline,)
+@admin.register(StockTransferRequest)
+class StockTransferRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "request_type",
+        "requested_by",
+        "warehouse_manager",
+        "warehouse",
+        "status",
+        "created_at",
+        "reviewed_at",
+    )
+    list_filter = ("request_type", "status", "warehouse")
+    search_fields = (
+        "requested_by__username",
+        "warehouse_manager__username",
+        "reference",
+    )
+    readonly_fields = ("created_at", "reviewed_at", "approved_by", "approved_movement", "invoice_return")
+    inlines = (StockTransferRequestItemInline,)
 
 
 @admin.register(StockBalance)
 class StockBalanceAdmin(admin.ModelAdmin):
-    list_display = ("location", "product", "quantity", "updated_at")
+    list_display = ("location", "product", "quantity", "total_cost", "updated_at")
     list_filter = ("location",)
     search_fields = ("location__name", "product__name")
-    ordering = ("location", "product")
-    list_select_related = ("location", "product")
-    autocomplete_fields = ("location", "product")
-    readonly_fields = ("updated_at",)
+    readonly_fields = ("quantity", "total_cost", "updated_at")
+
+
+@admin.register(StockBatchBalance)
+class StockBatchBalanceAdmin(admin.ModelAdmin):
+    list_display = ("location", "batch", "quantity", "total_cost", "updated_at")
+    list_filter = ("location",)
+    search_fields = ("location__name", "batch__product__name", "batch__batch_number")
+    readonly_fields = ("quantity", "total_cost", "updated_at")
+
+
+@admin.register(StockMovement)
+class StockMovementAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "movement_type",
+        "source_location",
+        "destination_location",
+        "created_by",
+        "created_at",
+        "reference",
+    )
+    list_filter = ("movement_type", "created_at")
+    search_fields = ("reference", "created_by__username", "source_location__name", "destination_location__name")
+    readonly_fields = tuple(field.name for field in StockMovement._meta.fields)
+
+
+@admin.register(StockMovementItem)
+class StockMovementItemAdmin(admin.ModelAdmin):
+    list_display = ("movement", "product", "batch", "quantity", "unit_cost")
+    list_filter = ("product",)
+    search_fields = ("product__name", "movement__reference")
+    readonly_fields = tuple(field.name for field in StockMovementItem._meta.fields)

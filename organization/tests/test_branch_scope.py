@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from accounts.models import Employee, Role
+from accounts.models import Employee
 from core.testing.roles import create_role
 from organization.models import Company, Site
 from services.organization_scope import visible_site_ids
@@ -58,7 +58,7 @@ class BranchScopeTests(TestCase):
 
     def test_branch_employee_sees_branch_and_child_store_only(self):
         user = self.make_user("branch-user")
-        role = create_role(code="branch-scope", level=20, scope=Role.Scope.BRANCH)
+        role = create_role(code="branch-scope", level=20, scope="branch")
         user.groups.add(role.group)
         Employee.objects.create(user=user, work_site=self.branch_a)
 

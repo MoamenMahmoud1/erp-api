@@ -9,13 +9,13 @@ from inventory.services.stock_balance import StockBalanceService
 
 
 @transaction.atomic
-def transfer_stock(*, source_id, destination_id, items, created_by, reference=""):
+def transfer_stock(*, source_id, destination_id, items, created_by, reference="", shift=None):
     if source_id == destination_id:
         raise InvalidBusinessOperation("Source and destination must be different.")
     if not items:
         raise InvalidBusinessOperation("Transfer must contain at least one item.")
 
-    shift = require_open_shift(created_by)
+    effective_shift = shift if shift is not None else require_open_shift(created_by)
     visible_locations = StockLocation.objects.visible_to(created_by).filter(is_active=True)
     location_map = {
         location.pk: location
@@ -26,8 +26,12 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
     if source is None or destination is None:
         raise InvalidBusinessOperation("Source or destination location is not accessible.")
 
-    if shift is not None and (source.site_id != shift.site_id or destination.site_id != shift.site_id):
+    if effective_shift is not None and (source.site_id != effective_shift.site_id or destination.site_id != effective_shift.site_id):
         raise InvalidBusinessOperation("A site-scoped employee can only transfer stock within the current shift site.")
+
+    if effective_shift is not None and effective_shift.vehicle_id is not None:
+        if destination.location_type == StockLocation.LocationType.SALES_VEHICLE and destination.pk != effective_shift.vehicle_id:
+            raise InvalidBusinessOperation("The transfer vehicle must match the current shift vehicle.")
 
     product_ids = [item["product"].pk for item in items]
     if len(product_ids) != len(set(product_ids)):
@@ -37,7 +41,7 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
         movement_type=StockMovement.MovementType.TRANSFER,
         source_location=source,
         destination_location=destination,
-        shift=shift,
+        shift=effective_shift,
         created_by_id=created_by.pk,
         reference=reference,
     )
@@ -81,8 +85,8 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
         metadata={
             "source_location_id": source.pk,
             "destination_location_id": destination.pk,
-            "site_id": shift.site_id if shift else source.site_id,
-            "shift_id": shift.pk if shift else None,
+            "site_id": effective_shift.site_id if effective_shift else source.site_id,
+            "shift_id": effective_shift.pk if effective_shift else None,
             "item_count": len(items),
             "reference": reference,
         },
@@ -91,5 +95,12 @@ def transfer_stock(*, source_id, destination_id, items, created_by, reference=""
 
 
 class TransferStock:
-    def __call__(self, *, source_id, destination_id, items, created_by, reference=""):
-        return transfer_stock(source_id=source_id, destination_id=destination_id, items=items, created_by=created_by, reference=reference)
+    def __call__(self, *, source_id, destination_id, items, created_by, reference="", shift=None):
+        return transfer_stock(
+            source_id=source_id,
+            destination_id=destination_id,
+            items=items,
+            created_by=created_by,
+            reference=reference,
+            shift=shift,
+        )

@@ -6,17 +6,22 @@ import { api } from '../lib/api';
 function expiryBadge(value: unknown, days: unknown) {
   if (value === true) return <Badge color="red" variant="light">Expired</Badge>;
   const remaining = Number(days);
-  if (Number.isFinite(remaining) && remaining <= 0) return <Badge color="red" variant="light">Expired</Badge>;
-  if (Number.isFinite(remaining) && remaining <= 7) return <Badge color="orange" variant="light">{remaining}d left</Badge>;
-  if (Number.isFinite(remaining) && remaining <= 30) return <Badge color="yellow" variant="light">{remaining}d left</Badge>;
-  if (Number.isFinite(remaining)) return <Badge color="teal" variant="light">{remaining}d left</Badge>;
-  return <Badge variant="light">No expiry</Badge>;
+  if (!Number.isFinite(remaining)) return <Badge variant="light">No expiry</Badge>;
+  if (remaining < 0) return <Badge color="red" variant="light">Expired</Badge>;
+  if (remaining === 0) return <Badge color="orange" variant="light">Expires today</Badge>;
+  if (remaining <= 7) return <Badge color="orange" variant="light">{remaining}d left</Badge>;
+  if (remaining <= 30) return <Badge color="yellow" variant="light">{remaining}d left</Badge>;
+  return <Badge color="teal" variant="light">{remaining}d left</Badge>;
 }
 
 const dateOnly = (value: unknown) => {
   if (!value) return '—';
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString([], { dateStyle: 'medium' });
+  const raw = String(value);
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const date = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(raw);
+  return Number.isNaN(date.getTime()) ? raw : date.toLocaleDateString([], { dateStyle: 'medium' });
 };
 
 export function InventoryBatchesPage() {

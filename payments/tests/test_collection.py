@@ -59,6 +59,24 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             Decimal("20.00"),
         )
 
+    def test_targeted_payment_stays_on_selected_invoice(self):
+        old = self.create_invoice(total="100.00")
+        selected = self.create_invoice(total="50.00")
+        tx = collect(
+            customer=self.customer,
+            cash_amount=Decimal("30"),
+            transfer_amount=Decimal("0"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
+            invoice_id=selected.pk,
+        )
+
+        self.assertEqual(
+            PaymentAllocation.objects.get(transaction=tx, invoice=selected).total_amount,
+            Decimal("30.00"),
+        )
+        self.assertFalse(PaymentAllocation.objects.filter(transaction=tx, invoice=old).exists())
+
     def test_overpayment_rolls_back(self):
         self.create_invoice()
         with self.assertRaises(OverpaymentError):

@@ -18,6 +18,11 @@ EMAIL_CHANGE_TIMEOUT = config("EMAIL_CHANGE_TIMEOUT", default=60 * 60, cast=int)
 REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 
+FIREBASE_ENABLED = config("FIREBASE_ENABLED", default=False, cast=bool)
+FIREBASE_PROJECT_ID = config("FIREBASE_PROJECT_ID", default="")
+FIREBASE_CREDENTIALS_FILE = config("FIREBASE_CREDENTIALS_FILE", default="")
+FCM_ANDROID_CHANNEL_ID = config("FCM_ANDROID_CHANNEL_ID", default="erp_notifications")
+
 AUTH_USER_MODEL = "accounts.CustomUserModel"
 AUTHENTICATION_BACKENDS = [
     "authentication.email.EmailBackend",
@@ -45,6 +50,7 @@ PROJECT_APPS = [
     "authsession.apps.AuthSessionConfig",
     "organization.apps.OrganizationConfig",
     "customers.apps.CustomersConfig",
+    "customer_assignments.apps.CustomerAssignmentsConfig",
     "products.apps.ProductsConfig",
     "coupons.apps.CouponsConfig",
     "invoices.apps.InvoicesConfig",
@@ -53,6 +59,7 @@ PROJECT_APPS = [
     "purchases.apps.PurchasesConfig",
     "suppliers.apps.SuppliersConfig",
     "accounting.apps.AccountingConfig",
+    "notifications.apps.NotificationsConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 MIDDLEWARE = [
@@ -99,6 +106,7 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_PAGINATION_CLASS": "common.pagination.StandardPagination",
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "common.exception_handler.custom_exception_handler",
     "DEFAULT_THROTTLE_CLASSES": (
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -122,7 +130,7 @@ SIMPLE_JWT = {
     "CHECK_REVOKE_TOKEN": False,
     "TOKEN_USER_CLASS": "authentication.token_user.ERPTokenUser",
 }
-IDEMPOTENCY_RETENTION_DAYS = config("IDEMPOTENCY_RETENTION_DAYS", default=90, cast=int)
+IDEMPOTENCY_RETENTION_DAYS = config("IDEMPOTENCY_RETENTION_DAYS", default=365, cast=int)
 if IDEMPOTENCY_RETENTION_DAYS < 1:
     raise ValueError("IDEMPOTENCY_RETENTION_DAYS must be >= 1")
 AUTH_SESSION_MIN_AGE = timedelta(hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int))
@@ -134,8 +142,24 @@ DJANGO_LOG_LEVEL = config("DJANGO_LOG_LEVEL", default="WARNING").upper()
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "formatters": {"standard": {"format": "{asctime} {levelname} {name} [{request_id}]: {message}", "style": "{"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "standard"}},
+    "filters": {
+        "ensure_request_id": {
+            "()": "core.middleware.EnsureRequestIdLogFilter",
+        },
+    },
+    "formatters": {
+        "standard": {
+            "format": "{asctime} {levelname} {name} [{request_id}]: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+            "filters": ["ensure_request_id"],
+        },
+    },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
     "loggers": {
         "django": {"handlers": ["console"], "level": DJANGO_LOG_LEVEL, "propagate": False},
@@ -143,6 +167,7 @@ LOGGING = {
         "accounts": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
         "erp.operations": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
         "erp.metrics": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "notifications": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
 }
 INTERNAL_IPS = ["127.0.0.1"]
@@ -163,12 +188,14 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
 
-# The dashboard stays live. Celery is used only for an inexpensive daily
-# integrity check today; heavy historical analytics will use it later.
 CELERY_BEAT_SCHEDULE = {
     "reconcile-company-counters": {
         "task": "organization.tasks.reconcile_company_counters",
         "schedule": crontab(hour=2, minute=0),
+    },
+    "rebuild-recent-approval-notifications": {
+        "task": "notifications.tasks.rebuild_recent_approval_notifications",
+        "schedule": crontab(minute="*/1"),
     },
 }
 

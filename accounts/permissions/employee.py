@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 
-from accounts.models import Role
+from accounts.models import RoleProfile
 
 
 class EmployeeAccessPermission(BasePermission):
@@ -19,6 +19,8 @@ class EmployeeAccessPermission(BasePermission):
         "partial_aupdate": "accounts.change_employee",
         "destroy": "accounts.delete_employee",
         "adestroy": "accounts.delete_employee",
+        "groups": "accounts.view_employee",
+        "agroups": "accounts.view_employee",
     }
 
     def has_permission(self, request, view):
@@ -28,9 +30,10 @@ class EmployeeAccessPermission(BasePermission):
         if request.user.is_superuser:
             return True
 
-        request._employee_role_level = Role.level_for_user(request.user)
+        request._employee_role_level = RoleProfile.level_for_user(request.user)
 
-        codename = self.permission_map.get(getattr(view, "action", None))
+        action = getattr(view, "action", None)
+        codename = self.permission_map.get(action)
         if not codename:
             return False
 
@@ -48,6 +51,6 @@ class EmployeeAccessPermission(BasePermission):
             "destroy",
             "adestroy",
         }:
-            return Role.can_manage_user(request.user, obj.user)
+            return RoleProfile.can_manage_user(request.user, obj.user)
 
         return True

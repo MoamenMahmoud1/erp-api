@@ -9,7 +9,7 @@ from datetime import datetime, timezone as datetime_timezone
 
 from django.core.cache import cache
 
-from accounts.models.role import Role
+from accounts.models import RoleProfile
 
 
 AUTH_SESSION_CACHE_PREFIX = "authsession"
@@ -29,6 +29,7 @@ def cache_active_session(*, auth_session, user, access_token):
         1,
         int((expires_at - datetime.now(datetime_timezone.utc)).total_seconds()),
     )
+    role = RoleProfile.summary_for_user(user)
 
     cache.set(
         auth_session_cache_key(auth_session.id),
@@ -42,7 +43,10 @@ def cache_active_session(*, auth_session, user, access_token):
             "is_active": bool(user.is_active),
             "is_staff": bool(user.is_staff),
             "is_superuser": bool(user.is_superuser),
-            "role_level": Role.level_for_user(user),
+            "role_level": role["level"] if role else RoleProfile.level_for_user(user),
+            "role_scope": role["scope"] if role else RoleProfile.Scope.SITE,
+            "requires_shift": role["requires_shift"] if role else False,
+            "role": role,
             "permissions": sorted(user.get_all_permissions()),
             "device_id": str(auth_session.device_id),
             "current_refresh_jti": str(auth_session.current_refresh_jti),
@@ -61,3 +65,13 @@ def delete_auth_session_caches(session_ids):
     cache.delete_many(
         [auth_session_cache_key(session_id) for session_id in session_ids]
     )
+
+
+def delete_all_auth_session_caches():
+    """Invalidate every active authorization snapshot after global RBAC changes."""
+    from authsession.models import AuthSession
+
+    session_ids = AuthSession.objects.filter(
+        revoked_at__isnull=True,
+    ).values_list("pk", flat=True)
+    delete_auth_session_caches(session_ids)

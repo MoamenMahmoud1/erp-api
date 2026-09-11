@@ -1,7 +1,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .api.views import EmployeeViewSet
+from .api.views import EmployeeViewSet, RoleViewSet
 from .api.views.current_user import CurrentUserView
 from .api.views.login import CsrfTokenView, LoginView
 from .api.views.logout import LogoutAllView, LogoutView
@@ -15,6 +15,7 @@ app_name = "accounts"
 
 router = DefaultRouter()
 router.register("employees", EmployeeViewSet, basename="employee")
+router.register("roles", RoleViewSet, basename="role")
 
 urlpatterns = [
     path("auth/me/", CurrentUserView.as_view(), name="current-user"),

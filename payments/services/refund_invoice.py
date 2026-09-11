@@ -9,7 +9,15 @@ from .refund import refund_payment
 
 
 @transaction.atomic
-def refund_invoice(*, invoice_id, amount, created_by_id, reason="", actor=None):
+def refund_invoice(
+    *,
+    invoice_id,
+    amount,
+    created_by_id,
+    reason="",
+    actor=None,
+    processing_shift=None,
+):
     invoice_qs = Invoice.objects
     if actor is not None:
         invoice_qs = invoice_qs.visible_to(actor)
@@ -41,6 +49,7 @@ def refund_invoice(*, invoice_id, amount, created_by_id, reason="", actor=None):
             created_by_id=created_by_id,
             reason=reason,
             actor=actor,
+            processing_shift=processing_shift,
         )
         remaining -= chunk
         if remaining <= 0:

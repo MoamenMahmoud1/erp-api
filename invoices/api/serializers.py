@@ -2,6 +2,8 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from accounts.models import RoleProfile
+from customer_assignments.services import assigned_customer_queryset
 from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
 
 
@@ -9,11 +11,28 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     line_total = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     gross_profit = serializers.SerializerMethodField()
+    returned_quantity = serializers.SerializerMethodField()
 
     class Meta:
         model = InvoiceItem
-        fields = ("id", "product", "product_name", "quantity", "unit_price", "line_total", "gross_profit")
-        read_only_fields = ("id", "product_name", "unit_price", "line_total", "gross_profit")
+        fields = (
+            "id", "product", "product_name", "quantity", "returned_quantity",
+            "unit_price", "line_total", "gross_profit",
+        )
+        read_only_fields = (
+            "id", "product_name", "returned_quantity", "unit_price", "line_total", "gross_profit",
+        )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields.pop("gross_profit", None)
+        return fields
+
+    def get_returned_quantity(self, obj):
+        return sum(item.quantity for item in obj.return_items.all())
 
     def get_gross_profit(self, obj):
         if obj.cost_price is None:
@@ -51,6 +70,15 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "subtotal", "total", "paid_amount", "refunded_amount", "net_paid_amount", "returned_amount", "outstanding_amount", "sold_quantity",
             "gross_profit", "created_at", "updated_at",
         )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields["customer"].queryset = assigned_customer_queryset(user)
+            fields.pop("gross_profit", None)
+        return fields
 
     def get_created_by_name(self, obj):
         return obj.created_by.get_full_name() or obj.created_by.username

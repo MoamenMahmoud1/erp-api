@@ -10,13 +10,20 @@ class CeleryConfigurationTests(SimpleTestCase):
         self.assertEqual(app.main, "erp_api")
         self.assertEqual(app.conf.broker_url, settings.CELERY_BROKER_URL)
 
-    def test_only_counter_reconciliation_is_scheduled(self):
+    def test_expected_background_tasks_are_scheduled(self):
         schedule = settings.CELERY_BEAT_SCHEDULE
         self.assertEqual(
             set(schedule),
-            {"reconcile-company-counters"},
+            {
+                "reconcile-company-counters",
+                "rebuild-recent-approval-notifications",
+            },
         )
         self.assertEqual(
             schedule["reconcile-company-counters"]["task"],
             "organization.tasks.reconcile_company_counters",
+        )
+        self.assertEqual(
+            schedule["rebuild-recent-approval-notifications"]["task"],
+            "notifications.tasks.rebuild_recent_approval_notifications",
         )

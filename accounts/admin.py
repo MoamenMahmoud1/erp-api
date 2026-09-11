@@ -3,10 +3,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
-from django.urls import reverse
-from django.utils.html import format_html
 
-from .models import Employee, Role
+from .models import Employee, RoleProfile
 
 User = get_user_model()
 
@@ -79,91 +77,47 @@ class CustomUserAdmin(BaseUserAdmin):
     readonly_fields = ("updated_at", "password_changed_at")
 
 
-@admin.register(Group)
-class GroupAdmin(BaseGroupAdmin):
-    search_fields = ("name",)
-    ordering = ("name",)
-
-
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = (
-        "id",
-        "user_link",
-        "manager",
-        "department",
-        "work_site",
-        "created_at",
-    )
-
+    list_display = ("id", "user", "manager", "work_site", "department")
     search_fields = (
         "user__username",
         "user__email",
         "user__first_name",
         "user__last_name",
     )
-
-    list_filter = (
-        "department",
-        "work_site",
-        "created_at",
-    )
-
-    ordering = ("-created_at",)
-
-    list_select_related = (
-        "user",
-        "manager",
-        "manager__user",
-        "department",
-        "work_site",
-    )
-
-    autocomplete_fields = (
-        "user",
-        "manager",
-        "department",
-        "work_site",
-    )
-
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-    )
-
-    @admin.display(description="User", ordering="user__username")
-    def user_link(self, obj):
-        url = reverse(
-            "admin:accounts_customusermodel_change",
-            args=[obj.user_id],
-        )
-        return format_html('<a href="{}">{}</a>', url, obj.user)
+    list_filter = ("work_site", "department")
+    list_select_related = ("user", "manager", "work_site", "department")
+    autocomplete_fields = ("user", "manager", "work_site", "department")
 
 
-@admin.register(Role)
-class RoleAdmin(admin.ModelAdmin):
+class RoleProfileInline(admin.StackedInline):
+    model = RoleProfile
+    extra = 1
+    max_num = 1
+    fields = ("name", "level", "scope", "requires_shift", "description")
+
+
+@admin.register(Group)
+class GroupAdmin(BaseGroupAdmin):
+    search_fields = ("name",)
+    ordering = ("name",)
+    inlines = (RoleProfileInline,)
+
+
+@admin.register(RoleProfile)
+class RoleProfileAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
-        "code",
+        "name",
         "group",
         "level",
-        "is_system",
+        "scope",
+        "requires_shift",
         "updated_at",
     )
-    search_fields = (
-        "code",
-        "group__name",
-    )
-    list_filter = (
-        "is_system",
-    )
-    ordering = (
-        "-level",
-        "code",
-    )
+    search_fields = ("name", "group__name", "description")
+    list_filter = ("scope", "requires_shift")
+    ordering = ("name", "-level", "group__name")
     list_select_related = ("group",)
     autocomplete_fields = ("group",)
-    readonly_fields = (
-        "created_at",
-        "updated_at",
-    )
+    readonly_fields = ("created_at", "updated_at")

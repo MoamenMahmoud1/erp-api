@@ -1,9 +1,10 @@
 # Production WSGI deployment image.
 #
-# Build:  docker build -t erp-api:latest .
-# Run:    docker run -p 8000:8000 \
-#           -e DJANGO_SETTINGS_MODULE=core.settings.settings_prod \
-#           -e DB_HOST=postgres ... erp-api:latest
+# Build the Celery image used by local Compose:
+#   docker build --target worker -t erp-api-worker:latest .
+#
+# Build the Django web image:
+#   docker build --target web -t erp-api:latest .
 ARG PYTHON_VERSION=3.13
 FROM python:${PYTHON_VERSION}-slim AS base
 
@@ -13,8 +14,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    POETRY_VIRTUALENVS_CREATE=false
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
@@ -23,10 +23,25 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN useradd --create-home appuser && chown -R appuser:appuser /app
+COPY docker-entrypoint-web.sh /usr/local/bin/docker-entrypoint-web.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint-web.sh && \
+    useradd --create-home appuser && \
+    chown -R appuser:appuser /app /usr/local/bin/docker-entrypoint-web.sh
+
+# Celery worker/beat image target. It intentionally does not run any
+# production-only Django command during the image build.
+FROM base AS worker
 USER appuser
 
-RUN DJANGO_SETTINGS_MODULE=core.settings.settings_prod python manage.py collectstatic --noinput
+# The Compose file supplies the concrete Celery worker/beat command.
+CMD ["celery", "-A", "core", "worker", "-l", "info"]
 
+# Django WSGI web image target. Production environment is available at
+# container runtime, so collectstatic is executed by the entrypoint rather
+# than during image build.
+FROM base AS web
+USER appuser
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-web.sh"]
 EXPOSE 8000
-CMD ["sh", "-c", "exec gunicorn -c gunicorn.conf.py core.wsgi:application"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "core.wsgi:application"]

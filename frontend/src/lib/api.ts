@@ -51,6 +51,28 @@ function requestErrorMessage(data: Json, status: number): string {
   return `Request failed with status ${status}`;
 }
 
+export function query(params: Record<string, unknown>): string {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null && item !== '') {
+          searchParams.append(key, String(item));
+        }
+      });
+      continue;
+    }
+
+    searchParams.set(key, String(value));
+  }
+
+  const encoded = searchParams.toString();
+  return encoded ? `?${encoded}` : '';
+}
+
 async function getCsrfToken() {
   const response = await fetch(`${API_BASE}/auth/csrf/`, { credentials: 'include', headers: { Accept: 'application/json' } });
   const data = (await parseResponse(response)) as { csrf_token?: string } | null;
@@ -131,6 +153,10 @@ export const api = {
     createSite: (body: Json) => jsonRequest('/organization/sites/', 'POST', body), updateSite: (id: number, body: Json) => jsonRequest(`/organization/sites/${id}/`, 'PATCH', body), deleteSite: (id: number) => request(`/organization/sites/${id}/`, { method: 'DELETE' }),
     createDepartment: (body: Json) => jsonRequest('/organization/departments/', 'POST', body), updateDepartment: (id: number, body: Json) => jsonRequest(`/organization/departments/${id}/`, 'PATCH', body), deleteDepartment: (id: number) => request(`/organization/departments/${id}/`, { method: 'DELETE' }),
   },
+  roles: {
+    list: (query = '') => request<Paginated>(`/roles/${query}`),
+    get: (id: number) => request(`/roles/${id}/`),
+  },
   products: {
     list: (query = '') => request<Paginated>(`/products/${query}`), get: (id: number) => request(`/products/${id}/`), create: (body: Json) => jsonRequest('/products/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/products/${id}/`, 'PATCH', body), delete: (id: number) => request(`/products/${id}/`, { method: 'DELETE' }),
     cartonPricings: (query = '') => request<Paginated>(`/carton-pricings/${query}`), createCartonPricing: (body: Json) => jsonRequest('/carton-pricings/', 'POST', body), updateCartonPricing: (id: number, body: Json) => jsonRequest(`/carton-pricings/${id}/`, 'PATCH', body), deleteCartonPricing: (id: number) => request(`/carton-pricings/${id}/`, { method: 'DELETE' }),
@@ -139,7 +165,7 @@ export const api = {
   suppliers: { list: (query = '') => request<Paginated>(`/suppliers/${query}`), get: (id: number) => request(`/suppliers/${id}/`), create: (body: Json) => jsonRequest('/suppliers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body) },
   coupons: { list: (query = '') => request<Paginated>(`/coupons/${query}`), get: (id: number) => request(`/coupons/${id}/`), create: (body: Json) => jsonRequest('/coupons/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/coupons/${id}/`, 'PATCH', body), delete: (id: number) => request(`/coupons/${id}/`, { method: 'DELETE' }) },
   employees: {
-    list: (query = '') => request<Paginated>(`/employees/${query}`), get: (id: number) => request(`/employees/${id}/`), options: (query = '') => request<Paginated>(`/employees/options/${query}`), create: (body: Json) => jsonRequest('/employees/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body), delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
+    list: (query = '') => request<Paginated>(`/employees/${query}`), get: (id: number) => request(`/employees/${id}/`), options: (query = '') => request<Paginated>(`/employees/options/${query}`), groups: (query = '') => request<Paginated>(`/employees/groups/${query}`), create: (body: Json) => jsonRequest('/employees/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/employees/${id}/`, 'PATCH', body), delete: (id: number) => request(`/employees/${id}/`, { method: 'DELETE' }),
     currentShift: () => request<EmployeeShift | null>('/shifts/current/'), vehicleOptions: () => request<EmployeeVehicleOption[]>('/shifts/vehicles/'), startShift: (body: { opening_cash?: number; vehicle?: number | null }) => jsonRequest<EmployeeShift>('/shifts/start/', 'POST', body), closeShift: (body: { closing_cash: number; closing_transfer: number; closing_notes?: string }) => jsonRequest<EmployeeShiftCloseResponse>('/shifts/close/', 'POST', body), shifts: (query = '') => request<Paginated>(`/shifts/${query}`),
   },
   invoices: {
@@ -157,7 +183,7 @@ export const api = {
 };
 
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
-export type EmployeeRole = { code: string; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean };
+export type EmployeeRole = { id: number; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean; description: string };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
 export type EmployeeVehicleOption = { id: number; name: string };
 export type EmployeeShift = { id: number; employee: number; employee_name: string; site: number; site_name: string; vehicle: number | null; vehicle_name: string | null; business_date: string; status: 'open' | 'closed'; opened_at: string; closed_at: string | null; opening_cash: number | string; closing_cash: number | string | null; closing_transfer: number | string | null; closing_notes: string };
@@ -178,5 +204,3 @@ export type DashboardOverview = {
   customer_balances: { customer_id: number; customer_name: string; balance: number | string }[];
   supplier_balances: { supplier_id: number; supplier_name: string; balance: number | string }[];
 };
-
-export function query(params: Record<string, string | number | undefined>) { const search = new URLSearchParams(); Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') search.set(key, String(value)); }); const value = search.toString(); return value ? `?${value}` : ''; }
