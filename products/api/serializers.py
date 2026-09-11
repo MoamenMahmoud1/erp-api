@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from accounts.models import RoleProfile
 from products.models import CartonPricing, Product
 
 
@@ -17,6 +18,14 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id", "created_at", "updated_at", "total_stock", "stock_quantity", "sold_quantity",
         )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields.pop("purchase_price", None)
+        return fields
 
 
 class CartonPricingSerializer(serializers.ModelSerializer):
