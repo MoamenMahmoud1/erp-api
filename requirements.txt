@@ -8,6 +8,9 @@ drf-spectacular==0.30.0
 # Background jobs
 celery[redis]==5.6.2
 
+# Push notifications
+firebase-admin==7.5.0
+
 # Database
 psycopg[binary,pool]==3.3.4
 
