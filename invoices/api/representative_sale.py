@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from customer_assignments.services import assigned_customer_queryset
 from customers.models import Customer
 from products.models import Product
 
@@ -21,6 +22,13 @@ class RepresentativeSaleSerializer(serializers.Serializer):
         min_value=Decimal("0"),
         default=Decimal("0"),
     )
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        fields["customer"].queryset = assigned_customer_queryset(user)
+        return fields
 
     def validate_items(self, value):
         if not value:
