@@ -2,6 +2,7 @@ from collections import defaultdict
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 
 from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_sales_return
@@ -50,9 +51,12 @@ def _return_allocations(*, invoice_id, sale, product_id, quantity):
     if not sale_items:
         raise InvalidBusinessOperation("Cannot return sale: original product movement was not found.")
 
+    canonical_prefix = f"source:invoice.return:{invoice_id}"
+    legacy_reference = f"Return Invoice #{invoice_id}"
     previous_returned = defaultdict(int)
     previous_movements = StockMovementItem.objects.filter(
-        movement__reference__startswith=f"source:invoice.return:{invoice_id}",
+        Q(movement__reference__startswith=canonical_prefix)
+        | Q(movement__reference=legacy_reference)
     )
     for item in previous_movements:
         if item.product_id == product_id:
