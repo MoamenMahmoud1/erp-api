@@ -50,6 +50,7 @@ The included React/TypeScript frontend provides permission-aware workflows for s
 ## Quality & Infrastructure
 
 - Docker / Docker Compose
+- Separate Docker build targets for Celery worker/beat and Django WSGI web
 - Gunicorn production configuration
 - psycopg 3 connection pooling
 - Redis + Celery worker/beat processes for background jobs
@@ -60,15 +61,31 @@ The included React/TypeScript frontend provides permission-aware workflows for s
 
 ## Development
 
+Start the local infrastructure and background workers without building the Django web image:
+
+```bash
+docker compose up -d --build
+```
+
+The default Compose stack starts PostgreSQL, Redis, Celery worker, and Celery beat. The Celery services use the `worker` Docker build target and do not execute production `collectstatic` during image build.
+
+For local Django development outside Docker:
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-
-docker compose up -d
 python manage.py migrate
 python manage.py runserver
 ```
+
+When you are ready to build the Django WSGI image, build the dedicated `web` target:
+
+```bash
+docker build --target web -t erp-api:latest .
+```
+
+The web image runs `collectstatic` when the container starts, after the production environment has been supplied, so image build does not require production environment variables.
 
 Frontend:
 
@@ -92,4 +109,4 @@ Together, `erp-api` and `sales_erp` form the web and mobile applications of the 
 
 ## License
 
-This repository is **proprietary**. All rights are reserved by the copyright holder. No permission is granted to use, copy, modify, distribute, publish, sublicense, or create derivative works from this code without prior written permission. See [`LICENSE`](LICENSE).
+This repository is **proprietary**. All rights reserved by the copyright holder. No permission is granted to use, copy, modify, distribute, publish, sublicense, or create derivative works from this code without prior written permission. See [`LICENSE`](LICENSE).
