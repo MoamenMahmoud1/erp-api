@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.models import Employee, RoleProfile
 from auditlog.models import AuditEvent
@@ -318,7 +319,7 @@ def review_approval(*, approver, approval_event_id, decision, reason="", idempot
                 "requester_id": requester_id,
                 "operation": operation,
                 "decision_reason": str(reason or "").strip(),
-                "reviewed_at": request_event.created_at.isoformat(),
+                "reviewed_at": timezone.now().isoformat(),
                 "status": "approved" if decision == "approve" else "rejected",
             },
         )
