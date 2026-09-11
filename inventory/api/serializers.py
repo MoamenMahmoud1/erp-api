@@ -1,34 +1,31 @@
 from rest_framework import serializers
 
+from accounts.models import RoleProfile
 from inventory.models import InventoryBatch, StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
 from products.models import Product
 
 
 class StockLocationSerializer(serializers.ModelSerializer):
-    employee_name = serializers.SerializerMethodField()
     site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
+    employee_name = serializers.SerializerMethodField()
+    warehouse_manager_names = serializers.SerializerMethodField()
 
     class Meta:
         model = StockLocation
-        fields = ("id", "site", "site_name", "name", "location_type", "employee", "employee_name", "is_active", "created_at")
+        fields = (
+            "id", "name", "location_type", "site", "site_name", "employee", "employee_name",
+            "warehouse_manager_names", "is_active", "created_at", "updated_at",
+        )
         read_only_fields = fields
 
     def get_employee_name(self, obj):
-        if not obj.employee_id:
+        if obj.employee_id is None:
             return None
-        return obj.employee.get_full_name() or obj.employee.username
+        employee = getattr(obj.employee, "employee", None)
+        return str(employee) if employee is not None else obj.employee.get_full_name() or obj.employee.username
 
-
-class InventoryBatchSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", read_only=True)
-
-    class Meta:
-        model = InventoryBatch
-        fields = ("id", "product", "product_name", "batch_number", "manufactured_date", "expiry_date", "created_at", "is_expired", "days_to_expiry")
-        read_only_fields = fields
-
-    is_expired = serializers.BooleanField(read_only=True)
-    days_to_expiry = serializers.IntegerField(read_only=True, allow_null=True)
+    def get_warehouse_manager_names(self, obj):
+        return [user.get_full_name() or user.username for user in obj.warehouse_managers.all()]
 
 
 class StockBatchBalanceSerializer(serializers.ModelSerializer):
@@ -52,6 +49,15 @@ class StockBatchBalanceSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields.pop("total_cost", None)
+            fields.pop("average_unit_cost", None)
+        return fields
+
 
 class StockBalanceSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -68,6 +74,15 @@ class StockBalanceSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields.pop("total_cost", None)
+            fields.pop("average_unit_cost", None)
+        return fields
+
 
 class StockMovementItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -79,6 +94,15 @@ class StockMovementItemSerializer(serializers.ModelSerializer):
         model = StockMovementItem
         fields = ("id", "product", "product_name", "batch", "batch_number", "expiry_date", "quantity", "unit_cost", "total_cost")
         read_only_fields = fields
+
+    def get_fields(self):
+        fields = super().get_fields()
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if RoleProfile.requires_shift_for_user(user):
+            fields.pop("unit_cost", None)
+            fields.pop("total_cost", None)
+        return fields
 
 
 class StockMovementSerializer(serializers.ModelSerializer):
