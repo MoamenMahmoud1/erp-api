@@ -50,6 +50,7 @@ PROJECT_APPS = [
     "authsession.apps.AuthSessionConfig",
     "organization.apps.OrganizationConfig",
     "customers.apps.CustomersConfig",
+    "customer_assignments.apps.CustomerAssignmentsConfig",
     "products.apps.ProductsConfig",
     "coupons.apps.CouponsConfig",
     "invoices.apps.InvoicesConfig",
