@@ -77,8 +77,7 @@ jobs:
       - name: Check migrations
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Ruff (informational)
-        continue-on-error: true
+      - name: Ruff
         run: ruff check .
 
       - name: Production Django checks
