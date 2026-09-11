@@ -127,7 +127,7 @@ class NotificationDelivery(models.Model):
             )
         ]
         indexes = [
-            models.Index(fields=("status", "last_attempt_at"), name="notif_delivery_status_attempt_idx"),
+            models.Index(fields=("status", "last_attempt_at"), name="notif_delivery_status_attempt"),
         ]
 
     def mark_sent(self, message_id: str = ""):
