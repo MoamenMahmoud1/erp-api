@@ -10,6 +10,7 @@ from accounting.services import get_default_company, post_sales_invoice, reverse
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from common.observability import log_operation
+from customer_assignments.services import require_customer_assignment
 from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice
@@ -96,13 +97,14 @@ def confirm_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidStateTransition("Only a draft invoice can be confirmed.")
+    require_customer_assignment(customer=invoice.customer, user=actor) if actor is not None else None
     shift = _required_shift(actor, invoice)
     if shift is not None and invoice.shift_id not in (None, shift.pk):
         raise InvalidBusinessOperation("The invoice was created in a different shift.")
     source = sales_source_location(invoice, shift=shift)
     if source is None:
         raise InvalidBusinessOperation("The invoice creator has no active sales location for this branch.")
-    movement = _record_sale_movement(invoice, source, shift=shift or invoice.shift)
+    movement = _record_sale_movement(invoice, source, shift=shift)
     company = get_default_company()
     post_sales_invoice(invoice=invoice, actor_id=invoice.created_by_id, company=company)
     if shift is not None and invoice.shift_id is None:
@@ -142,6 +144,7 @@ def cancel_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
         raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
+    require_customer_assignment(customer=invoice.customer, user=actor) if actor is not None else None
     shift = _required_shift(actor, invoice)
     if invoice.net_paid_amount > 0:
         raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
