@@ -3,6 +3,7 @@ from django.db import transaction
 from accounts.services.employee_shift import operation_context
 from common.exceptions import InvalidBusinessOperation
 from common.money import quantize_money
+from customer_assignments.services import require_customer_assignment
 from invoices.models import Invoice, InvoiceItem
 
 
@@ -23,6 +24,11 @@ def _create_invoice(*, created_by, validated_data):
     requested_site = invoice_data.pop("site", None)
     invoice_data.pop("shift", None)
     _validate_items(items)
+
+    customer = invoice_data.get("customer")
+    if customer is None:
+        raise InvalidBusinessOperation("A customer is required before creating an invoice.")
+    require_customer_assignment(customer=customer, user=created_by)
 
     _employee, site, shift = operation_context(created_by, requested_site=requested_site)
     if site is None:
