@@ -122,11 +122,7 @@ class NotificationApiTests(TestCase):
         self.notification.refresh_from_db()
         self.assertIsNone(self.notification.read_at)
 
-    @patch("notifications.views.timezone.now")
-    def test_mark_read_updates_read_at(self, mocked_now):
-        from django.utils import timezone
-
-        mocked_now.return_value = timezone.now()
+    def test_mark_read_updates_read_at(self):
         request = APIRequestFactory().post(f"/api/v1/notifications/{self.notification.pk}/read/")
         force_authenticate(request, user=self.user)
 
