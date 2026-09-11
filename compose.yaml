@@ -29,8 +29,12 @@ services:
     ports:
       - "127.0.0.1:6379:6379"
 
+  # Local background services intentionally use the worker target.
+  # They do not build or run the Django web image.
   celery_worker:
-    build: .
+    build:
+      context: .
+      target: worker
     restart: unless-stopped
     command: celery -A core worker -l info
     environment:
@@ -54,7 +58,9 @@ services:
         condition: service_started
 
   celery_beat:
-    build: .
+    build:
+      context: .
+      target: worker
     restart: unless-stopped
     command: celery -A core beat -l info
     environment:
