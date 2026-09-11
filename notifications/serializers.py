@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Notification
+from .models import Notification, PushDevice
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -21,3 +21,9 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = fields
+
+
+class PushDeviceRegistrationSerializer(serializers.Serializer):
+    installation_id = serializers.CharField(min_length=1, max_length=255)
+    platform = serializers.ChoiceField(choices=PushDevice.Platform.choices)
+    firebase_app_id = serializers.CharField(required=False, allow_blank=True, max_length=255)
