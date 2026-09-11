@@ -39,6 +39,15 @@ logging.setLogRecordFactory(
 )
 
 
+class EnsureRequestIdLogFilter(logging.Filter):
+    """Provide a safe request id for records created outside HTTP requests."""
+
+    def filter(self, record):
+        if not hasattr(record, "request_id"):
+            record.request_id = get_current_request_id() or "-"
+        return True
+
+
 class RequestCorrelationMiddleware:
     """Attach a bounded, header-safe correlation id to every request."""
 
