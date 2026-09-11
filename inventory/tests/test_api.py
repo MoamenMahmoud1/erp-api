@@ -191,6 +191,7 @@ class StockTransferRequestAPITests(TestCase):
                 "items": [{"product": self.product.pk, "quantity": 4}],
             },
             format="json",
+            HTTP_IDEMPOTENCY_KEY="loading-request",
         )
         force_authenticate(request, user=self.rep)
         response = StockTransferRequestListCreateView.as_view()(request)
@@ -211,7 +212,12 @@ class StockTransferRequestAPITests(TestCase):
         created = self._create_loading_request()
         request_id = created.data["id"]
 
-        approve_request = self.factory.post(f"/api/v1/inventory/transfer-requests/{request_id}/approve/", {}, format="json")
+        approve_request = self.factory.post(
+            f"/api/v1/inventory/transfer-requests/{request_id}/approve/",
+            {},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="approve-loading-request",
+        )
         force_authenticate(approve_request, user=self.manager)
         response = StockTransferRequestApproveView.as_view()(approve_request, pk=request_id)
 
@@ -226,7 +232,12 @@ class StockTransferRequestAPITests(TestCase):
         self.assertEqual(event.metadata["approver_role_level"], 20)
 
     def test_same_role_cannot_approve(self):
-        peer = get_user_model().objects.create_user(username="peer-manager", password="StrongPass123!", is_staff=True)
+        peer = get_user_model().objects.create_user(
+            username="peer-manager",
+            email="peer-manager@example.com",
+            password="StrongPass123!",
+            is_staff=True,
+        )
         peer.user_permissions.set(self.manager.user_permissions.all())
         peer_group = Group.objects.create(name="Peer Manager")
         RoleProfile.objects.create(group=peer_group, name="Peer Manager", level=20, scope=RoleProfile.Scope.SITE)
@@ -236,7 +247,12 @@ class StockTransferRequestAPITests(TestCase):
 
         created = self._create_loading_request()
         request_id = created.data["id"]
-        approve_request = self.factory.post(f"/api/v1/inventory/transfer-requests/{request_id}/approve/", {}, format="json")
+        approve_request = self.factory.post(
+            f"/api/v1/inventory/transfer-requests/{request_id}/approve/",
+            {},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="approve-peer-request",
+        )
         force_authenticate(approve_request, user=peer)
         response = StockTransferRequestApproveView.as_view()(approve_request, pk=request_id)
 
@@ -255,6 +271,7 @@ class StockTransferRequestAPITests(TestCase):
                 "items": [{"product": self.product.pk, "quantity": 1, "invoice_item": line.pk}],
             },
             format="json",
+            HTTP_IDEMPOTENCY_KEY="return-request",
         )
         force_authenticate(create_request, user=self.rep)
         created = StockTransferRequestListCreateView.as_view()(create_request)
@@ -262,7 +279,12 @@ class StockTransferRequestAPITests(TestCase):
         request_id = created.data["id"]
         self.assertEqual(StockBalance.objects.get(location=self.vehicle, product=self.product).quantity, 1)
 
-        approve_request = self.factory.post(f"/api/v1/inventory/transfer-requests/{request_id}/approve/", {}, format="json")
+        approve_request = self.factory.post(
+            f"/api/v1/inventory/transfer-requests/{request_id}/approve/",
+            {},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="approve-return-request",
+        )
         force_authenticate(approve_request, user=self.manager)
         response = StockTransferRequestApproveView.as_view()(approve_request, pk=request_id)
 
