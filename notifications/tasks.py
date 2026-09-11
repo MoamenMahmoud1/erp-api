@@ -8,6 +8,18 @@ from auditlog.models import AuditEvent
 from .models import Notification
 
 
+APPROVAL_ACTIONS = ("approval.requested", "approval.approved", "approval.rejected")
+
+
+def _notification_details(event: AuditEvent):
+    metadata = event.metadata or {}
+    if event.action == "approval.requested":
+        return [metadata.get("approver_id")], Notification.NotificationType.APPROVAL_REQUESTED, "طلب موافقة جديد", f"يوجد طلب {metadata.get('operation', '')} جديد يحتاج إلى موافقتك."
+    if event.action == "approval.approved":
+        return [metadata.get("requester_id")], Notification.NotificationType.APPROVAL_APPROVED, "تمت الموافقة", f"تمت الموافقة على طلب {metadata.get('operation', '')}."
+    return [metadata.get("requester_id")], Notification.NotificationType.APPROVAL_REJECTED, "تم رفض الطلب", f"تم رفض طلب {metadata.get('operation', '')}."
+
+
 @shared_task(
     name="notifications.tasks.create_notification_for_approval_event",
     ignore_result=True,
@@ -15,29 +27,15 @@ from .models import Notification
 def create_notification_for_approval_event(approval_event_id: int) -> int:
     event = AuditEvent.objects.filter(
         pk=approval_event_id,
-        action__in=("approval.requested", "approval.approved", "approval.rejected"),
+        action__in=APPROVAL_ACTIONS,
     ).first()
     if event is None:
         return 0
 
     metadata = event.metadata or {}
-    if event.action == "approval.requested":
-        recipient_ids = [metadata.get("approver_id")]
-        notification_type = Notification.NotificationType.APPROVAL_REQUESTED
-        title = "طلب موافقة جديد"
-        body = f"يوجد طلب {metadata.get('operation', '')} جديد يحتاج إلى موافقتك."
-    elif event.action == "approval.approved":
-        recipient_ids = [metadata.get("requester_id")]
-        notification_type = Notification.NotificationType.APPROVAL_APPROVED
-        title = "تمت الموافقة"
-        body = f"تمت الموافقة على طلب {metadata.get('operation', '')}."
-    else:
-        recipient_ids = [metadata.get("requester_id")]
-        notification_type = Notification.NotificationType.APPROVAL_REJECTED
-        title = "تم رفض الطلب"
-        body = f"تم رفض طلب {metadata.get('operation', '')}."
-
+    recipient_ids, notification_type, title, body = _notification_details(event)
     created_count = 0
+
     for recipient_id in recipient_ids:
         if not recipient_id:
             continue
@@ -70,13 +68,21 @@ def create_notification_for_approval_event(approval_event_id: int) -> int:
 )
 def rebuild_recent_approval_notifications() -> int:
     since = timezone.now() - timedelta(days=7)
-    event_ids = AuditEvent.objects.filter(
+    events = AuditEvent.objects.filter(
         created_at__gte=since,
-        action__in=("approval.requested", "approval.approved", "approval.rejected"),
-    ).values_list("id", flat=True)
+        action__in=APPROVAL_ACTIONS,
+    ).only("id", "action", "actor_id", "entity_type", "entity_id", "metadata")
 
     queued_count = 0
-    for event_id in event_ids.iterator(chunk_size=200):
-        create_notification_for_approval_event.delay(event_id)
-        queued_count += 1
+    for event in events.iterator(chunk_size=200):
+        recipient_ids, _, _, _ = _notification_details(event)
+        for recipient_id in recipient_ids:
+            if not recipient_id:
+                continue
+            dedupe_key = f"approval:{event.pk}:{int(recipient_id)}"
+            if Notification.objects.filter(dedupe_key=dedupe_key).exists():
+                continue
+            create_notification_for_approval_event.delay(event.pk)
+            queued_count += 1
+            break
     return queued_count
