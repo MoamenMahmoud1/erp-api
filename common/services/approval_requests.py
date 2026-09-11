@@ -11,6 +11,7 @@ from customers.models import Customer
 from inventory.models import StockBalance, StockLocation
 from invoices.models import Invoice
 from invoices.services import DeleteInvoice, UpdateInvoice
+from notifications.services import queue_approval_event_notification
 from products.models import Product
 
 
@@ -187,6 +188,7 @@ def request_approval(*, requester, target_type, target_id, operation, payload=No
         "reason": str(reason or "").strip(),
     }
 
+    @transaction.atomic
     def create():
         manager, normalized_payload = _validate_create_request(
             requester=requester,
@@ -219,6 +221,7 @@ def request_approval(*, requester, target_type, target_id, operation, payload=No
                 "status": "pending",
             },
         )
+        queue_approval_event_notification(event)
         return IdempotentResult(status=201, body=_event_payload(event))
 
     return execute_idempotent(
@@ -236,6 +239,7 @@ def review_approval(*, approver, approval_event_id, decision, reason="", idempot
     if not idempotency_key:
         raise InvalidBusinessOperation("Idempotency-Key is required.")
 
+    @transaction.atomic
     def review():
         request_event = _load_request_for_update(approval_event_id)
         metadata = request_event.metadata or {}
@@ -323,6 +327,7 @@ def review_approval(*, approver, approval_event_id, decision, reason="", idempot
                 "status": "approved" if decision == "approve" else "rejected",
             },
         )
+        queue_approval_event_notification(decision_event)
         body["approval_request_id"] = request_event.pk
         body["decision_event_id"] = decision_event.pk
         return IdempotentResult(status=200, body=body)
