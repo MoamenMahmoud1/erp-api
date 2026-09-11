@@ -14,7 +14,7 @@ class StockLocationSerializer(serializers.ModelSerializer):
         model = StockLocation
         fields = (
             "id", "name", "location_type", "site", "site_name", "employee", "employee_name",
-            "warehouse_manager_names", "is_active", "created_at", "updated_at",
+            "warehouse_manager_names", "is_active", "created_at",
         )
         read_only_fields = fields
 
