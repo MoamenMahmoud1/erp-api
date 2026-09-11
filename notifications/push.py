@@ -9,6 +9,10 @@ class PushNotificationsNotConfigured(RuntimeError):
     pass
 
 
+class PushDeliveryPartiallyFailed(RuntimeError):
+    pass
+
+
 def _firebase_app():
     if not settings.FIREBASE_ENABLED:
         raise PushNotificationsNotConfigured("Firebase push notifications are disabled.")
@@ -37,9 +41,7 @@ def _chunks(values, size=500):
         yield values[index:index + size]
 
 
-def send_notification_push(notification_id: int) -> int:
-    app = _firebase_app()
-    notification = Notification.objects.get(pk=notification_id)
+def _get_pending_devices(notification: Notification) -> list[PushDevice]:
     devices = list(
         PushDevice.objects.filter(
             user_id=notification.user_id,
@@ -47,20 +49,44 @@ def send_notification_push(notification_id: int) -> int:
         ).order_by("id")
     )
     if not devices:
+        return []
+
+    deliveries = {
+        delivery.device_id: delivery
+        for delivery in NotificationDelivery.objects.filter(
+            notification=notification,
+            device__in=devices,
+        )
+    }
+
+    pending_devices = []
+    for device in devices:
+        delivery = deliveries.get(device.id)
+        if delivery is None:
+            NotificationDelivery.objects.create(
+                notification=notification,
+                device=device,
+            )
+            pending_devices.append(device)
+        elif delivery.status != NotificationDelivery.Status.SENT:
+            pending_devices.append(device)
+
+    return pending_devices
+
+
+def send_notification_push(notification_id: int) -> int:
+    app = _firebase_app()
+    notification = Notification.objects.get(pk=notification_id)
+    devices = _get_pending_devices(notification)
+    if not devices:
         return 0
 
-    for device in devices:
-        NotificationDelivery.objects.get_or_create(
+    delivery_by_device_id = {
+        delivery.device_id: delivery
+        for delivery in NotificationDelivery.objects.filter(
             notification=notification,
-            device=device,
+            device_id__in=[device.id for device in devices],
         )
-
-    delivery_by_fid = {
-        device.installation_id: NotificationDelivery.objects.get(
-            notification=notification,
-            device=device,
-        )
-        for device in devices
     }
 
     sent_count = 0
@@ -98,7 +124,7 @@ def send_notification_push(notification_id: int) -> int:
         response = messaging.send_each_for_multicast(message, app=app)
 
         for device, send_response in zip(device_chunk, response.responses):
-            delivery = delivery_by_fid[device.installation_id]
+            delivery = delivery_by_device_id[device.id]
             if send_response.success:
                 delivery.mark_sent(send_response.message_id)
                 sent_count += 1
@@ -109,7 +135,10 @@ def send_notification_push(notification_id: int) -> int:
             failed_count += 1
 
             error_code = getattr(error, "code", "")
-            if error_code in {"messaging/registration-token-not-registered", "messaging/invalid-argument"}:
+            if error_code in {
+                "messaging/registration-token-not-registered",
+                "messaging/invalid-argument",
+            }:
                 device.deactivate(error_code)
 
     if failed_count:
@@ -118,7 +147,3 @@ def send_notification_push(notification_id: int) -> int:
         )
 
     return sent_count
-
-
-class PushDeliveryPartiallyFailed(RuntimeError):
-    pass
