@@ -5,6 +5,7 @@ from accounting.services import get_default_company, post_purchase
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import InventoryBatch, StockLocation, StockMovement, StockMovementItem
+from inventory.services.source_reference import build_source_reference
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase
 
@@ -56,7 +57,11 @@ class ConfirmPurchaseService:
             destination_location=warehouse,
             shift=shift or purchase.shift,
             created_by_id=actor.pk,
-            reference=purchase.reference,
+            reference=build_source_reference(
+                source_type="purchase.confirmation",
+                source_id=purchase.pk,
+                label=purchase.reference or f"Purchase #{purchase.pk}",
+            ),
         )
         for item in sorted(items, key=lambda value: value.product_id):
             batch = None
@@ -97,7 +102,11 @@ class ConfirmPurchaseService:
                 unit_cost=item.unit_purchase_price,
             )
 
-        post_purchase(purchase=purchase, actor_id=actor.pk, company=get_default_company())
+        post_purchase(
+            purchase=purchase,
+            actor_id=actor.pk,
+            company=get_default_company(),
+        )
         if shift is not None and purchase.shift_id is None:
             purchase.shift = shift
         purchase.status = Purchase.Status.CONFIRMED
