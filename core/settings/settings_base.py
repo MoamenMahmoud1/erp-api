@@ -18,6 +18,11 @@ EMAIL_CHANGE_TIMEOUT = config("EMAIL_CHANGE_TIMEOUT", default=60 * 60, cast=int)
 REDIS_URL = config("REDIS_URL", default="redis://127.0.0.1:6379/1")
 CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 
+FIREBASE_ENABLED = config("FIREBASE_ENABLED", default=False, cast=bool)
+FIREBASE_PROJECT_ID = config("FIREBASE_PROJECT_ID", default="")
+FIREBASE_CREDENTIALS_FILE = config("FIREBASE_CREDENTIALS_FILE", default="")
+FCM_ANDROID_CHANNEL_ID = config("FCM_ANDROID_CHANNEL_ID", default="erp_notifications")
+
 AUTH_USER_MODEL = "accounts.CustomUserModel"
 AUTHENTICATION_BACKENDS = [
     "authentication.email.EmailBackend",
@@ -145,6 +150,7 @@ LOGGING = {
         "accounts": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
         "erp.operations": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
         "erp.metrics": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        "notifications": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
     },
 }
 INTERNAL_IPS = ["127.0.0.1"]
