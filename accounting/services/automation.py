@@ -8,6 +8,7 @@ from django.utils import timezone
 from accounting.models import Account, JournalEntry
 from accounting.services.journal import create_journal_entry, get_default_company, post_journal_entry
 from inventory.models import StockMovement
+from inventory.services.source_reference import find_source_movement
 
 
 DEFAULT_ACCOUNTS = {
@@ -212,13 +213,11 @@ def post_purchase_return(*, purchase_return, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     total = purchase_return.total_amount
-    movement = (
-        StockMovement.objects.filter(
-            reference=f"Return Purchase #{purchase_return.purchase_id}",
-            movement_type=StockMovement.MovementType.PURCHASE_RETURN,
-        )
-        .order_by("-id")
-        .first()
+    movement = find_source_movement(
+        source_type="purchase.return",
+        source_id=purchase_return.pk,
+        movement_type=StockMovement.MovementType.PURCHASE_RETURN,
+        legacy_reference=f"Return Purchase #{purchase_return.purchase_id}",
     )
     inventory_cost = total
     if movement is not None:
