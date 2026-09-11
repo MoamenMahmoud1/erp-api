@@ -12,6 +12,7 @@ from common.exceptions import InsufficientStock, InvalidBusinessOperation, Inval
 from common.observability import log_operation
 from customer_assignments.services import require_customer_assignment
 from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement, StockMovementItem
+from inventory.services.source_reference import build_source_reference, find_source_movement
 from inventory.services.stock_balance import StockBalanceService
 from invoices.models import Invoice
 
@@ -23,7 +24,12 @@ class InvoiceNotFound(InvalidBusinessOperation):
 def load_invoice_for_update(invoice_id, actor=None):
     queryset = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     try:
-        return queryset.select_for_update(of=("self",)).select_related("customer", "coupon", "created_by", "site", "shift").prefetch_related("items__product", "payment_allocations", "payment_refunds").get(pk=invoice_id)
+        return (
+            queryset.select_for_update(of=("self",))
+            .select_related("customer", "coupon", "created_by", "site", "shift")
+            .prefetch_related("items__product", "payment_allocations", "payment_refunds")
+            .get(pk=invoice_id)
+        )
     except Invoice.DoesNotExist as exc:
         raise InvoiceNotFound("Invoice not found.") from exc
 
@@ -62,13 +68,23 @@ def _record_sale_movement(invoice, source_location, shift=None):
         source_location=source_location,
         shift=shift,
         created_by=invoice.created_by,
-        reference=f"Invoice #{invoice.pk}",
+        reference=build_source_reference(
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            label=f"Invoice #{invoice.pk}",
+        ),
     )
     for item in sorted(invoice.items.select_related("product"), key=lambda value: value.product_id):
         try:
-            balance = StockBalanceService.decrease(location=source_location, product=item.product, quantity=item.quantity)
+            balance = StockBalanceService.decrease(
+                location=source_location,
+                product=item.product,
+                quantity=item.quantity,
+            )
         except ValueError as exc:
-            raise InsufficientStock(f"Insufficient stock for {item.product.name} in {source_location.name}.") from exc
+            raise InsufficientStock(
+                f"Insufficient stock for {item.product.name} in {source_location.name}."
+            ) from exc
 
         allocations = getattr(balance, "_stock_allocations", None) or [
             {
@@ -97,7 +113,8 @@ def confirm_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status != Invoice.Status.DRAFT:
         raise InvalidStateTransition("Only a draft invoice can be confirmed.")
-    require_customer_assignment(customer=invoice.customer, user=actor) if actor is not None else None
+    if actor is not None:
+        require_customer_assignment(customer=invoice.customer, user=actor)
     shift = _required_shift(actor, invoice)
     if shift is not None and invoice.shift_id not in (None, shift.pk):
         raise InvalidBusinessOperation("The invoice was created in a different shift.")
@@ -112,7 +129,18 @@ def confirm_invoice(invoice_id, actor=None):
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "shift", "updated_at"))
     log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
-    record_event(action="invoice.confirm", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "stock_location_id": source.pk, "site_id": invoice.site_id, "shift_id": movement.shift_id})
+    record_event(
+        action="invoice.confirm",
+        entity_type="Invoice",
+        entity_id=invoice.pk,
+        actor_id=invoice.created_by_id,
+        metadata={
+            "status": invoice.status,
+            "stock_location_id": source.pk,
+            "site_id": invoice.site_id,
+            "shift_id": movement.shift_id,
+        },
+    )
     return invoice
 
 
@@ -144,29 +172,44 @@ def cancel_invoice(invoice_id, actor=None):
     invoice = load_invoice_for_update(invoice_id, actor)
     if invoice.status not in (Invoice.Status.DRAFT, Invoice.Status.CONFIRMED):
         raise InvalidStateTransition(f"Cannot cancel an invoice in state {invoice.status}.")
-    require_customer_assignment(customer=invoice.customer, user=actor) if actor is not None else None
+    if actor is not None:
+        require_customer_assignment(customer=invoice.customer, user=actor)
     shift = _required_shift(actor, invoice)
     if invoice.net_paid_amount > 0:
         raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
     if invoice.status == Invoice.Status.CONFIRMED:
-        sale = (
-            StockMovement.objects
-            .filter(reference=f"Invoice #{invoice.pk}", movement_type=StockMovement.MovementType.SALE)
-            .select_related("source_location")
-            .prefetch_related("items")
-            .first()
+        sale = find_source_movement(
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            movement_type=StockMovement.MovementType.SALE,
+            legacy_reference=f"Invoice #{invoice.pk}",
         )
         if sale is None or sale.source_location is None:
             raise InvalidBusinessOperation("Cannot reverse sale: no original SALE movement found for this invoice.")
 
-        _validate_cancellation_stock_position(invoice_id=invoice.pk, sale=sale, source_location=sale.source_location)
+        sale = (
+            StockMovement.objects
+            .filter(pk=sale.pk)
+            .select_related("source_location")
+            .prefetch_related("items")
+            .first()
+        )
+        _validate_cancellation_stock_position(
+            invoice_id=invoice.pk,
+            sale=sale,
+            source_location=sale.source_location,
+        )
 
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
             shift=shift or invoice.shift,
             created_by=invoice.created_by,
-            reference=f"Cancel Invoice #{invoice.pk}",
+            reference=build_source_reference(
+                source_type="invoice.cancellation",
+                source_id=invoice.pk,
+                label=f"Cancel Invoice #{invoice.pk}",
+            ),
         )
         for sale_item in sale.items.all():
             StockBalanceService.increase(
@@ -183,19 +226,39 @@ def cancel_invoice(invoice_id, actor=None):
                 quantity=sale_item.quantity,
                 unit_cost=sale_item.unit_cost,
             )
-        original_entry = JournalEntry.objects.filter(company=get_default_company(), source_type="invoice.sale", source_id=invoice.pk, status=JournalEntry.Status.POSTED).prefetch_related("lines").first()
+        original_entry = JournalEntry.objects.filter(
+            company=get_default_company(),
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            status=JournalEntry.Status.POSTED,
+        ).prefetch_related("lines").first()
         if original_entry is None:
             raise InvalidBusinessOperation("Cannot reverse sale: accounting entry is missing.")
-        reverse_source_entry(source_entry=original_entry, actor_id=invoice.created_by_id, source_type="invoice.sale", source_id=invoice.pk, company=get_default_company())
+        reverse_source_entry(
+            source_entry=original_entry,
+            actor_id=invoice.created_by_id,
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+            company=get_default_company(),
+        )
     invoice.status = Invoice.Status.CANCELLED
     invoice.save(update_fields=("status", "updated_at"))
     log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
-    record_event(action="invoice.cancel", entity_type="Invoice", entity_id=invoice.pk, actor_id=invoice.created_by_id, metadata={"status": invoice.status, "site_id": invoice.site_id, "shift_id": (shift.pk if shift else invoice.shift_id)})
+    record_event(
+        action="invoice.cancel",
+        entity_type="Invoice",
+        entity_id=invoice.pk,
+        actor_id=invoice.created_by_id,
+        metadata={
+            "status": invoice.status,
+            "site_id": invoice.site_id,
+            "shift_id": shift.pk if shift else invoice.shift_id,
+        },
+    )
     return invoice
 
 
-# Kept for compatibility with older internal callers/tests. It intentionally
-# bypasses actor/shift checks and is only suitable for trusted service code.
+# Compatibility wrapper retained for trusted internal service callers.
 def _cancel_invoice_sync(invoice_id):
     return cancel_invoice(invoice_id, actor=None)
 
