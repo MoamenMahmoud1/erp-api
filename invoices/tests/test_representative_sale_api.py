@@ -6,10 +6,12 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import Employee, EmployeeShift, RoleProfile
+from common.exceptions import InvalidBusinessOperation
 from customer_assignments.models import CustomerAssignment
 from inventory.models import StockBalance, StockLocation
 from invoices.api.views import InvoiceViewSet
 from invoices.models import Invoice
+from invoices.services.delete import delete_invoice
 from payments.models import PaymentAllocation, PaymentTransaction
 from organization.models import Company, Site
 from customers.models import Customer
@@ -186,3 +188,17 @@ class RepresentativeSaleIdempotencyTests(TestCase):
             StockBalance.objects.get(location=self.vehicle, product=self.product).quantity,
             5,
         )
+
+    def test_unauthorized_draft_cannot_be_deleted_by_representative(self):
+        invoice = Invoice.objects.create(
+            customer=self.unassigned_customer,
+            site=self.site,
+            shift=self.shift,
+            created_by=self.rep,
+            status=Invoice.Status.DRAFT,
+        )
+
+        with self.assertRaises(InvalidBusinessOperation):
+            delete_invoice(invoice.pk, actor=self.rep)
+
+        self.assertTrue(Invoice.objects.filter(pk=invoice.pk).exists())
