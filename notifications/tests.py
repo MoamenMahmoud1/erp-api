@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -6,9 +7,14 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from auditlog.models import AuditEvent
 
-from .models import Notification
+from .models import Notification, NotificationDelivery, PushDevice
+from .push import send_notification_push
 from .tasks import create_notification_for_approval_event
-from .views import NotificationListView, NotificationMarkReadView
+from .views import (
+    NotificationListView,
+    NotificationMarkReadView,
+    PushDeviceRegistrationView,
+)
 
 
 User = get_user_model()
@@ -113,3 +119,98 @@ class NotificationApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.notification.refresh_from_db()
         self.assertIsNotNone(self.notification.read_at)
+
+    def test_device_registration_belongs_to_authenticated_user(self):
+        request = APIRequestFactory().post(
+            "/api/v1/notifications/devices/",
+            {
+                "installation_id": "fid-device-1",
+                "platform": "android",
+                "firebase_app_id": "app-id-1",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+
+        response = PushDeviceRegistrationView.as_view()(request)
+
+        self.assertEqual(response.status_code, 201)
+        device = PushDevice.objects.get(installation_id="fid-device-1")
+        self.assertEqual(device.user_id, self.user.pk)
+        self.assertTrue(device.is_active)
+
+    def test_device_registration_reassigns_device_when_user_logs_into_same_installation(self):
+        device = PushDevice.objects.create(
+            user=self.user,
+            installation_id="fid-device-shared",
+            platform="android",
+        )
+
+        request = APIRequestFactory().post(
+            "/api/v1/notifications/devices/",
+            {
+                "installation_id": device.installation_id,
+                "platform": "android",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.other_user)
+
+        response = PushDeviceRegistrationView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        device.refresh_from_db()
+        self.assertEqual(device.user_id, self.other_user.pk)
+        self.assertTrue(device.is_active)
+
+
+class PushDeliveryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="push-user", password="test-password")
+        self.notification = Notification.objects.create(
+            user=self.user,
+            notification_type=Notification.NotificationType.APPROVAL_APPROVED,
+            title="Approved",
+            body="Approved body",
+            dedupe_key="push-test-notification",
+        )
+
+    @patch("notifications.push._firebase_app", return_value=object())
+    @patch("notifications.push.messaging.send_each_for_multicast")
+    def test_retry_sends_only_to_devices_that_have_not_succeeded(self, send_mock, _firebase_mock):
+        sent_device = PushDevice.objects.create(
+            user=self.user,
+            installation_id="fid-already-sent",
+            platform="android",
+        )
+        pending_device = PushDevice.objects.create(
+            user=self.user,
+            installation_id="fid-pending",
+            platform="android",
+        )
+        NotificationDelivery.objects.create(
+            notification=self.notification,
+            device=sent_device,
+            status=NotificationDelivery.Status.SENT,
+            attempt_count=1,
+        )
+
+        send_mock.return_value = SimpleNamespace(
+            responses=[SimpleNamespace(success=True, message_id="message-1", exception=None)]
+        )
+
+        with self.settings(FIREBASE_ENABLED=True):
+            self.assertEqual(send_notification_push(self.notification.pk), 1)
+
+        call_message = send_mock.call_args.args[0]
+        self.assertEqual(call_message.fids, [pending_device.installation_id])
+        pending_delivery = NotificationDelivery.objects.get(
+            notification=self.notification,
+            device=pending_device,
+        )
+        sent_delivery = NotificationDelivery.objects.get(
+            notification=self.notification,
+            device=sent_device,
+        )
+        self.assertEqual(pending_delivery.status, NotificationDelivery.Status.SENT)
+        self.assertEqual(sent_delivery.attempt_count, 1)
