@@ -17,6 +17,8 @@ The repository contains the central business API and a permission-aware **React/
 - Secure JWT authentication with refresh/session state and throttling
 - Redis-backed caching, throttling, and authentication session state
 - Celery background and scheduled jobs
+- Durable in-app notifications driven by approval workflow events
+- Generic direct-vs-approval mutation policy for representative operations
 
 ## Architecture
 
@@ -32,11 +34,14 @@ The repository contains the central business API and a permission-aware **React/
               v              v              v
          PostgreSQL        Redis          Celery
         source of truth   cache/auth     background jobs
+                                             |
+                                             v
+                                      Async notifications
 ```
 
 The backend keeps domain boundaries explicit and isolates transactional business operations behind service layers. Critical financial and inventory writes use database transactions and row-level locking to preserve integrity under concurrent requests.
 
-The API is served through **ASGI**. PostgreSQL is the system of record, Redis handles caching/throttling/session workloads, and Celery handles background processing.
+The API is served through **WSGI/Gunicorn**. PostgreSQL is the system of record, Redis handles caching/throttling/session workloads, and Celery handles background processing.
 
 ## Frontend
 
@@ -47,6 +52,7 @@ The included React/TypeScript frontend provides permission-aware workflows for s
 - Docker / Docker Compose
 - Gunicorn production configuration
 - psycopg 3 connection pooling
+- Redis + Celery worker/beat processes for background jobs
 - GitHub Actions CI
 - Automated Django, migration, and domain-level tests
 - Ruff code-quality checks
