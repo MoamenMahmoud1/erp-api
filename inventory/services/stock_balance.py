@@ -11,6 +11,7 @@ from inventory.models import StockBalance, StockBatchBalance
 
 class StockBalanceService:
     @staticmethod
+    @transaction.atomic
     def increase(*, location, product, quantity, unit_cost=None, batch=None):
         if quantity <= 0:
             raise ValueError("Quantity must be greater than zero.")
@@ -79,6 +80,19 @@ class StockBalanceService:
     def decrease_specific_batch(*, location, batch, quantity):
         if quantity <= 0:
             raise ValueError("Quantity must be greater than zero.")
+
+        # Keep the same lock order as decrease(): aggregate first, then batch.
+        # Otherwise two concurrent operations can lock the two rows in opposite
+        # order and deadlock.
+        aggregate = (
+            StockBalance.objects
+            .select_for_update()
+            .filter(location=location, product_id=batch.product_id)
+            .first()
+        )
+        if aggregate is None or aggregate.quantity < quantity:
+            raise ValueError("Insufficient stock.")
+
         batch_balance = (
             StockBatchBalance.objects
             .select_for_update()
@@ -93,9 +107,6 @@ class StockBalanceService:
             balance=batch_balance,
             quantity=quantity,
         )
-        aggregate = StockBalance.objects.select_for_update().get(location=location, product=batch.product)
-        if aggregate.quantity < quantity:
-            raise ValueError("Aggregate stock is inconsistent with batch stock.")
         aggregate.quantity -= quantity
         aggregate.total_cost = max(Decimal("0.00"), aggregate.total_cost - removed_cost)
         if aggregate.quantity == 0:
