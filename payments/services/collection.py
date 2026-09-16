@@ -55,7 +55,9 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     outstanding = []
     total_outstanding = Decimal("0")
     for invoice in invoices:
-        due = quantize_money(invoice.total - invoice.paid_amount)
+        # A refund restores the customer's outstanding balance, so collection
+        # must be based on net paid rather than gross historical allocations.
+        due = quantize_money(invoice.outstanding_amount)
         if due > 0:
             outstanding.append((invoice, due))
             total_outstanding += due
@@ -94,8 +96,11 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
         cash_remaining -= cash_use
         transfer_remaining -= transfer_use
 
+        # The prefetched allocation list does not include the allocation just
+        # created, so compute the new net-paid amount explicitly.
         new_paid = quantize_money(invoice.paid_amount + allocation.total_amount)
-        if new_paid >= invoice.total:
+        new_net_paid = quantize_money(new_paid - invoice.refunded_amount)
+        if new_net_paid >= invoice.total:
             invoice.status = Invoice.Status.PAID
             invoice.save(update_fields=("status", "updated_at"))
 
