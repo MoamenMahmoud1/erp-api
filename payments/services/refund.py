@@ -50,7 +50,10 @@ def refund_payment(
     if shift is not None and invoice.site_id != shift.site_id:
         raise RefundError("The invoice belongs to a different site than the current shift.")
 
-    allocation = PaymentAllocation.objects.filter(transaction_id=transaction_id, invoice_id=invoice_id).select_for_update().prefetch_related("refunds").first()
+    allocation = PaymentAllocation.objects.filter(
+        transaction_id=transaction_id,
+        invoice_id=invoice_id,
+    ).select_for_update().prefetch_related("refunds").first()
     if allocation is None:
         raise RefundError("No matching payment allocation exists.")
     if amount > allocation.refundable_amount:
@@ -67,12 +70,29 @@ def refund_payment(
         reason=reason,
         created_by_id=created_by_id,
     )
+
+    # A refund reduces the customer's net paid balance. A previously PAID
+    # invoice therefore becomes collectible again until the refunded amount
+    # is collected again.
+    new_net_paid = quantize_money(invoice.net_paid_amount - amount)
+    if invoice.status == Invoice.Status.PAID and new_net_paid < invoice.total:
+        invoice.status = Invoice.Status.CONFIRMED
+        invoice.save(update_fields=("status", "updated_at"))
+
     post_payment_refund(refund=refund, actor_id=created_by_id, company=get_default_company())
     record_event(
         action="payment.refund",
         entity_type="PaymentRefund",
         entity_id=refund.pk,
         actor_id=created_by_id,
-        metadata={"invoice_id": invoice.pk, "transaction_id": transaction_id, "site_id": site_id, "shift_id": refund.shift_id, "reason": reason},
+        metadata={
+            "invoice_id": invoice.pk,
+            "transaction_id": transaction_id,
+            "site_id": site_id,
+            "shift_id": refund.shift_id,
+            "reason": reason,
+            "invoice_status": invoice.status,
+            "net_paid_after_refund": str(new_net_paid),
+        },
     )
     return invoice
