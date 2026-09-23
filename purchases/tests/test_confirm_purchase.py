@@ -6,6 +6,7 @@ from django.test import TestCase
 from inventory.models import StockBalance, StockLocation, StockMovement, StockMovementItem
 from organization.models import Company
 from products.models import Product
+from inventory.services.source_reference import build_source_reference
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.confirm_purchase import ConfirmPurchaseService
 from suppliers.models import Supplier
@@ -57,7 +58,13 @@ class ConfirmPurchaseServiceTests(TestCase):
 
     def test_confirm_records_movement_and_items(self):
         self.confirm()
-        movement = StockMovement.objects.get(reference=self.purchase.reference)
+        movement = StockMovement.objects.get(
+            reference=build_source_reference(
+                source_type="purchase.confirmation",
+                source_id=self.purchase.pk,
+                label=self.purchase.reference,
+            )
+        )
         self.assertEqual(movement.movement_type, StockMovement.MovementType.PURCHASE)
         item = StockMovementItem.objects.get(movement=movement)
         self.assertEqual(item.product, self.product)
