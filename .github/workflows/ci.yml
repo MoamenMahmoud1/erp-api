@@ -146,10 +146,10 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
-      - name: Prepare Django migration tables
-        run: python manage.py migrate --noinput
-
-      - name: Prepare project model tables
+      - name: Prepare test database schema
+        # Project migration files are intentionally not committed. --run-syncdb
+        # creates tables for those unmigrated apps before Django applies the
+        # built-in migrated apps (admin/auth/contenttypes/sessions).
         run: python manage.py migrate --noinput --run-syncdb
 
       - name: Run ${{ matrix.suite }} tests
