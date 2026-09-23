@@ -2,8 +2,8 @@ from decimal import Decimal
 
 from django.db import transaction
 
-from accounts.services.employee_shift import operation_context
 from accounting.services import get_default_company, post_customer_collection
+from accounts.services.employee_shift import operation_context
 from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
