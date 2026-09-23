@@ -28,9 +28,9 @@ def _create_invoice(*, created_by, validated_data):
     customer = invoice_data.get("customer")
     if customer is None:
         raise InvalidBusinessOperation("A customer is required before creating an invoice.")
-    require_customer_assignment(customer=customer, user=created_by)
 
     _employee, site, shift = operation_context(created_by, requested_site=requested_site)
+    require_customer_assignment(customer=customer, user=created_by)
     if site is None:
         raise InvalidBusinessOperation("A site is required before creating an invoice.")
 
