@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
-# CI-only schema generation: generated migration files are removed on exit.
+# CI-only schema generation: generated migration files and missing migration
+# packages are removed on exit. No migration history is committed by CI.
 
 before_files="$(mktemp)"
 before_dirs="$(mktemp)"
@@ -25,6 +26,21 @@ trap cleanup EXIT HUP INT TERM
 
 find . -type f -path '*/migrations/[0-9]*.py' -print | sort > "$before_files"
 find . -type d -path '*/migrations' -print | sort > "$before_dirs"
+
+python - <<'PY'
+from pathlib import Path
+
+from django.apps import apps
+
+for app_config in apps.get_app_configs():
+    if not app_config.models:
+        continue
+    migrations_dir = Path(app_config.path) / "migrations"
+    if migrations_dir.exists():
+        continue
+    migrations_dir.mkdir()
+    (migrations_dir / "__init__.py").write_text("", encoding="utf-8")
+PY
 
 python manage.py makemigrations --noinput
 "$@"
