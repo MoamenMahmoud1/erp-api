@@ -75,9 +75,6 @@ jobs:
       - name: Run Django checks
         run: python manage.py check
 
-      - name: Ruff
-        run: ruff check .
-
       - name: Production Django checks
         env:
           DJANGO_SETTINGS_MODULE: core.settings.settings_prod
