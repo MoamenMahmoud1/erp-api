@@ -1,11 +1,10 @@
 from django.db import transaction
 
-from inventory.models import StockLocation, StockMovement, StockMovementItem
-
 from accounts.services.employee_shift import require_open_shift
 from accounting.services import get_default_company, post_purchase_return
 from auditlog.services import record_event
 from common.exceptions import InsufficientStock, InvalidBusinessOperation
+from inventory.models import StockLocation, StockMovement, StockMovementItem
 from inventory.services.source_reference import build_source_reference
 from inventory.services.stock_balance import StockBalanceService
 from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
