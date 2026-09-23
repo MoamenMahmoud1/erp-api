@@ -4,8 +4,10 @@ from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from accounts.models import Employee, RoleProfile
+from accounts.services.employee_shift import start_shift
 from customers.api.views import CustomerViewSet
 from customers.models import Customer
+from organization.models import Company, Site
 
 from .models import CustomerAssignment
 
@@ -28,7 +30,18 @@ class AssignedCustomerApiTests(TestCase):
             is_staff=True,
         )
         user.groups.add(group)
-        employee = Employee.objects.create(user=user)
+        company = Company.objects.create(name="Customer Assignment Test Company")
+        site = Site.objects.create(
+            company=company,
+            code="BR-ASSIGN",
+            name="Assignment Branch",
+            site_type=Site.Type.BRANCH,
+            address_line_1="Test address",
+            city="Cairo",
+            country_code="EG",
+        )
+        employee = Employee.objects.create(user=user, work_site=site)
+        start_shift(user=user)
 
         assigned = Customer.objects.create(name="Assigned Customer")
         unassigned = Customer.objects.create(name="Unassigned Customer")
