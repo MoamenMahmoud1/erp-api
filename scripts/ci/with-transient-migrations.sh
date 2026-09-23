@@ -1,5 +1,6 @@
 #!/bin/sh
 set -eu
+# CI-only schema generation: generated migration files are removed on exit.
 
 before_files="$(mktemp)"
 before_dirs="$(mktemp)"
