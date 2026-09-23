@@ -64,7 +64,7 @@ class PurchaseReturnTests(TestCase):
             StockMovement.objects.filter(
                 reference=build_source_reference(
                     source_type="purchase.return",
-                    source_id=self.purchase.pk,
+                    source_id=result.pk,
                     label=f"Return Purchase #{self.purchase.pk}",
                 ),
                 movement_type=StockMovement.MovementType.PURCHASE_RETURN,
