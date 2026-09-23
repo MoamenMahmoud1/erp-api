@@ -151,7 +151,7 @@ jobs:
           python -m pip check
 
       - name: Run ${{ matrix.suite }} tests with transient authsession migration
-        run: ./scripts/ci/with-transient-migrations.sh python manage.py test ${{ matrix.apps }}
+        run: bash scripts/ci/with-transient-migrations.sh python manage.py test ${{ matrix.apps }}
 
   frontend:
     name: Frontend build
