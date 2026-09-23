@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Run Django checks with transient authsession migration
-        run: ./scripts/ci/with-transient-migrations.sh python manage.py check
+        run: bash scripts/ci/with-transient-migrations.sh python manage.py check
 
       - name: Ruff
         run: ruff check .
