@@ -32,3 +32,24 @@ REPORT_CACHE_TTL = 0
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_URL = "memory://"
+
+# The project intentionally does not commit generated migration files for every app.
+# CI/test databases are built from the current model state instead.
+PROJECT_APP_LABELS = [
+    "accounts",
+    "authsession",
+    "organization",
+    "customers",
+    "customer_assignments",
+    "products",
+    "coupons",
+    "invoices",
+    "payments",
+    "inventory",
+    "purchases",
+    "suppliers",
+    "accounting",
+    "auditlog",
+    "notifications",
+]
+MIGRATION_MODULES = {label: None for label in PROJECT_APP_LABELS}
