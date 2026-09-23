@@ -42,5 +42,20 @@ for app_config in apps.get_app_configs():
     (migrations_dir / "__init__.py").write_text("", encoding="utf-8")
 PY
 
-python manage.py makemigrations --noinput
+python - <<'PY'
+from django.apps import apps
+
+for app_config in apps.get_app_configs():
+    if app_config.models:
+        print(
+            "CI_MIGRATION_APP",
+            app_config.label,
+            "module=" + app_config.name,
+            "path=" + app_config.path,
+            "migrations=" + repr(app_config.migrations_module()),
+        )
+PY
+
+python manage.py makemigrations --noinput --verbosity 2
+python manage.py showmigrations --verbosity 1
 "$@"
