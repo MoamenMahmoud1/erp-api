@@ -10,9 +10,6 @@ urlpatterns = [
     path("health/live/", health_live, name="health-live"),
     path("health/ready/", health_ready, name="health-ready"),
     path("api/v1/system/version/", version_view, name="system-version"),
-    path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
-    path("api/v1/docs/swagger/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
-    path("api/v1/docs/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
     path("api/v1/", include(("accounts.urls", "accounts"), namespace="accounts")),
     path("api/v1/organization/", include(("organization.urls", "organization"), namespace="organization")),
     path("api/v1/", include(("customers.urls", "customers"), namespace="customers")),
@@ -28,6 +25,13 @@ urlpatterns = [
     path("api/v1/accounting/", include(("accounting.urls", "accounting"), namespace="accounting")),
     path("admin/", admin.site.urls),
 ]
+
+if getattr(settings, "ENABLE_API_DOCS", False):
+    urlpatterns.extend([
+        path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
+        path("api/v1/docs/swagger/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+        path("api/v1/docs/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    ])
 
 if settings.DEBUG:
     if "silk" in settings.INSTALLED_APPS:
