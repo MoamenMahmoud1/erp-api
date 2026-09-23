@@ -49,13 +49,18 @@ def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None)
             raise InvalidBusinessOperation("Return quantity exceeds the remaining purchased quantity.")
         cleaned.append((line, quantity))
 
-    warehouse = StockLocation.objects.select_for_update().filter(
+    warehouse_query = StockLocation.objects.filter(
         location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
         is_active=True,
-        **({"site_id": purchase.site_id} if purchase.site_id else {}),
-    ).first()
-    if warehouse is None:
+    )
+    if purchase.site_id:
+        warehouse_query = warehouse_query.filter(site_id=purchase.site_id)
+    warehouses = list(warehouse_query.select_for_update()[:2])
+    if not warehouses:
         raise InvalidBusinessOperation("Active main warehouse does not exist for this site.")
+    if len(warehouses) > 1:
+        raise InvalidBusinessOperation("The site has more than one active main warehouse.")
+    warehouse = warehouses[0]
 
     purchase_return = PurchaseReturn.objects.create(
         purchase=purchase,

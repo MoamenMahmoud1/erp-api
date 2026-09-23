@@ -1,6 +1,9 @@
 from .settings_base import *
 
 DEBUG = True
+SECRET_KEY = config("SECRET_KEY", default="dev-local-secret-key-not-for-production")
+SIMPLE_JWT["SIGNING_KEY"] = config("JWT_SIGNING_KEY", default="dev-local-jwt-key-not-for-production")
+ENABLE_API_DOCS = True
 ALLOWED_HOSTS = ["*"]
 AUTH_COOKIE_SECURE = False
 

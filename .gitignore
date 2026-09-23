@@ -27,6 +27,3 @@ frontend/.cache/
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
-
-# Django migrations are kept local for this development workflow
-migrations/

@@ -90,7 +90,7 @@ class Invoice(models.Model):
     @property
     def outstanding_amount(self):
         from common.money import quantize_money
-        return quantize_money(self.total - self.paid_amount)
+        return max(Decimal("0.00"), quantize_money(self.total - self.net_paid_amount))
 
 
 class InvoiceItem(models.Model):
