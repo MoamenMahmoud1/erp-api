@@ -1,13 +1,29 @@
 #!/bin/sh
 set -eu
 
+before_files="$(mktemp)"
+before_dirs="$(mktemp)"
+
 cleanup() {
-  rm -f authsession/migrations/[0-9]*.py
-  rm -f authsession/migrations/[0-9]*.pyc
-  rm -rf authsession/migrations/__pycache__
-  rmdir authsession/migrations 2>/dev/null || true
+  after_files="$(mktemp)"
+  after_dirs="$(mktemp)"
+  find . -type f -path '*/migrations/[0-9]*.py' -print | sort > "$after_files"
+  find . -type d -path '*/migrations' -print | sort > "$after_dirs"
+
+  comm -13 "$before_files" "$after_files" | while IFS= read -r file; do
+    [ -z "$file" ] || rm -f "$file"
+  done
+
+  comm -13 "$before_dirs" "$after_dirs" | while IFS= read -r directory; do
+    [ -z "$directory" ] || rm -rf "$directory"
+  done
+
+  rm -f "$before_files" "$before_dirs" "$after_files" "$after_dirs"
 }
 trap cleanup EXIT HUP INT TERM
 
-python manage.py makemigrations authsession --noinput
+find . -type f -path '*/migrations/[0-9]*.py' -print | sort > "$before_files"
+find . -type d -path '*/migrations' -print | sort > "$before_dirs"
+
+python manage.py makemigrations --noinput
 "$@"
