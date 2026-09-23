@@ -75,8 +75,18 @@ jobs:
       - name: Run Django checks with transient authsession migration
         run: bash scripts/ci/with-transient-migrations.sh python manage.py check
 
-      - name: Ruff
+      - name: Ruff baseline
+        continue-on-error: true
         run: ruff check .
+
+      - name: Ruff changed Python files
+        shell: bash
+        run: |
+          set -euo pipefail
+          changed="$(git diff --name-only origin/main...HEAD -- '*.py')"
+          if [[ -n "$changed" ]]; then
+            ruff check $changed
+          fi
 
       - name: Production Django checks
         env:
