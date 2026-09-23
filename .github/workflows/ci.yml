@@ -72,8 +72,8 @@ jobs:
             exit 1
           fi
 
-      - name: Run Django checks with transient authsession migration
-        run: bash scripts/ci/with-transient-migrations.sh python manage.py check
+      - name: Run Django checks
+        run: python manage.py check
 
       - name: Ruff
         run: ruff check .
@@ -150,8 +150,8 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
-      - name: Run ${{ matrix.suite }} tests with transient authsession migration
-        run: bash scripts/ci/with-transient-migrations.sh python manage.py test ${{ matrix.apps }}
+      - name: Run ${{ matrix.suite }} tests
+        run: python manage.py test ${{ matrix.apps }}
 
   frontend:
     name: Frontend build
