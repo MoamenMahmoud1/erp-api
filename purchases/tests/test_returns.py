@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from common.exceptions import InvalidBusinessOperation
 from inventory.models import StockBalance, StockLocation, StockMovement
+from inventory.services.source_reference import build_source_reference
 from organization.models import Company
 from products.models import Product
 from purchases.models import Purchase, PurchaseItem
@@ -61,7 +62,11 @@ class PurchaseReturnTests(TestCase):
         )
         self.assertTrue(
             StockMovement.objects.filter(
-                reference=f"Return Purchase #{self.purchase.pk}",
+                reference=build_source_reference(
+                    source_type="purchase.return",
+                    source_id=self.purchase.pk,
+                    label=f"Return Purchase #{self.purchase.pk}",
+                ),
                 movement_type=StockMovement.MovementType.PURCHASE_RETURN,
             ).exists()
         )
