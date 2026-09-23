@@ -1,7 +1,7 @@
 export type Json = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
-const ACCESS_KEY = 'erp_access_token';
+let accessToken: string | null = null;
 const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
 
 let csrfToken = '';
@@ -9,12 +9,11 @@ let refreshing = false;
 let refreshPromise: Promise<boolean> | null = null;
 
 function getAccessToken() {
-  return localStorage.getItem(ACCESS_KEY);
+  return accessToken;
 }
 
 function setAccessToken(token: string | null) {
-  if (token) localStorage.setItem(ACCESS_KEY, token);
-  else localStorage.removeItem(ACCESS_KEY);
+  accessToken = token;
 }
 
 function notifyAuthExpired() {

@@ -8,6 +8,7 @@ from auditlog.services import record_event
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.money import quantize_money
 from common.observability import log_operation
+from customer_assignments.services import require_customer_assignment
 from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentTransaction
 
@@ -38,6 +39,7 @@ def collect(*, customer, cash_amount, transfer_amount, collected_by_id, actor=No
     shift = None
     site = None
     if actor is not None:
+        require_customer_assignment(customer=customer, user=actor)
         _employee, site, shift = operation_context(actor)
     site_id = site.pk if site else None
 

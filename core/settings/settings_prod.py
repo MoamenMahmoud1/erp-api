@@ -8,6 +8,7 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS",
     cast=lambda value: [origin.strip() for origin in value.split(",") if origin.strip()],
 )
+ENABLE_API_DOCS = config("ENABLE_API_DOCS", default=False, cast=bool)
 CSRF_TRUSTED_ORIGINS = config(
     "CSRF_TRUSTED_ORIGINS",
     cast=lambda value: [origin.strip() for origin in value.split(",") if origin.strip()],
