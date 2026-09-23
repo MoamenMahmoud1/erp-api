@@ -150,6 +150,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip check
 
+      - name: Prepare test database
+        run: python manage.py migrate --noinput --run-syncdb
+
       - name: Run ${{ matrix.suite }} tests
         run: python manage.py test ${{ matrix.apps }}
 
