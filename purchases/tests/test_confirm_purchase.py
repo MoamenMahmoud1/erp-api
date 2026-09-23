@@ -4,9 +4,9 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from inventory.models import StockBalance, StockLocation, StockMovement, StockMovementItem
+from inventory.services.source_reference import build_source_reference
 from organization.models import Company
 from products.models import Product
-from inventory.services.source_reference import build_source_reference
 from purchases.models import Purchase, PurchaseItem
 from purchases.services.confirm_purchase import ConfirmPurchaseService
 from suppliers.models import Supplier
