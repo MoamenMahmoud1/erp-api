@@ -153,7 +153,7 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
             response_body={"ok": True},
         )
         IdempotencyKey.objects.filter(pk=old.pk).update(
-            created_at=timezone.now() - timedelta(days=91)
+            created_at=timezone.now() - timedelta(days=366)
         )
 
         deleted = prune_idempotency_keys()
