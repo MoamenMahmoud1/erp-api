@@ -154,6 +154,7 @@ export const api = {
     refresh: refreshAccessToken,
     logout: () => jsonRequest('/auth/logout/', 'POST').finally(() => setAccessToken(null)),
     logoutAll: () => jsonRequest('/auth/logout-all/', 'POST').finally(() => setAccessToken(null)),
+    openAdmin: () => jsonRequest<{ url: string }>('/auth/admin/session/', 'POST'),
   },
   organization: {
     company: () => request('/organization/company/'), updateCompany: (body: Json) => jsonRequest('/organization/company/', 'PATCH', body),
