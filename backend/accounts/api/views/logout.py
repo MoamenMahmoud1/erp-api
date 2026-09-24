@@ -30,8 +30,6 @@ class LogoutView(NoStoreResponseMixin, APIView):
 
         django_logout(request)
 
-        django_logout(request)
-
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)
         return response
@@ -42,6 +40,7 @@ class LogoutAllView(NoStoreResponseMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         revoke_all_sessions(user_id=request.user.pk)
+        django_logout(request)
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)
