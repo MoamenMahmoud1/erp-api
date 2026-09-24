@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
-from payments.api.views import CollectionView, RefundView, TransactionListView
+from payments.api.views import CollectionView, RefundView, TransactionListView, TransferApprovalView
 from payments.models import PaymentTransaction
 from payments.services import collect
 
@@ -81,3 +81,40 @@ class PaymentAPITests(PaymentTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
         self.assertEqual(PaymentTransaction.objects.count(), 1)
+
+
+    def test_transfer_approval_endpoint(self):
+        request = self.factory.post(
+            "/api/v1/payments/collections/",
+            {
+                "customer": self.customer.pk,
+                "invoice": self.invoice.pk,
+                "cash_amount": "0.00",
+                "transfer_amount": "100.00",
+            },
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="transfer-approval-key",
+        )
+        force_authenticate(request, user=self.user)
+        response = CollectionView.as_view()(request)
+        self.assertEqual(response.status_code, 201)
+        transaction_id = response.data["id"]
+        self.assertEqual(response.data["transfer_status"], "pending")
+        self.assertEqual(response.data["effective_total_amount"], "0.00")
+
+        approve_request = self.factory.post(
+            f"/api/v1/payments/transactions/{transaction_id}/approve-transfer/",
+            {},
+            format="json",
+        )
+        force_authenticate(approve_request, user=self.user)
+        approved = TransferApprovalView.as_view()(
+            approve_request,
+            pk=transaction_id,
+        )
+        self.assertEqual(approved.status_code, 200)
+        self.assertEqual(approved.data["transfer_status"], "accepted")
+        self.assertEqual(approved.data["effective_total_amount"], "100.00")
+
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, "paid")
