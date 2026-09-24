@@ -36,6 +36,8 @@ class Invoice(models.Model):
             models.Index(fields=("customer", "created_at"), name="invoice_cust_created_idx"),
             models.Index(fields=("site", "created_at"), name="invoice_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="invoice_shift_created_idx"),
+            models.Index(fields=("created_at", "id"), name="invoice_created_id_idx"),
+            models.Index(fields=("status", "created_at"), name="invoice_status_created_idx"),
         ]
         permissions = [
             ("confirm_invoice", "Can confirm an invoice"),
@@ -136,6 +138,7 @@ class InvoiceReturn(models.Model):
         indexes = [
             models.Index(fields=("site", "created_at"), name="iret_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="iret_shift_created_idx"),
+            models.Index(fields=("created_at", "id"), name="iret_created_id_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=Q(refund_amount__gte=Decimal("0")), name="invoice_return_refund_amount_non_negative"),
