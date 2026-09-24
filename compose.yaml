@@ -1,0 +1,142 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-erp_api}
+      POSTGRES_USER: ${DB_USER:-erp_api}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $\{POSTGRES_USER\} -d $\{POSTGRES_DB\}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  migrate:
+    build:
+      context: ./backend
+      target: web
+    restart: "no"
+    env_file:
+      - ./.env.prod.local
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.settings_prod
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+    command: python manage.py migrate --noinput
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  erp-api-prod:
+    build:
+      context: ./backend
+      target: web
+    restart: unless-stopped
+    env_file:
+      - ./.env.prod.local
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.settings_prod
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8000"
+
+  celery_worker:
+    build:
+      context: ./backend
+      target: worker
+    restart: unless-stopped
+    env_file:
+      - ./.env.prod.local
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.settings_prod
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery_beat:
+    build:
+      context: ./backend
+      target: worker
+    restart: unless-stopped
+    env_file:
+      - ./.env.prod.local
+    environment:
+      DJANGO_SETTINGS_MODULE: core.settings.settings_prod
+      DB_HOST: db
+      DB_PORT: 5432
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/1
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  erp-frontend-prod:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api/v1
+    restart: unless-stopped
+    expose:
+      - "80"
+
+  erp-gateway:
+    build:
+      context: ./infra/gateway
+    restart: unless-stopped
+    depends_on:
+      erp-api-prod:
+        condition: service_started
+      erp-frontend-prod:
+        condition: service_started
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
+    name: erp-api_postgres_data
