@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from organization.models import Department
+from organization.models import Department, Site
 from services.organization_scope import visible_site_ids
 
 
@@ -44,10 +44,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
         site = attrs.get("site", getattr(self.instance, "site", None))
         site_ids = visible_site_ids(actor) if actor else None
         if site is not None and site_ids is not None:
-            if not Department._meta.get_field("site").remote_field.model.objects.filter(
-                pk=site.pk,
-                pk__in=site_ids,
-            ).exists():
+            if not Site.objects.filter(pk=site.pk, pk__in=site_ids).exists():
                 raise serializers.ValidationError({"site": "The department site is outside your allowed scope."})
         return attrs
 
