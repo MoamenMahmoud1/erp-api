@@ -34,7 +34,7 @@ services:
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE must be set}
       DB_NAME: ${DB_NAME:-erp_api}
       DB_USER: ${DB_USER:-erp_api}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
@@ -57,7 +57,7 @@ services:
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE must be set}
       DB_NAME: ${DB_NAME:-erp_api}
       DB_USER: ${DB_USER:-erp_api}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
@@ -96,7 +96,7 @@ services:
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE must be set}
       DB_NAME: ${DB_NAME:-erp_api}
       DB_USER: ${DB_USER:-erp_api}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
@@ -125,7 +125,7 @@ services:
     env_file:
       - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:?DJANGO_SETTINGS_MODULE must be set}
       DB_NAME: ${DB_NAME:-erp_api}
       DB_USER: ${DB_USER:-erp_api}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
