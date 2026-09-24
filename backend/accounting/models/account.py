@@ -29,6 +29,32 @@ class Account(models.Model):
             ("view_financial_reports", "Can view financial reports"),
         ]
 
+    def clean(self):
+        super().clean()
+        if self.parent_id is None:
+            return
+        if self.pk is not None and self.parent_id == self.pk:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"parent": "An account cannot be its own parent."})
+
+        parent = self.parent
+        if parent.company_id != self.company_id:
+            from django.core.exceptions import ValidationError
+            raise ValidationError({"parent": "The parent account must belong to the same company."})
+
+        from django.core.exceptions import ValidationError
+        visited = {self.pk} if self.pk is not None else set()
+        current = parent
+        while current is not None:
+            if current.pk in visited:
+                raise ValidationError({"parent": "The account hierarchy cannot contain cycles."})
+            visited.add(current.pk)
+            current = current.parent
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
     @property
     def normal_side(self) -> str:
         return "debit" if self.account_type in {self.AccountType.ASSET, self.AccountType.EXPENSE} else "credit"
