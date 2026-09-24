@@ -53,6 +53,7 @@ class EmployeeShiftTests(TestCase):
     def test_required_shift_blocks_invoice_creation_context(self):
         product = Product.objects.create(name="Product", purchase_price=Decimal("10"), selling_price=Decimal("20"))
         customer = Customer.objects.create(name="Customer")
+        CustomerAssignment.objects.create(customer=customer, employee=self.employee)
         from invoices.services.create import CreateInvoice
 
         with self.assertRaises(ShiftError):
