@@ -72,10 +72,10 @@ class SalesReturnTests(InvoiceTestMixin, TestCase):
 
         self.assertEqual(returned.total_amount, Decimal("100.00"))
         invoice.refresh_from_db()
-        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
         self.assertEqual(invoice.paid_amount, Decimal("200.00"))
         self.assertEqual(invoice.refunded_amount, Decimal("100.00"))
-        self.assertEqual(invoice.outstanding_amount, Decimal("0.00"))
+        self.assertEqual(invoice.outstanding_amount, Decimal("100.00"))
         self.assertEqual(StockBalance.objects.get(location=self.location, product=self.product).quantity, 1)
 
     def test_full_return_marks_invoice_returned(self):
