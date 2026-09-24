@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import Client, TestCase
 from rest_framework.test import APIClient
 
 
@@ -36,6 +36,7 @@ class AdminAccessTests(TestCase):
 class AdminSessionBridgeTests(TestCase):
     def setUp(self):
         User = get_user_model()
+        self.admin_browser = Client()
         self.superuser = User.objects.create_superuser(
             username="admin",
             email="admin@example.com",
@@ -63,19 +64,19 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["url"].endswith("/admin/"))
 
-        self.client.force_authenticate(user=None)
-        admin_response = self.client.get("/admin/")
+        self.admin_browser.cookies.update(self.client.cookies)
+        admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 200)
 
     def test_erp_logout_clears_admin_session(self):
         self.client.force_authenticate(user=self.superuser)
         session_response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(session_response.status_code, 200)
+        self.admin_browser.cookies.update(self.client.cookies)
 
         self.client.force_authenticate(user=self.superuser)
         logout_response = self.client.post("/api/v1/auth/logout/", {})
         self.assertEqual(logout_response.status_code, 204)
 
-        self.client.force_authenticate(user=None)
-        admin_response = self.client.get("/admin/")
+        admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 404)
