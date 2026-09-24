@@ -8,6 +8,7 @@ from payments.models import PaymentAllocation, PaymentTransaction
 from payments.services import (
     NoConfirmableInvoicesError,
     OverpaymentError,
+    TransferApprovalError,
     approve_bank_transfer,
     collect,
 )
@@ -106,7 +107,7 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
                 actor=self.user,
             )
 
-    
+
     def test_transfer_payment_stays_pending_until_approval(self):
         invoice = self.create_invoice(total="100.00")
         tx = collect(
@@ -181,7 +182,7 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor_id=self.user.pk,
             actor=self.user,
         )
-        with self.assertRaisesMessage(Exception, "overpay"):
+        with self.assertRaisesMessage(TransferApprovalError, "overpay"):
             approve_bank_transfer(
                 transaction_id=second.pk,
                 actor_id=self.user.pk,
