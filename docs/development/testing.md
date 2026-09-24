@@ -5,7 +5,7 @@ The test suite is organized around business domains and responsibilities rather 
 ## Repository layout
 
 ```text
-accounts/tests/
+backend/accounts/tests/
   test_login_serializer.py
   test_login_view.py
   test_signup_verification.py
@@ -19,19 +19,19 @@ accounts/tests/
   test_employee_organization.py
   test_employee_organization_api.py
 
-authsession/tests/
+backend/authsession/tests/
   test_http.py
   test_session_api.py
   ...
 
-products/tests/
+backend/products/tests/
   test_models.py
   test_product_api.py
   test_carton_pricing_api.py
   test_intelligence.py
   test_intelligence_api.py
 
-organization/tests/
+backend/organization/tests/
   test_company.py
   test_metrics.py
   test_site.py
@@ -42,7 +42,7 @@ The same rule applies to the remaining apps: model/constraint tests stay separat
 
 ## Shared test infrastructure
 
-`core.testing.auth` owns the stateful login setup used by API tests. It performs the real login endpoint and carries the `refresh_token` and signed `device_id` cookies into the API client. This keeps stateful authentication tests faithful to production without duplicating cookie plumbing in every suite.
+`backend/core/testing/auth` owns the stateful login setup used by API tests. It performs the real login endpoint and carries the `refresh_token` and signed `device_id` cookies into the API client. This keeps stateful authentication tests faithful to production without duplicating cookie plumbing in every suite.
 
 Stateless JWT tests remain separate and use direct token authentication because they intentionally verify zero-database authentication behavior.
 
@@ -75,30 +75,30 @@ Product intelligence has both service-level and API contract coverage. Dashboard
 Run everything:
 
 ```bash
-python manage.py test
+python backend/manage.py test
 ```
 
 Run one app:
 
 ```bash
-python manage.py test invoices
+python backend/manage.py test invoices
 ```
 
 Run one responsibility:
 
 ```bash
-python manage.py test invoices.tests.test_lifecycle
-python manage.py test payments.tests.test_collection
-python manage.py test organization.tests.test_metrics
-python manage.py test core.tests.test_celery
-python manage.py test products.tests.test_intelligence products.tests.test_intelligence_api
+python backend/manage.py test invoices.tests.test_lifecycle
+python backend/manage.py test payments.tests.test_collection
+python backend/manage.py test organization.tests.test_metrics
+python backend/manage.py test core.tests.test_celery
+python backend/manage.py test products.tests.test_intelligence products.tests.test_intelligence_api
 ```
 
 Run one test class or method:
 
 ```bash
-python manage.py test invoices.tests.test_lifecycle.InvoiceLifecycleTests
-python manage.py test invoices.tests.test_lifecycle.InvoiceLifecycleTests.test_confirm_consumes_stock
+python backend/manage.py test invoices.tests.test_lifecycle.InvoiceLifecycleTests
+python backend/manage.py test invoices.tests.test_lifecycle.InvoiceLifecycleTests.test_confirm_consumes_stock
 ```
 
 ## CI suites
