@@ -32,11 +32,6 @@ if not CORS_ALLOWED_ORIGINS:
     raise ImproperlyConfigured(
         "CORS_ALLOWED_ORIGINS must contain at least one origin in production."
     )
-if any(not origin.startswith("https://") for origin in CORS_ALLOWED_ORIGINS):
-    raise ImproperlyConfigured(
-        "All production CORS origins must use HTTPS."
-    )
-
 ENABLE_API_DOCS = config("ENABLE_API_DOCS", default=False, cast=bool)
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
@@ -46,10 +41,6 @@ CSRF_TRUSTED_ORIGINS = [
 if not CSRF_TRUSTED_ORIGINS:
     raise ImproperlyConfigured(
         "CSRF_TRUSTED_ORIGINS must contain at least one origin in production."
-    )
-if any(not origin.startswith("https://") for origin in CSRF_TRUSTED_ORIGINS):
-    raise ImproperlyConfigured(
-        "All production CSRF trusted origins must use HTTPS."
     )
 
 # PostgreSQL Production
