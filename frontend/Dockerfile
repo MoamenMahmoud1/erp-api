@@ -7,10 +7,7 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
-# Keep exactly one frontend configuration source in the image.
-# Vite otherwise gives mode-specific env files precedence over .env.
-RUN rm -f .env.production .env.development .env.local .env.production.local .env.development.local \
-    && npm run build
+RUN npm run build
 
 FROM nginx:1.29-alpine AS runtime
 
