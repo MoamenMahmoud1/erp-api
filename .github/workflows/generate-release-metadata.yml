@@ -1,0 +1,70 @@
+name: Generate release metadata
+
+on:
+  push:
+    branches:
+      - production-hardening-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Generate Django migrations
+        env:
+          DJANGO_SETTINGS_MODULE: core.settings.settings_dev
+          SECRET_KEY: migration-generation-only
+          JWT_SIGNING_KEY: migration-generation-only
+          DB_NAME: erp_api
+          DB_USER: erp_api
+          DB_PASSWORD: local-development-only
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          REDIS_URL: redis://127.0.0.1:6379/1
+        run: python manage.py makemigrations --noinput
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package.json
+
+      - name: Generate frontend lockfile
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit generated release metadata
+        working-directory: .
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add backend/*/migrations frontend/package-lock.json
+          if git diff --cached --quiet; then
+            echo "No generated files changed."
+            exit 0
+          fi
+          git commit -m "build: add generated release metadata"
+          git push
