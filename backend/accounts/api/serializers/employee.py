@@ -144,7 +144,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "role",
             "role_id",
             "groups",
-            "group_ids",
             "manager",
             "manager_details",
             "work_site",
@@ -185,7 +184,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         work_site = attrs.get("work_site", getattr(self.instance, "work_site", None))
         department = attrs.get("department", getattr(self.instance, "department", None))
         requested_role = attrs.get("_role_assignment", serializers.empty)
-        requested_groups = attrs.get("group_ids", serializers.empty)
 
         if actor and user and not RoleProfile.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
