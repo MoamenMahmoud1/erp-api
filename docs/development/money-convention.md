@@ -49,7 +49,7 @@ Examples already enforced:
 
 ## Where the helpers live
 
-`erp-api/common/money.py` (small, function-based):
+`backend/common/money.py` (small, function-based):
 
 - `money_decimal(value)` — coerce to `Decimal`, reject `float`.
 - `quantize_money(value)` — round to 2dp with ROUND_HALF_UP.
