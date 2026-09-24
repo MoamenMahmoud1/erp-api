@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 PYTHON="${PYTHON:-python}"
@@ -50,8 +50,8 @@ printf 'Database: %s@%s:%s/%s\n' "$DB_USER" "$DB_HOST" "$DB_PORT" "$DB_NAME" | t
 printf 'Log file: %s\n' "$LOG_FILE" | tee -a "$LOG_FILE"
 
 run_step "Python version" "$PYTHON" --version
-run_step "Django checks" "$PYTHON" manage.py check
-run_step "Migration drift check" "$PYTHON" manage.py makemigrations --check --dry-run
+run_step "Django checks" "$PYTHON" backend/manage.py check
+run_step "Migration drift check" "$PYTHON" backend/manage.py makemigrations --check --dry-run
 
 printf '\n%s\n' "============================================================" | tee -a "$LOG_FILE"
 printf ' Ruff (informational)\n' | tee -a "$LOG_FILE"
@@ -62,7 +62,7 @@ else
     printf '\n[INFO] Ruff reported existing lint debt; it is not part of P0-P2 verification.\n' | tee -a "$LOG_FILE"
 fi
 
-run_step "P0/P1 focused tests" "$PYTHON" manage.py test \
+run_step "P0/P1 focused tests" "$PYTHON" backend/manage.py test \
     accounting.tests.test_permissions \
     accounting.tests.test_reconciliation \
     accounting.tests.test_balances \
@@ -75,13 +75,13 @@ run_step "P0/P1 focused tests" "$PYTHON" manage.py test \
     auditlog \
     --verbosity 2
 
-run_step "Authentication suite" "$PYTHON" manage.py test accounts authsession authentication --verbosity 1
-run_step "Organization suite" "$PYTHON" manage.py test organization customers suppliers --verbosity 1
-run_step "Catalog suite" "$PYTHON" manage.py test products coupons --verbosity 1
-run_step "Sales suite" "$PYTHON" manage.py test invoices payments inventory --verbosity 1
-run_step "Purchasing suite" "$PYTHON" manage.py test purchases --verbosity 1
-run_step "Accounting suite" "$PYTHON" manage.py test accounting auditlog --verbosity 1
-run_step "Infrastructure suite" "$PYTHON" manage.py test core common --verbosity 1
+run_step "Authentication suite" "$PYTHON" backend/manage.py test accounts authsession authentication --verbosity 1
+run_step "Organization suite" "$PYTHON" backend/manage.py test organization customers suppliers --verbosity 1
+run_step "Catalog suite" "$PYTHON" backend/manage.py test products coupons --verbosity 1
+run_step "Sales suite" "$PYTHON" backend/manage.py test invoices payments inventory --verbosity 1
+run_step "Purchasing suite" "$PYTHON" backend/manage.py test purchases --verbosity 1
+run_step "Accounting suite" "$PYTHON" backend/manage.py test accounting auditlog --verbosity 1
+run_step "Infrastructure suite" "$PYTHON" backend/manage.py test core common --verbosity 1
 
 # Production settings use the real PostgreSQL connection pool and may require
 # a real production-style database/Redis environment. Keep this opt-in for
@@ -102,7 +102,7 @@ if [[ "${CHECK_PRODUCTION:-0}" == "1" ]]; then
     export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:-}"
     export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
     export AWS_STORAGE_BUCKET_NAME="${AWS_STORAGE_BUCKET_NAME:-}"
-    run_step "Production Django deploy checks" "$PYTHON" manage.py check --deploy --fail-level ERROR
+    run_step "Production Django deploy checks" "$PYTHON" backend/manage.py check --deploy --fail-level ERROR
 else
     printf '\n[SKIP] Production Django deploy checks (set CHECK_PRODUCTION=1 to run).\n' | tee -a "$LOG_FILE"
 fi
