@@ -121,6 +121,91 @@ class OrganizationPermissionAPITests(OrganizationAPITestBase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class OrganizationScopeMutationTests(OrganizationAPITestBase):
+    def test_branch_user_cannot_create_site_under_another_branch(self):
+        self.grant_permissions("add_site")
+
+        response = self.client.post(
+            reverse("organization:site-list"),
+            {
+                "parent": self._create_other_branch().pk,
+                "code": "ST-CROSS",
+                "name": "Cross Branch Store",
+                "site_type": Site.Type.STORE,
+                "address_line_1": "Test address",
+                "city": "Cairo",
+                "country_code": "EG",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("parent", response.data)
+
+    def test_site_scoped_user_cannot_create_organizational_site(self):
+        site_group = Group.objects.create(name="Site Create Role")
+        RoleProfile.objects.create(
+            group=site_group,
+            name="Site Create Role",
+            level=10,
+            scope=RoleProfile.Scope.SITE,
+        )
+        site_user = User.objects.create_user(
+            username="site-create-user",
+            email="site-create@example.com",
+            password="StrongPass123!",
+        )
+        site_user.groups.add(site_group)
+        Employee.objects.create(user=site_user, work_site=self.store)
+        site_user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="organization",
+                codename="add_site",
+            )
+        )
+        self.client.force_authenticate(site_user)
+
+        response = self.client.post(
+            reverse("organization:site-list"),
+            {
+                "code": "ST-NEW",
+                "name": "New Store",
+                "site_type": Site.Type.STORE,
+                "address_line_1": "Test address",
+                "city": "Cairo",
+                "country_code": "EG",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("site_type", response.data)
+
+    def test_branch_user_cannot_move_department_outside_scope(self):
+        self.grant_permissions("view_department", "change_department")
+        other_branch = self._create_other_branch()
+
+        response = self.client.patch(
+            reverse("organization:department-detail", args=[self.department.pk]),
+            {"site": other_branch.pk},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("site", response.data)
+
+    def _create_other_branch(self):
+        return Site.objects.create(
+            company=self.company,
+            code="BR-99",
+            name="Other Branch",
+            site_type=Site.Type.BRANCH,
+            address_line_1="Other",
+            city="Cairo",
+            country_code="EG",
+        )
+
+
 class OrganizationRepresentationTests(OrganizationAPITestBase):
     def test_site_list_returns_relation_ids_and_names(self):
         self.grant_permissions("view_site")
