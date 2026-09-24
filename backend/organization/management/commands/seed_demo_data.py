@@ -237,9 +237,9 @@ class Command(BaseCommand):
         self._post_opening_balance(company=company, actor_id=actor_for_demo.pk, cash_account=accounts["cash"], bank_account=accounts["bank"], equity_account=equity_account, entry_date=timezone.localdate(dates[0]))
 
         purchases = [
-            self._create_purchase(supplier=suppliers["delta_foods"], actor=admin, when=dates[0], reference="PO-2026-0901", items=[(products["basmati_rice"], 100, "70.00"), (products["sunflower_oil"], 80, "60.00"), (products["detergent"], 50, "100.00")]),
-            self._create_purchase(supplier=suppliers["nile_fmcg"], actor=admin, when=dates[1], reference="PO-2026-0902", items=[(products["tissues"], 100, "45.00"), (products["water"], 150, "55.00"), (products["coffee"], 60, "120.00")]),
-            self._create_purchase(supplier=suppliers["cairo_home"], actor=admin, when=dates[2], reference="PO-2026-0903", items=[(products["tomato"], 100, "35.00"), (products["dishwash"], 80, "50.00"), (products["basmati_rice"], 50, "72.00"), (products["sunflower_oil"], 40, "62.00")]),
+            self._create_purchase(supplier=suppliers["delta_foods"], actor=actor_for_demo, when=dates[0], reference="PO-2026-0901", items=[(products["basmati_rice"], 100, "70.00"), (products["sunflower_oil"], 80, "60.00"), (products["detergent"], 50, "100.00")]),
+            self._create_purchase(supplier=suppliers["nile_fmcg"], actor=actor_for_demo, when=dates[1], reference="PO-2026-0902", items=[(products["tissues"], 100, "45.00"), (products["water"], 150, "55.00"), (products["coffee"], 60, "120.00")]),
+            self._create_purchase(supplier=suppliers["cairo_home"], actor=actor_for_demo, when=dates[2], reference="PO-2026-0903", items=[(products["tomato"], 100, "35.00"), (products["dishwash"], 80, "50.00"), (products["basmati_rice"], 50, "72.00"), (products["sunflower_oil"], 40, "62.00")]),
         ]
 
         return_purchase(purchase_id=purchases[0].pk, created_by_id=actor_for_demo.pk, actor=actor_for_demo, reason="Packaging damage identified during receiving inspection", items=[{"purchase_item": purchases[0].items.get(product=products["basmati_rice"]), "quantity": 5}])
@@ -251,22 +251,22 @@ class Command(BaseCommand):
         transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["manager"].pk, created_by=actor_for_demo, reference="LOAD-0904-SARA", items=[{"product": products["basmati_rice"], "quantity": 25}, {"product": products["water"], "quantity": 60}, {"product": products["tomato"], "quantity": 25}, {"product": products["dishwash"], "quantity": 20}, {"product": products["coffee"], "quantity": 20}])
 
         invoices = [
-            self._create_invoice(customer=customers["cairo_retail"], actor=admin, created_by=users["sales_1"], when=dates[2], items=[(products["basmati_rice"], 12), (products["sunflower_oil"], 8), (products["detergent"], 3)], coupon=coupon, discount=Decimal("218.40")),
-            self._create_invoice(customer=customers["delta_market"], actor=admin, created_by=users["sales_2"], when=dates[2], items=[(products["coffee"], 6), (products["tissues"], 10)]),
-            self._create_invoice(customer=customers["nile_mini"], actor=admin, created_by=users["manager"], when=dates[1], items=[(products["water"], 20), (products["tomato"], 12)]),
-            self._create_invoice(customer=customers["almanara"], actor=admin, created_by=users["sales_1"], when=dates[1], items=[(products["detergent"], 8), (products["dishwash"], 10), (products["basmati_rice"], 5)]),
-            self._create_invoice(customer=customers["fresh_corner"], actor=admin, created_by=users["sales_2"], when=dates[0], items=[(products["coffee"], 4), (products["water"], 12)]),
-            self._create_invoice(customer=customers["walk_in"], actor=admin, created_by=users["manager"], when=dates[0], items=[(products["basmati_rice"], 15), (products["water"], 10)]),
+            self._create_invoice(customer=customers["cairo_retail"], actor=actor_for_demo, created_by=users["sales_1"], when=dates[2], items=[(products["basmati_rice"], 12), (products["sunflower_oil"], 8), (products["detergent"], 3)], coupon=coupon, discount=Decimal("218.40")),
+            self._create_invoice(customer=customers["delta_market"], actor=actor_for_demo, created_by=users["sales_2"], when=dates[2], items=[(products["coffee"], 6), (products["tissues"], 10)]),
+            self._create_invoice(customer=customers["nile_mini"], actor=actor_for_demo, created_by=users["manager"], when=dates[1], items=[(products["water"], 20), (products["tomato"], 12)]),
+            self._create_invoice(customer=customers["almanara"], actor=actor_for_demo, created_by=users["sales_1"], when=dates[1], items=[(products["detergent"], 8), (products["dishwash"], 10), (products["basmati_rice"], 5)]),
+            self._create_invoice(customer=customers["fresh_corner"], actor=actor_for_demo, created_by=users["sales_2"], when=dates[0], items=[(products["coffee"], 4), (products["water"], 12)]),
+            self._create_invoice(customer=customers["walk_in"], actor=actor_for_demo, created_by=users["manager"], when=dates[0], items=[(products["basmati_rice"], 15), (products["water"], 10)]),
         ]
 
-        collect(customer=customers["cairo_retail"], cash_amount=invoices[0].total, transfer_amount=Decimal("0.00"), collected_by_id=admin.pk, actor=admin)
-        collect(customer=customers["delta_market"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("800.00"), collected_by_id=admin.pk, actor=admin)
-        collect(customer=customers["almanara"], cash_amount=invoices[3].total, transfer_amount=Decimal("0.00"), collected_by_id=admin.pk, actor=admin)
-        create_sales_return(invoice_id=invoices[3].pk, created_by_id=admin.pk, actor=admin, reason="Customer returned two unopened rice units", items=[{"invoice_item": invoices[3].items.get(product=products["basmati_rice"]), "quantity": 2}])
+        collect(customer=customers["cairo_retail"], cash_amount=invoices[0].total, transfer_amount=Decimal("0.00"), collected_by_id=actor_for_demo.pk, actor=actor_for_demo)
+        collect(customer=customers["delta_market"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("800.00"), collected_by_id=actor_for_demo.pk, actor=actor_for_demo)
+        collect(customer=customers["almanara"], cash_amount=invoices[3].total, transfer_amount=Decimal("0.00"), collected_by_id=actor_for_demo.pk, actor=actor_for_demo)
+        create_sales_return(invoice_id=invoices[3].pk, created_by_id=actor_for_demo.pk, actor=actor_for_demo, reason="Customer returned two unopened rice units", items=[{"invoice_item": invoices[3].items.get(product=products["basmati_rice"]), "quantity": 2}])
 
-        create_expense(amount=Decimal("2500.00"), expense_account=operating_expense.pk, payment_account=accounts["cash"].pk, expense_date=timezone.localdate(dates[0]), description="Warehouse utilities and local delivery fuel", reference="EXP-2026-0907", created_by_id=admin.pk, company=company)
+        create_expense(amount=Decimal("2500.00"), expense_account=operating_expense.pk, payment_account=accounts["cash"].pk, expense_date=timezone.localdate(dates[0]), description="Warehouse utilities and local delivery fuel", reference="EXP-2026-0907", created_by_id=actor_for_demo.pk, company=company)
 
-        draft_purchase = Purchase.objects.create(supplier=suppliers["delta_foods"], created_by=admin, reference="PO-DRAFT-2026-0910")
+        draft_purchase = Purchase.objects.create(supplier=suppliers["delta_foods"], created_by=actor_for_demo, reference="PO-DRAFT-2026-0910")
         PurchaseItem.objects.create(purchase=draft_purchase, product=products["coffee"], quantity=20, unit_purchase_price=Decimal("122.00"))
 
         draft_invoice = Invoice.objects.create(customer=customers["walk_in"], created_by=users["sales_2"], status=Invoice.Status.DRAFT)
