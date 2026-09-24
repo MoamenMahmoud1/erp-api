@@ -128,8 +128,17 @@ async function request<T = Json>(path: string, init: RequestInit = {}, retry = t
   return data as T;
 }
 
-async function jsonRequest<T = Json>(path: string, method: string, body?: unknown) {
-  return request<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+async function jsonRequest<T = Json>(
+  path: string,
+  method: string,
+  body?: unknown,
+  headers?: HeadersInit,
+) {
+  return request<T>(path, {
+    method,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    headers,
+  });
 }
 
 export const api = {
@@ -174,7 +183,15 @@ export const api = {
     list: (query = '') => request<Paginated>(`/purchases/${query}`), get: (id: number) => request(`/purchases/${id}/`), create: (body: Json) => jsonRequest('/purchases/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/purchases/${id}/edit/`, 'PATCH', body), confirm: (id: number) => request(`/purchases/${id}/confirm/`, { method: 'POST' }), cancel: (id: number) => request(`/purchases/${id}/cancel/`, { method: 'POST' }), delete: (id: number) => request(`/purchases/${id}/delete/`, { method: 'DELETE' }), returns: (id: number, body: Json) => jsonRequest(`/purchases/${id}/returns/`, 'POST', body), supplierPayment: (body: Json) => jsonRequest('/purchases/supplier-payments/', 'POST', body),
   },
   payments: {
-    collections: (body: Json) => jsonRequest('/payments/collections/', 'POST', body),
+    collections: (
+      body: Json,
+      idempotencyKey = crypto.randomUUID(),
+    ) => jsonRequest(
+      '/payments/collections/',
+      'POST',
+      body,
+      { 'Idempotency-Key': idempotencyKey },
+    ),
     refunds: (body: Json) => jsonRequest('/payments/refunds/', 'POST', body),
     transactions: (query = '') => request<Paginated>(`/payments/transactions/${query}`),
     approveTransfer: (id: number) => request(`/payments/transactions/${id}/approve-transfer/`, { method: 'POST' }),
