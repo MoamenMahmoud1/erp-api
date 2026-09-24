@@ -7,6 +7,7 @@ from accounting.services import ensure_default_accounts
 from accounting.services.automation import post_payment_refund, post_purchase_return, post_sales_return
 from accounts.models import CustomUserModel
 from customers.models import Customer
+from inventory.models import InventoryBatch, StockLocation, StockMovement, StockMovementItem
 from invoices.models import Invoice, InvoiceItem, InvoiceReturn, InvoiceReturnItem
 from organization.models import Company
 from payments.models import PaymentAllocation, PaymentRefund, PaymentTransaction
@@ -41,6 +42,63 @@ class AccountingReturnTests(TestCase):
         self.assertEqual(entry.lines.filter(account__code="1100", debit=Decimal("40.00")).count(), 1)
         self.assertEqual(entry.lines.filter(account__code="5100", credit=Decimal("40.00")).count(), 1)
         self.assertEqual(post_sales_return(sales_return=returned, actor_id=self.user.pk, company=self.company).pk, entry.pk)
+
+    def test_sales_return_uses_actual_return_movement_cost(self):
+        location = StockLocation.objects.create(
+            name="Return Warehouse",
+            location_type=StockLocation.LocationType.MAIN_WAREHOUSE,
+        )
+        batch = InventoryBatch.objects.create(
+            product=self.product,
+            batch_number="B-40",
+        )
+        invoice = Invoice.objects.create(customer=self.customer, created_by=self.user)
+        item = InvoiceItem.objects.create(
+            invoice=invoice,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("100.00"),
+            cost_price=Decimal("50.00"),
+        )
+        returned = InvoiceReturn.objects.create(
+            invoice=invoice,
+            created_by=self.user,
+            refund_amount=Decimal("100.00"),
+        )
+        InvoiceReturnItem.objects.create(
+            invoice_return=returned,
+            invoice_item=item,
+            quantity=1,
+            unit_price=Decimal("100.00"),
+        )
+        movement = StockMovement.objects.create(
+            movement_type=StockMovement.MovementType.SALEABLE_RETURN,
+            destination_location=location,
+            created_by=self.user,
+            reference=f"source:invoice.return:{returned.pk}:return",
+        )
+        StockMovementItem.objects.create(
+            movement=movement,
+            product=self.product,
+            batch=batch,
+            quantity=1,
+            unit_cost=Decimal("40.00"),
+        )
+
+        entry = post_sales_return(
+            sales_return=returned,
+            actor_id=self.user.pk,
+            company=self.company,
+        )
+
+        self.assertEqual(
+            entry.lines.get(account__code="1100").debit,
+            Decimal("40.00"),
+        )
+        self.assertEqual(
+            entry.lines.get(account__code="5100").credit,
+            Decimal("40.00"),
+        )
 
     def test_purchase_return_reduces_inventory_and_ap(self):
         purchase = Purchase.objects.create(supplier=self.supplier, created_by=self.user, reference="P-1")
