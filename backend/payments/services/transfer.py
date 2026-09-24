@@ -34,6 +34,10 @@ def approve_bank_transfer(*, transaction_id, actor_id, actor=None):
             "Only payments containing a bank transfer can be approved."
         )
 
+    if payment.transfer_accepted:
+        payment._transfer_approved = True
+        return payment
+
     allocations = list(payment.allocations.all())
     transfer_by_invoice = {}
     for allocation in allocations:
