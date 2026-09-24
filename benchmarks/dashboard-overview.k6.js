@@ -23,8 +23,6 @@ export const options = {
 };
 
 function login() {
-  const jar = http.cookieJar();
-
   const csrfResponse = http.get(`${BASE_URL}/api/v1/auth/csrf/`, {
     headers: { Accept: 'application/json' },
   });
@@ -53,7 +51,9 @@ function login() {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },
-      cookies: jar.cookiesForURL(BASE_URL),
+      cookies: {
+        csrftoken: csrfResponse.cookies.csrftoken?.[0]?.value || '',
+      },
     },
   );
 
