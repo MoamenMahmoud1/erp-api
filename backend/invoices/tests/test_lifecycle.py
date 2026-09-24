@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TransactionTestCase
 
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
-from inventory.models import StockBalance, StockMovement
+from inventory.models import StockBalance, StockLocation, StockMovement
 from invoices.models import Invoice, InvoiceItem
 from invoices.services import CancelInvoice, ConfirmInvoice, CreateInvoice, InvoiceNotFound
 from .helpers import InvoiceTestMixin
@@ -109,3 +109,38 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
 
         with self.assertRaises(InvalidStateTransition):
             CancelInvoice()(invoice.pk)
+
+    def test_cancel_confirmed_restores_original_sale_location_after_employee_location_changes(self):
+        invoice = self.create_invoice()
+        StockBalance.objects.create(
+            location=self.location,
+            product=self.product,
+            quantity=10,
+        )
+
+        ConfirmInvoice()(invoice.pk)
+
+        self.location.employee = None
+        self.location.save(update_fields=("employee",))
+        current = StockLocation.objects.create(
+            name="Vehicle 02",
+            location_type=StockLocation.LocationType.SALES_VEHICLE,
+            employee=self.user,
+            site=self.site,
+        )
+
+        CancelInvoice()(invoice.pk)
+
+        self.assertEqual(
+            StockBalance.objects.get(
+                location=self.location,
+                product=self.product,
+            ).quantity,
+            10,
+        )
+        self.assertFalse(
+            StockBalance.objects.filter(
+                location=current,
+                product=self.product,
+            ).exists()
+        )
