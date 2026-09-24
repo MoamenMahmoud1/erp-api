@@ -6,6 +6,7 @@ import uuid
 from contextvars import ContextVar
 
 from django.conf import settings
+from django.http import Http404
 
 from core.proxy import is_trusted_proxy, normalize_ip
 
@@ -100,4 +101,18 @@ class TrustedProxyHeadersMiddleware:
 
     def __call__(self, request):
         self._strip_headers(request)
+        return self.get_response(request)
+
+
+class AdminAccessMiddleware:
+    """Keep Django Admin completely inaccessible except to superusers."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.path == "/admin" or request.path.startswith("/admin/"):
+            user = getattr(request, "user", None)
+            if not user or not user.is_authenticated or not user.is_superuser:
+                raise Http404
         return self.get_response(request)
