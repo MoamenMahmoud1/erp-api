@@ -32,6 +32,7 @@ analytics.py is a separate operational analytics layer.
 from .automation import (
     ensure_default_accounts,
     post_customer_collection,
+    post_customer_transfer_approval,
     post_payment_refund,
     post_purchase,
     post_purchase_return,
@@ -71,6 +72,7 @@ __all__ = (
     "general_ledger",
     "get_default_company",
     "post_customer_collection",
+    "post_customer_transfer_approval",
     "post_journal_entry",
     "post_payment_refund",
     "post_purchase",
