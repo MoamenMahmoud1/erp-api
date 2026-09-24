@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Group, Loader, NumberInput, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { can } from '../components/PermissionGuard';
+import type { UserProfile } from '../lib/api';
 
 import { api, type EmployeeShift, type Paginated, type UserProfile } from '../lib/api';
 
@@ -117,7 +119,7 @@ export function ShiftPage({ user }: Props) {
                 <NumberInput label="Actual transfer" min={0} value={closingTransfer} onChange={setClosingTransfer} required />
               </SimpleGrid>
               <Textarea label="Notes" value={closingNotes} onChange={(event) => setClosingNotes(event.currentTarget.value)} maxLength={500} />
-              <Button loading={saving} onClick={close} color="dark">Close shift</Button>
+              {can(user, 'accounts.close_employee_shift') && <Button loading={saving} onClick={close} color="dark">Close shift</Button>}
             </Stack>
           </Card>
         </>
@@ -129,7 +131,7 @@ export function ShiftPage({ user }: Props) {
               <>
                 <NumberInput label="Opening cash" min={0} value={openingCash} onChange={setOpeningCash} required />
                 <Select label="Assigned sales vehicle" placeholder={vehicleOptions.length ? 'Select a vehicle' : 'No active vehicles'} searchable clearable data={vehicleOptions} value={vehicle} onChange={(value) => setVehicle(value || '')} />
-                <Button loading={saving} onClick={start}>Start shift</Button>
+                {can(user, 'accounts.start_employee_shift') && <Button loading={saving} onClick={start}>Start shift</Button>}
               </>
             )}
           </Stack>
