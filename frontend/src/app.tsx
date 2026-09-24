@@ -160,8 +160,8 @@ export function App() {
     { path: '/accounting/trial-balance', permission: 'accounting.view_financial_reports', element: <TrialBalancePage /> },
     { path: '/accounting/statements', permission: 'accounting.view_financial_reports', element: <StatementsPage /> },
     { path: '/accounting/balances', permission: 'accounting.view_financial_reports', element: <BalancesPage /> },
-    { path: '/accounting/expenses', permission: 'accounting.view_expense', element: <ExpensesPage /> },
-    { path: '/accounting/periods', permission: 'accounting.view_accountingperiod', element: <PeriodsPage /> },
+    { path: '/accounting/expenses', permission: 'accounting.view_expense', element: <ExpensesPage user={user!} /> },
+    { path: '/accounting/periods', permission: 'accounting.view_accountingperiod', element: <PeriodsPage user={user!} /> },
     { path: '/accounting/opening-balance', permission: 'accounting.manage_chart_of_accounts', element: <OpeningBalancePage /> },
     { path: '/accounting/manual-journal', permission: 'accounting.add_journalentry', element: <ManualJournalPage /> },
   ];
