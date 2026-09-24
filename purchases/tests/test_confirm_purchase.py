@@ -57,7 +57,7 @@ class ConfirmPurchaseServiceTests(TestCase):
 
     def test_confirm_records_movement_and_items(self):
         self.confirm()
-        movement = StockMovement.objects.get(reference=self.purchase.reference)
+        movement = StockMovement.objects.get(reference__startswith=f"source:purchase.confirmation:{self.purchase.pk}")
         self.assertEqual(movement.movement_type, StockMovement.MovementType.PURCHASE)
         item = StockMovementItem.objects.get(movement=movement)
         self.assertEqual(item.product, self.product)
