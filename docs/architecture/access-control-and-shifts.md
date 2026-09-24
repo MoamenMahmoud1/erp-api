@@ -35,7 +35,7 @@ Permissions are still ordinary Django permissions. Scope does not replace permis
 
 ## Standard roles
 
-The repository provides an idempotent `sync_system_roles` command for the standard role set:
+The standard role set is represented by Django Groups with an associated `RoleProfile`:
 
 - HQ Admin: company scope
 - Finance: company scope
@@ -45,13 +45,7 @@ The repository provides an idempotent `sync_system_roles` command for the standa
 - Cashier: site scope, shift required
 - Warehouse Operator: site scope, shift required
 
-Run after migrations:
-
-```bash
-python manage.py sync_system_roles
-```
-
-The command sets the Group permissions to the declared system-role definition instead of accumulating permissions from repeated runs.
+Roles are managed through **Django admin** under **Groups** and **Role profiles**. Assigning a user to a Group gives that user the permissions and role metadata associated with the group.
 
 ## Employee shifts
 
