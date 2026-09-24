@@ -4,7 +4,6 @@
 import argparse
 import concurrent.futures
 import os
-import statistics
 import time
 import urllib.error
 import urllib.request
@@ -15,15 +14,32 @@ URL = os.getenv(
     "http://127.0.0.1:8080/api/v1/products/?page_size=50",
 )
 
-TOKENS = tuple(
-    token.strip()
-    for token in os.getenv("JWT_TOKENS", "").split(",")
-    if token.strip()
-)
+TOKEN_FILE = os.getenv("JWT_TOKEN_FILE", "benchmarks/jwt_tokens.txt")
 
-SINGLE_TOKEN = os.getenv("JWT_TOKEN", "").strip()
-if SINGLE_TOKEN and not TOKENS:
-    TOKENS = (SINGLE_TOKEN,)
+
+def load_tokens():
+    if os.getenv("JWT_TOKENS"):
+        return tuple(
+            token.strip()
+            for token in os.getenv("JWT_TOKENS", "").split(",")
+            if token.strip()
+        )
+
+    if os.getenv("JWT_TOKEN"):
+        return (os.getenv("JWT_TOKEN").strip(),)
+
+    try:
+        with open(TOKEN_FILE, encoding="utf-8") as file:
+            return tuple(
+                line.strip()
+                for line in file
+                if line.strip()
+            )
+    except FileNotFoundError:
+        return ()
+
+
+TOKENS = load_tokens()
 
 
 def request_once(token: str) -> tuple[float, int]:
@@ -56,7 +72,10 @@ def main():
     args = parser.parse_args()
 
     if not TOKENS:
-        raise SystemExit("Set JWT_TOKEN or JWT_TOKENS before running the benchmark.")
+        raise SystemExit(
+            f"No benchmark JWTs found. Run the setup command first or set "
+            f"JWT_TOKEN/JWT_TOKENS. Expected file: {TOKEN_FILE}"
+        )
 
     if args.requests < 1 or args.concurrency < 1:
         raise SystemExit("--requests and --concurrency must be >= 1")
@@ -67,8 +86,8 @@ def main():
         max_workers=args.concurrency
     ) as executor:
         futures = [
-            executor.submit(request_once, TOKENS[i % len(TOKENS)])
-            for i in range(args.requests)
+            executor.submit(request_once, TOKENS[index % len(TOKENS)])
+            for index in range(args.requests)
         ]
         results = [future.result() for future in futures]
 
@@ -86,9 +105,12 @@ def main():
         index = (len(values) - 1) * p
         lower = int(index)
         upper = min(lower + 1, len(values) - 1)
-        return values[lower] + (values[upper] - values[lower]) * (index - lower)
+        return values[lower] + (values[upper] - values[lower]) * (
+            index - lower
+        )
 
     print(f"URL:          {URL}")
+    print(f"Users/tokens: {len(TOKENS)}")
     print(f"Requests:     {args.requests}")
     print(f"Concurrency:  {args.concurrency}")
     print(f"Elapsed:      {elapsed:.3f}s")
