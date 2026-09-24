@@ -207,16 +207,32 @@ def post_sales_return(*, sales_return, actor_id, company=None):
         return existing
     accounts = ensure_default_accounts(company)
     refund_amount = sales_return.refund_amount
-    returned_cost = sum(
-        (
-            (item.invoice_item.cost_price
-             if item.invoice_item.cost_price is not None
-             else item.invoice_item.product.purchase_price)
-            * item.quantity
-            for item in sales_return.items.select_related("invoice_item__product")
-        ),
-        Decimal("0"),
+    return_movement = (
+        StockMovement.objects
+        .filter(
+            reference__startswith=f"source:invoice.return:{sales_return.pk}",
+            movement_type__in=(
+                StockMovement.MovementType.SALEABLE_RETURN,
+                StockMovement.MovementType.TRANSFER,
+            ),
+        )
+        .prefetch_related("items")
+        .first()
     )
+    movement_items = list(return_movement.items.all()) if return_movement is not None else []
+    if movement_items and all(item.unit_cost is not None for item in movement_items):
+        returned_cost = sum((item.total_cost for item in movement_items), Decimal("0.00"))
+    else:
+        returned_cost = sum(
+            (
+                (item.invoice_item.cost_price
+                 if item.invoice_item.cost_price is not None
+                 else item.invoice_item.product.purchase_price)
+                * item.quantity
+                for item in sales_return.items.select_related("invoice_item__product")
+            ),
+            Decimal("0"),
+        )
     lines = [
         {"account_id": accounts["sales_returns"].pk, "debit": refund_amount, "credit": 0},
         {"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": refund_amount},
