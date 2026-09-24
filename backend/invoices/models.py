@@ -109,7 +109,7 @@ class InvoiceItem(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=("product", "invoice"), name="invoice_item_product_invoice_idx"),
+            models.Index(fields=("product", "invoice"), name="invitem_product_invoice_idx"),
         ]
         constraints = [
             models.UniqueConstraint(fields=("invoice", "product"), name="invoices_unique_invoice_product"),
