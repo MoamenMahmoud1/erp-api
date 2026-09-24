@@ -21,7 +21,7 @@ try {
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
 
   await page.getByRole('textbox', { name: 'Username or email' }).fill(username);
-  await page.getByLabel('Password').fill(password);
+  await page.locator('input[type="password"]').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   await page.getByRole('heading', { name: 'Dashboard', exact: true }).waitFor({
