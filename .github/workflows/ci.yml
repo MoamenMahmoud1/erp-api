@@ -147,10 +147,16 @@ jobs:
           python -m pip check
 
       - name: Prepare test database schema
-        # Project migration files are intentionally not committed. --run-syncdb
-        # creates tables for those unmigrated apps before Django applies the
-        # built-in migrated apps (admin/auth/contenttypes/sessions).
-        run: python manage.py migrate --noinput --run-syncdb
+        # Project migration files are intentionally not committed. Build the
+        # built-in auth/contenttypes tables first because project tables have
+        # foreign keys to them. Then sync the unmigrated project apps, and
+        # finally apply admin/sessions migrations that depend on project users.
+        run: |
+          python manage.py migrate contenttypes --noinput
+          python manage.py migrate auth --noinput
+          python manage.py migrate --noinput --run-syncdb
+          python manage.py migrate admin --noinput
+          python manage.py migrate sessions --noinput
 
       - name: Run ${{ matrix.suite }} tests
         run: python manage.py test ${{ matrix.apps }}
