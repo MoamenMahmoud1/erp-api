@@ -5,7 +5,8 @@ import { notifications } from '@mantine/notifications';
 import { Link, useParams } from 'react-router-dom';
 
 import { RecordsPage } from '../components/RecordsPage';
-import { api } from '../lib/api';
+import { can } from '../components/PermissionGuard';
+import { api, type UserProfile } from '../lib/api';
 
 function statusBadge(value: unknown) {
   const status = String(value || '').toUpperCase();
