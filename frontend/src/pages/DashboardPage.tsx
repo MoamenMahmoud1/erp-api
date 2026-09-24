@@ -5,7 +5,8 @@ import { Badge, Button, Card, Group, Loader, Progress, SegmentedControl, SimpleG
 import { DatePickerInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 
-import { api, query, type DashboardOverview } from '../lib/api';
+import { can } from '../components/PermissionGuard';
+import { api, query, type DashboardOverview, type UserProfile } from '../lib/api';
 
 type Range = 'today' | 'week' | 'month' | 'year' | 'custom';
 
@@ -70,13 +71,13 @@ function RiskRow({ label, count, units, color, to }: { label: string; count: unk
       </div>
       <Group gap="sm" wrap="nowrap">
         <Badge color={color} variant="light">{number.format(numericCount)}</Badge>
-        <Button component={Link} to={to} variant="subtle" size="compact-sm">Open</Button>
+        {canOpen && <Button component={Link} to={to} variant="subtle" size="compact-sm">Open</Button>}
       </Group>
     </Group>
   );
 }
 
-export function DashboardPage() {
+export function DashboardPage({ user }: { user: UserProfile }) {
   const [range, setRange] = useState<Range>('month');
   const [customFrom, setCustomFrom] = useState<string | null>(null);
   const [customTo, setCustomTo] = useState<string | null>(null);
@@ -224,9 +225,9 @@ export function DashboardPage() {
 
             <Panel title="Needs attention" subtitle="Only issues that may require action">
               <Stack gap={0}>
-                <RiskRow label="Expired batches" count={data.inventory.expired_batch_count} units={data.inventory.expired_units} color="red" to="/inventory/batches" />
-                <RiskRow label="Expiring within 7 days" count={data.inventory.expiring_7_days_batch_count} units={data.inventory.expiring_7_days_units} color="orange" to="/inventory/batches" />
-                <RiskRow label="Low stock products" count={data.inventory.low_stock_count} units={data.inventory.total_units} color={data.inventory.low_stock_count ? 'orange' : 'teal'} to="/inventory" />
+                <RiskRow label="Expired batches" count={data.inventory.expired_batch_count} units={data.inventory.expired_units} color="red" to="/inventory/batches" canOpen={can(user, 'inventory.view_stockbalance')} />
+                <RiskRow label="Expiring within 7 days" count={data.inventory.expiring_7_days_batch_count} units={data.inventory.expiring_7_days_units} color="orange" to="/inventory/batches" canOpen={can(user, 'inventory.view_stockbalance')} />
+                <RiskRow label="Low stock products" count={data.inventory.low_stock_count} units={data.inventory.total_units} color={data.inventory.low_stock_count ? 'orange' : 'teal'} to="/inventory" canOpen={can(user, 'inventory.view_stockbalance')} />
               </Stack>
             </Panel>
           </SimpleGrid>
@@ -240,7 +241,7 @@ export function DashboardPage() {
               </SimpleGrid>
             </Panel>
 
-            <Panel title="Inventory health" subtitle="Current stock position" right={<Button component={Link} to="/inventory/batches" variant="subtle" size="compact-sm">View batches</Button>}>
+            <Panel title="Inventory health" subtitle="Current stock position" right={can(user, 'inventory.view_stockbalance') ? <Button component={Link} to="/inventory/batches" variant="subtle" size="compact-sm">View batches</Button> : null}>
               <Group justify="space-between" align="flex-end">
                 <div>
                   <Text size="xs" c="dimmed">Active products</Text>
@@ -256,7 +257,7 @@ export function DashboardPage() {
             </Panel>
           </SimpleGrid>
 
-          <Panel title="Expiry watch" subtitle="Expired and upcoming batches, ordered by urgency" right={<Button component={Link} to="/inventory/batches" variant="subtle" size="compact-sm">View all</Button>}>
+          <Panel title="Expiry watch" subtitle="Expired and upcoming batches, ordered by urgency" right={can(user, 'inventory.view_stockbalance') ? <Button component={Link} to="/inventory/batches" variant="subtle" size="compact-sm">View all</Button> : null}>
             {expiryRisks.length ? (
               <Stack gap="xs">
                 {expiryRisks.map((item) => {
