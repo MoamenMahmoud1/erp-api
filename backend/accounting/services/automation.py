@@ -117,13 +117,17 @@ def post_customer_collection(*, payment, actor_id, company=None):
     existing = _source_entry(company, "payment.collection", payment.pk)
     if existing:
         return existing
+
+    effective_amount = payment.effective_total_amount
+    if effective_amount <= 0:
+        return None
+
     accounts = ensure_default_accounts(company)
     lines = []
     if payment.cash_amount > 0:
         lines.append({"account_id": accounts["cash"].pk, "debit": payment.cash_amount, "credit": 0})
-    if payment.transfer_amount > 0:
-        lines.append({"account_id": accounts["bank"].pk, "debit": payment.transfer_amount, "credit": 0})
-    lines.append({"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": payment.total_amount})
+    if payment.cash_amount > 0:
+        lines.append({"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": payment.cash_amount})
     entry = create_journal_entry(
         created_by_id=actor_id,
         entry_date=timezone.localdate(),
@@ -162,6 +166,35 @@ def post_payment_refund(*, refund, actor_id, company=None):
         source_type="payment.refund",
         source_id=refund.pk,
         lines=lines,
+        company=company,
+    )
+    return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
+
+
+@transaction.atomic
+def post_customer_transfer_approval(*, payment, actor_id, company=None):
+    """Post the bank transfer after it has been explicitly accepted."""
+    company = company or get_default_company()
+    existing = _source_entry(company, "payment.transfer.approval", payment.pk)
+    if existing:
+        return existing
+
+    if payment.transfer_amount <= 0:
+        raise ValueError("Only payments containing a bank transfer can be approved.")
+
+    accounts = ensure_default_accounts(company)
+    amount = payment.transfer_amount
+    entry = create_journal_entry(
+        created_by_id=actor_id,
+        entry_date=timezone.localdate(),
+        description=f"Bank transfer approval for payment #{payment.pk}",
+        reference=f"Payment Transfer Approval #{payment.pk}",
+        source_type="payment.transfer.approval",
+        source_id=payment.pk,
+        lines=[
+            {"account_id": accounts["bank"].pk, "debit": amount, "credit": 0},
+            {"account_id": accounts["accounts_receivable"].pk, "debit": 0, "credit": amount},
+        ],
         company=company,
     )
     return post_journal_entry(entry_id=entry.pk, actor_id=actor_id, company=company)
