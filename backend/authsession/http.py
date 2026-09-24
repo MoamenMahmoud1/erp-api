@@ -69,7 +69,7 @@ def _cookie_options():
     return {
         "httponly": True,
         "secure": settings.AUTH_COOKIE_SECURE,
-        "samesite": "Lax",
+        "samesite": settings.AUTH_COOKIE_SAMESITE,
         "path": AUTH_COOKIE_PATH,
     }
 
@@ -110,7 +110,7 @@ def clear_login_cookies(response):
         response.delete_cookie(
             key=cookie_name,
             path=AUTH_COOKIE_PATH,
-            samesite="lax",
+            samesite=settings.AUTH_COOKIE_SAMESITE,
         )
 
 
