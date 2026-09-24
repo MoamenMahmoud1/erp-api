@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge, Card, Center, Loader, Stack, Text } from '@mantine/core';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
-import { can, type UserProfile } from '../components/PermissionGuard';
+import { can } from '../components/PermissionGuard';
+import type { UserProfile } from '../lib/api';
 import { api, type Paginated } from '../lib/api';
 
 export function ProductsPage({ user }: { user: UserProfile }) {
