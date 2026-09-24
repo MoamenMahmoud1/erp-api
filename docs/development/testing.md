@@ -72,11 +72,13 @@ Product intelligence has both service-level and API contract coverage. Dashboard
 
 ## Local commands
 
-Run everything:
+Run everything from the repository root:
 
 ```bash
 python backend/manage.py test
 ```
+
+The project does not commit generated migration files. Test settings disable migrations for project and Django built-in apps so Django's test runner creates an isolated schema directly from the current model state.
 
 Run one app:
 
