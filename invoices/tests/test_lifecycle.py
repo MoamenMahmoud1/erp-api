@@ -43,7 +43,7 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
         self.assertEqual(StockBalance.objects.get(location=self.location, product=self.product).quantity, 9)
-        self.assertTrue(StockMovement.objects.filter(reference=f"Invoice #{invoice.pk}").exists())
+        self.assertTrue(StockMovement.objects.filter(reference__startswith=f"source:invoice.sale:{invoice.pk}").exists())
 
     def test_confirm_rolls_back_when_stock_is_missing(self):
         invoice = self.create_invoice()
