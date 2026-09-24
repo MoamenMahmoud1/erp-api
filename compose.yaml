@@ -150,7 +150,8 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: /api/v1
+        # Vite embeds this value into the production bundle at build time.
+        VITE_API_URL: ${VITE_API_URL:?VITE_API_URL must be set}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1/"]
