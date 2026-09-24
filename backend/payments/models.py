@@ -44,7 +44,17 @@ class PaymentTransaction(models.Model):
     def transfer_accepted(self) -> bool:
         if self.transfer_amount <= 0:
             return True
-        return bool(getattr(self, "_transfer_approved", False))
+        cached = getattr(self, "_transfer_approved", None)
+        if cached is not None:
+            return bool(cached)
+
+        from accounting.models import JournalEntry
+
+        return JournalEntry.objects.filter(
+            source_type="payment.transfer.approval",
+            source_id=self.pk,
+            status=JournalEntry.Status.POSTED,
+        ).exists()
 
     @property
     def transfer_status(self) -> str:
