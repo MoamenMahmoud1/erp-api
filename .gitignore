@@ -28,5 +28,3 @@ frontend/.cache/
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
-
-benchmarks/jwt_tokens.txt
