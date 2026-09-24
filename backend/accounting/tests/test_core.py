@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -62,6 +63,31 @@ class AccountingCoreTests(TestCase):
         self.assertEqual(total_debit, Decimal("100.00"))
         self.assertEqual(total_credit, Decimal("100.00"))
         self.assertEqual(len(rows), 2)
+
+    def test_account_hierarchy_rejects_self_parent_and_cycles(self):
+        parent = Account.objects.create(
+            company=self.company,
+            code="1100",
+            name="Parent",
+            account_type=Account.AccountType.ASSET,
+        )
+        child = Account.objects.create(
+            company=self.company,
+            code="1110",
+            name="Child",
+            account_type=Account.AccountType.ASSET,
+            parent=parent,
+        )
+
+        child.parent = child
+        with self.assertRaises(ValidationError):
+            child.save()
+
+        child.parent = parent
+        child.save()
+        parent.parent = child
+        with self.assertRaises(ValidationError):
+            parent.save()
 
     def test_unbalanced_entry_is_rejected(self):
         with self.assertRaises(Exception):
