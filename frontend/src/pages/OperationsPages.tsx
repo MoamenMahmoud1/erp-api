@@ -84,7 +84,18 @@ function paymentDetails(data: Record<string, unknown>) {
       </div>
       <div>
         <Text fw={800} mb="sm">Invoice allocations</Text>
-        <TableLike rows={allocations} fields={[['invoice_number', 'Invoice'], ['cash_amount', 'Cash'], ['transfer_amount', 'Transfer'], ['total_amount', 'Total']]} moneyFields={['cash_amount', 'transfer_amount', 'total_amount']} fallbackFields={{ invoice_number: 'invoice' }} />
+        <TableLike
+          rows={allocations}
+          fields={[
+            ['invoice_number', 'Invoice'],
+            ['cash_amount', 'Cash'],
+            ['transfer_amount', 'Transfer'],
+            ['effective_total_amount', 'Effective'],
+            ['total_amount', 'Recorded'],
+          ]}
+          moneyFields={['cash_amount', 'transfer_amount', 'effective_total_amount', 'total_amount']}
+          fallbackFields={{ invoice_number: 'invoice' }}
+        />
       </div>
       {refunds.length > 0 && <div><Text fw={800} mb="sm">Refunds</Text><TableLike rows={refunds} fields={[['invoice_number', 'Invoice'], ['total_amount', 'Refund'], ['reason', 'Reason'], ['created_at', 'Date']]} moneyFields={['total_amount']} fallbackFields={{ invoice_number: 'invoice' }} dateFields={['created_at']} /></div>}
     </Stack>
