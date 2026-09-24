@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
             model_name="invoiceitem",
             index=models.Index(
                 fields=("product", "invoice"),
-                name="invoice_item_product_invoice_idx",
+                name="invitem_product_invoice_idx",
             ),
         ),
     ]
