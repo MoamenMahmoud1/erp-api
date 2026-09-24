@@ -13,6 +13,8 @@ from purchases.models import Purchase, PurchaseReturn, PurchaseReturnItem
 
 @transaction.atomic
 def return_purchase(*, purchase_id, items, created_by_id, reason="", actor=None):
+    if actor is not None and created_by_id != actor.pk:
+        raise InvalidBusinessOperation("The return creator must match the authenticated actor.")
     purchases = Purchase.objects.visible_to(actor) if actor is not None else Purchase.objects
     try:
         purchase = (

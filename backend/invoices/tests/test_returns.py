@@ -1,7 +1,9 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
+from auditlog.models import AuditEvent
 from common.exceptions import InvalidBusinessOperation
 from inventory.models import StockBalance, StockMovement
 from invoices.models import Invoice, InvoiceItem
@@ -59,6 +61,30 @@ class SalesReturnTests(InvoiceTestMixin, TestCase):
                 created_by_id=self.user.pk,
                 actor=self.user,
             )
+
+    def test_return_creator_must_match_authenticated_actor(self):
+        invoice, line = self.paid_invoice()
+
+        other_user = get_user_model().objects.create_user(
+            username="other-return-user",
+            email="other-return-user@example.com",
+            password="StrongPass123!",
+        )
+
+        with self.assertRaisesMessage(
+            InvalidBusinessOperation,
+            "return creator must match",
+        ):
+            CreateSalesReturn()(
+                invoice_id=invoice.pk,
+                items=[{"invoice_item": line, "quantity": 1}],
+                created_by_id=other_user.pk,
+                actor=self.user,
+            )
+
+        self.assertFalse(
+            AuditEvent.objects.filter(action="invoice.return").exists()
+        )
 
     def test_partial_return_refunds_and_restores_stock(self):
         invoice, line = self.paid_invoice()

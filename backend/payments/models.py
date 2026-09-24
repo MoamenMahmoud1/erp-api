@@ -40,6 +40,7 @@ class PaymentTransaction(models.Model):
         permissions = [
             ("process_collection", "Can process a payment collection"),
             ("refund_payment", "Can refund a payment"),
+            ("approve_bank_transfer", "Can approve a bank transfer"),
         ]
 
     @property

@@ -23,6 +23,7 @@ All standard CRUD resources use explicit Django model permissions:
 | Invoices | `invoices.return_invoice` | Create a sales return |
 | Payments | `payments.process_collection` | Collect customer payment |
 | Payments | `payments.refund_payment` | Process payment refund |
+| Payments | `payments.approve_bank_transfer` | Approve a bank transfer created by another authorized operator |
 | Inventory | `inventory.transfer_stock` | Transfer stock between locations |
 | Accounting | `accounting.manage_chart_of_accounts` | Manage chart of accounts / opening balances |
 | Accounting | `accounting.post_journal_entry` | Post manual journal entries |
@@ -32,6 +33,10 @@ All standard CRUD resources use explicit Django model permissions:
 | Purchasing | `purchases.cancel_purchase` | Cancel a purchase |
 | Purchasing | `purchases.return_purchase` | Create a purchase return |
 | Purchasing | `purchases.process_supplier_payment` | Pay a supplier |
+
+## Payment approval separation
+
+Bank transfers require the dedicated `payments.approve_bank_transfer` permission. The backend also prevents the user who collected a transfer from approving that same transfer, so collection and approval remain separate controls.
 
 ## Inventory reads
 

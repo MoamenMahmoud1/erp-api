@@ -9,7 +9,7 @@ from common.observability import log_operation
 from invoices.models import Invoice
 from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer, RefundInputSerializer
 from payments.models import PaymentTransaction
-from payments.permissions import CollectionPermission, RefundPermission, TransactionReadPermission
+from payments.permissions import CollectionPermission, RefundPermission, TransactionReadPermission, TransferApprovalPermission
 from payments.services import (
     NoConfirmableInvoicesError,
     OverpaymentError,
@@ -91,7 +91,7 @@ class RefundView(generics.GenericAPIView):
 
 
 class TransferApprovalView(generics.GenericAPIView):
-    permission_classes = (CollectionPermission,)
+    permission_classes = (TransferApprovalPermission,)
     throttle_classes = (SensitiveActionThrottle,)
 
     def post(self, request, pk, *args, **kwargs):

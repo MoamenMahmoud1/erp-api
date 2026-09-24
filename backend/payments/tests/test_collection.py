@@ -125,6 +125,28 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
         self.assertEqual(invoice.outstanding_amount, Decimal("100.00"))
 
+    def test_collector_cannot_approve_own_transfer(self):
+        invoice = self.create_invoice(total="100.00")
+        tx = collect(
+            customer=self.customer,
+            cash_amount=Decimal("0"),
+            transfer_amount=Decimal("100"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
+        )
+
+        with self.assertRaisesMessage(TransferApprovalError, "collector cannot approve"):
+            approve_bank_transfer(
+                transaction_id=tx.pk,
+                actor_id=self.user.pk,
+                actor=self.user,
+            )
+
+        tx.refresh_from_db()
+        self.assertEqual(tx.transfer_status, "pending")
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
+
     def test_approved_transfer_counts_as_paid(self):
         invoice = self.create_invoice(total="100.00")
         tx = collect(
@@ -135,10 +157,11 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
 
+        approver = self.make_transfer_approver()
         approved = approve_bank_transfer(
             transaction_id=tx.pk,
-            actor_id=self.user.pk,
-            actor=self.user,
+            actor_id=approver.pk,
+            actor=approver,
         )
         invoice.refresh_from_db()
         self.assertEqual(approved.transfer_status, "accepted")
@@ -185,10 +208,11 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
             actor=self.user,
         )
 
+        approver = self.make_transfer_approver()
         approve_bank_transfer(
             transaction_id=first.pk,
-            actor_id=self.user.pk,
-            actor=self.user,
+            actor_id=approver.pk,
+            actor=approver,
         )
         with self.assertRaisesMessage(TransferApprovalError, "overpay"):
             approve_bank_transfer(
