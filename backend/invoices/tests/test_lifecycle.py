@@ -1,7 +1,10 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.test import TransactionTestCase
 
+from auditlog.models import AuditEvent
+from accounting.models import JournalEntry
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import StockBalance, StockLocation, StockMovement
 from invoices.models import Invoice, InvoiceItem
@@ -34,6 +37,36 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
             },
         )
         self.assertEqual(invoice.items.get().unit_price, Decimal("100.00"))
+
+    def test_confirm_attributes_stock_accounting_and_audit_to_actor(self):
+        invoice = self.create_invoice()
+        StockBalance.objects.create(location=self.location, product=self.product, quantity=10)
+        approver = get_user_model().objects.create_user(
+            username="invoice-approver",
+            email="invoice-approver@example.com",
+            password="StrongPass123!",
+        )
+
+        ConfirmInvoice()(invoice.pk, actor=approver)
+
+        movement = StockMovement.objects.get(
+            reference__startswith=f"source:invoice.sale:{invoice.pk}"
+        )
+        self.assertEqual(movement.created_by_id, approver.pk)
+
+        entry = JournalEntry.objects.get(
+            source_type="invoice.sale",
+            source_id=invoice.pk,
+        )
+        self.assertEqual(entry.created_by_id, approver.pk)
+        self.assertEqual(entry.posted_by_id, approver.pk)
+
+        event = AuditEvent.objects.get(
+            action="invoice.confirm",
+            entity_type="Invoice",
+            entity_id=invoice.pk,
+        )
+        self.assertEqual(event.actor_id, approver.pk)
 
     def test_confirm_consumes_stock(self):
         invoice = self.create_invoice()
