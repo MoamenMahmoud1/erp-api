@@ -145,22 +145,39 @@ def confirm_invoice(invoice_id, actor=None):
 
 
 def _validate_cancellation_stock_position(*, invoice_id, sale, source_location):
-    """Prevent cancelling a sale after its recorded source stock has moved away."""
-    for sale_item in sale.items.all():
+    """Lock and validate the original stock position before a sale is reversed."""
+    sale_items = list(sale.items.all())
+    product_ids = sorted({item.product_id for item in sale_items})
+
+    aggregate_balances = {
+        row.product_id: row
+        for row in (
+            StockBalance.objects
+            .select_for_update()
+            .filter(location=source_location, product_id__in=product_ids)
+            .order_by("product_id")
+        )
+    }
+
+    batch_ids = sorted({item.batch_id for item in sale_items if item.batch_id is not None})
+    batch_balances = {
+        row.batch_id: row
+        for row in (
+            StockBatchBalance.objects
+            .select_for_update()
+            .filter(location=source_location, batch_id__in=batch_ids)
+            .order_by("batch_id")
+        )
+    }
+
+    for sale_item in sale_items:
         if sale_item.batch_id:
-            available = (
-                StockBatchBalance.objects
-                .filter(location=source_location, batch_id=sale_item.batch_id)
-                .values_list("quantity", flat=True)
-                .first()
-            ) or 0
+            balance = batch_balances.get(sale_item.batch_id)
+            available = balance.quantity if balance is not None else 0
         else:
-            available = (
-                StockBalance.objects
-                .filter(location=source_location, product=sale_item.product)
-                .values_list("quantity", flat=True)
-                .first()
-            ) or 0
+            balance = aggregate_balances.get(sale_item.product_id)
+            available = balance.quantity if balance is not None else 0
+
         if available < sale_item.quantity:
             raise InvalidBusinessOperation(
                 f"Cannot cancel invoice #{invoice_id}: the sold stock is no longer available at the original location."
