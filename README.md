@@ -1,22 +1,23 @@
 # ERP API
 
-ERP platform with a Django/DRF backend and a React/TypeScript web client. The complementary Flutter mobile client lives in [`sales_erp`](https://github.com/MoamenMahmoud1/sales_erp).
+ERP platform with a Django/DRF backend and a React/TypeScript web client. The complementary Flutter mobile client lives in [\`sales_erp\`](https://github.com/MoamenMahmoud1/sales_erp).
 
 ## Repository structure
 
-```text
+\`\`\`text
 erp-api/
 ├── backend/       Django, DRF, domain apps, Celery, Gunicorn, backend Dockerfile
 ├── frontend/      React + TypeScript + Vite + Nginx
-├── infra/         Docker Compose and operational/local scripts
+├── infra/         Gateway and operational scripts
 ├── docs/          Current architecture/development/operations + historical notes
 ├── .github/       CI workflows
-├── .env.example   Shared local/CI environment template
+├── .env.example   Local Compose environment template
+├── compose.yaml   Single full-stack Docker Compose definition
 ├── README.md
 └── LICENSE
-```
+\`\`\`
 
-The repository is split at the service boundary. Container orchestration lives under `infra/`.
+The repository uses a single Compose entry point at the repository root. Gateway configuration lives under \`infra/gateway/\`.
 
 ## Backend
 
@@ -28,36 +29,90 @@ Core capabilities include organization and role-based access control, customer a
 
 The backend is synchronous WSGI-first. Celery is reserved for background and scheduled work that does not belong on the request path.
 
-## Frontend
+## Full-stack Docker Compose
 
-The `frontend/` directory contains the permission-aware React/TypeScript administration web application.
+The root \`compose.yaml\` runs the complete web stack:
 
-See [`frontend/README.md`](frontend/README.md) for setup, build and deployment details.
+- PostgreSQL
+- Redis
+- one-time Django migrations
+- Django/Gunicorn API
+- Celery worker
+- Celery Beat
+- React/Vite production build served by Nginx
+- Nginx gateway
 
-## Infrastructure
+The default Compose runtime uses \`core.settings.settings_dev\` so the HTTP-only local gateway works correctly at \`http://localhost:8080\`. Production settings should only be enabled behind a TLS-terminating edge/proxy with explicit production environment values.
 
-`infra/compose.yaml` defines the local PostgreSQL, Redis, Celery worker and Celery Beat services.
+### Start everything
 
-The backend image is built from `backend/Dockerfile` and has separate `web` and `worker` targets. The frontend image is built independently from `frontend/Dockerfile` and served by Nginx.
+From the repository root:
 
-Run the local infrastructure from the repository root:
+\`\`\`bash
+cp .env.example .env
+docker compose config
+docker compose up -d --build
+docker compose ps
+\`\`\`
 
-```bash
-docker compose --env-file .env -f infra/compose.yaml up -d --build
-```
+Open the application at:
 
-Copy `.env.example` to `.env` before starting services.
+\`\`\`text
+http://localhost:8080
+\`\`\`
 
-## Local backend development
+Useful endpoints include:
 
-```bash
+\`\`\`text
+http://localhost:8080/health/live/
+http://localhost:8080/health/ready/
+http://localhost:8080/admin/
+\`\`\`
+
+When API docs are enabled in the environment:
+
+\`\`\`text
+http://localhost:8080/api/v1/docs/swagger/
+http://localhost:8080/api/v1/docs/redoc/
+\`\`\`
+
+View service logs with:
+
+\`\`\`bash
+docker compose logs -f erp-api-prod
+docker compose logs -f celery_worker
+docker compose logs -f celery_beat
+docker compose logs -f erp-gateway
+\`\`\`
+
+Stop the stack with:
+
+\`\`\`bash
+docker compose down
+\`\`\`
+
+The PostgreSQL data volume is named \`erp-api_postgres_data\` and is intentionally preserved by a normal \`docker compose down\`.
+
+### Compose environment selection
+
+By default, Compose loads \`.env\`. The \`ENV_FILE\` variable can point to another environment file:
+
+\`\`\`bash
+ENV_FILE=.env.example docker compose --env-file .env.example config
+\`\`\`
+
+This is useful for CI validation without committing real secrets.
+
+## Local backend development without the full stack
+
+\`\`\`bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate --run-syncdb
 python manage.py runserver
-```
+\`\`\`
 
 Development and test settings use the same migration history as production.
 
@@ -65,9 +120,9 @@ Development and test settings use the same migration history as production.
 
 From the repository root:
 
-```bash
+\`\`\`bash
 python backend/manage.py test
-```
+\`\`\`
 
 GitHub Actions splits the test suite by domain so failures point to the relevant business area.
 
@@ -75,11 +130,11 @@ GitHub Actions splits the test suite by domain so failures point to the relevant
 
 Current guidance lives under:
 
-- `docs/architecture/`
-- `docs/development/`
-- `docs/operations/`
+- \`docs/architecture/\`
+- \`docs/development/\`
+- \`docs/operations/\`
 
-Historical phase and implementation notes are kept under `docs/history/` and are not the current source of truth.
+Historical phase and implementation notes are kept under \`docs/history/\` and are not the current source of truth.
 
 ## Quality and security
 
@@ -89,10 +144,10 @@ Ruff remains available as an optional local development tool; it is not part of 
 
 ## Related repository
 
-**Mobile client:** [`MoamenMahmoud1/sales_erp`](https://github.com/MoamenMahmoud1/sales_erp)
+**Mobile client:** [\`MoamenMahmoud1/sales_erp\`](https://github.com/MoamenMahmoud1/sales_erp)
 
 Together, the two repositories form the web and mobile clients of the same ERP platform.
 
 ## License
 
-This repository is **proprietary**. All rights reserved by the copyright holder. No permission is granted to use, copy, modify, distribute, publish, sublicense, or create derivative works from this code. See [`LICENSE`](LICENSE).
+This repository is **proprietary**. All rights reserved by the copyright holder. No permission is granted to use, copy, modify, distribute, publish, sublicense, or create derivative works from this code. See [\`LICENSE\`](LICENSE).
