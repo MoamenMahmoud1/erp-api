@@ -31,3 +31,14 @@ class TransactionReadPermission(BasePermission):
             and user.is_authenticated
             and (user.is_superuser or user.has_perm("payments.view_paymenttransaction"))
         )
+
+class TransferApprovalPermission(BasePermission):
+    """Only explicitly authorized users may approve bank transfers."""
+
+    def has_permission(self, request, view):
+        user = request.user
+        return bool(
+            user
+            and user.is_authenticated
+            and (user.is_superuser or user.has_perm("payments.approve_bank_transfer"))
+        )
