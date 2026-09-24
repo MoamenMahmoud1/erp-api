@@ -2,6 +2,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from organization.models import Site
+from services.organization_scope import visible_site_ids
 
 
 class SiteSerializer(serializers.ModelSerializer):
@@ -44,6 +45,16 @@ class SiteSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
+    def validate(self, attrs):
+        request = self.context.get("request")
+        actor = getattr(request, "user", None)
+        parent = attrs.get("parent", getattr(self.instance, "parent", None))
+        site_ids = visible_site_ids(actor) if actor else None
+        if parent is not None and site_ids is not None:
+            if not Site.objects.filter(pk=parent.pk, pk__in=site_ids).exists():
+                raise serializers.ValidationError({"parent": "The parent site is outside your allowed scope."})
+        return attrs
 
     def create(self, validated_data):
         try:
