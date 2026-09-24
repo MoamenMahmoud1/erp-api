@@ -13,6 +13,7 @@ class Supplier(models.Model):
 
     class Meta:
         ordering = ("name",)
+        indexes = [models.Index(fields=("name",), name="supplier_name_idx")]
 
     def __str__(self):
         return self.name
