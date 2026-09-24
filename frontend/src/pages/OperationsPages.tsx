@@ -227,7 +227,25 @@ export function PaymentsPage({ user }: { user: UserProfile }) {
       topContent={<Group gap="xs">{can(user, 'payments.process_collection') && <Button component={Link} to="/payments/collect" leftSection={<IconCreditCard size={16} />} radius="lg">Collect</Button>}{can(user, 'purchases.process_supplier_payment') && <Button component={Link} to="/payments/supplier" variant="light" leftSection={<IconTruckFallback />} radius="lg">Pay supplier</Button>}</Group>}
       list={api.payments.transactions}
       details={{ load: async (id) => { const result = await api.payments.transactions(`?id=${id}&page_size=1`); return result.results[0] || null; }, render: paymentDetails }}
-      columns={[{ key: 'id', label: '#' }, { key: 'customer_name', label: 'Customer' }, { key: 'total_amount', label: 'Amount', format: money }, { key: 'cash_amount', label: 'Cash', format: money }, { key: 'transfer_amount', label: 'Bank / transfer', format: money }, { key: 'created_at', label: 'Date', format: dateTime }]}
+      columns={[
+        { key: 'id', label: '#' },
+        { key: 'customer_name', label: 'Customer' },
+        { key: 'total_amount', label: 'Amount', format: money },
+        { key: 'effective_total_amount', label: 'Effective paid', format: money },
+        { key: 'cash_amount', label: 'Cash', format: money },
+        { key: 'transfer_amount', label: 'Bank / transfer', format: money },
+        { key: 'transfer_status', label: 'Transfer status', format: statusBadge },
+        { key: 'created_at', label: 'Date', format: dateTime },
+      ]}
+      actions={[
+        {
+          label: 'Approve bank transfer',
+          color: 'teal',
+          visible: (row) => can(user, 'payments.process_collection') && String(row.transfer_status || '').toLowerCase() === 'pending',
+          confirm: 'Approve this bank transfer? The transfer will become effective in the customer balance and accounting.',
+          run: (row) => api.payments.approveTransfer(Number(row.id)),
+        },
+      ]}
     />
   );
 }
