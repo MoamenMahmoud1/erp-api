@@ -2,18 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge, Card, Center, Loader, Stack, Text } from '@mantine/core';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
+import { can, type UserProfile } from '../components/PermissionGuard';
 import { api, type Paginated } from '../lib/api';
 
-export function ProductsPage() {
-  return <CrudPage title="Products" subtitle="Catalog, pricing and live stock visibility." searchPlaceholder="Search products by name or category" list={api.products.list} create={api.products.create} update={api.products.update} remove={api.products.delete} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Purchase price', type: 'number', required: true }, { key: 'selling_price', label: 'Selling price', type: 'number', required: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Product' }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Buy price' }, { key: 'selling_price', label: 'Sell price' }, { key: 'stock_quantity', label: 'Stock' }, { key: 'sold_quantity', label: 'Sold' }, { key: 'is_active', label: 'Status' }]} />;
+export function ProductsPage({ user }: { user: UserProfile }) {
+  return <CrudPage title="Products" subtitle="Catalog, pricing and live stock visibility." searchPlaceholder="Search products by name or category" list={api.products.list} create={can(user, 'products.add_product') ? api.products.create : undefined} update={api.products.update} remove={api.products.delete} canEdit={can(user, 'products.change_product')} canDelete={can(user, 'products.delete_product')} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Purchase price', type: 'number', required: true }, { key: 'selling_price', label: 'Selling price', type: 'number', required: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Product' }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Buy price' }, { key: 'selling_price', label: 'Sell price' }, { key: 'stock_quantity', label: 'Stock' }, { key: 'sold_quantity', label: 'Sold' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
-export function CustomersPage() {
-  return <CrudPage title="Customers" subtitle="Manage the customer master and contact details." list={api.customers.list} create={api.customers.create} update={api.customers.update} remove={api.customers.delete} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'address', label: 'Address' }]} columns={[{ key: 'name', label: 'Customer' }, { key: 'phone', label: 'Phone' }, { key: 'address', label: 'Address' }, { key: 'created_at', label: 'Created' }]} />;
+export function CustomersPage({ user }: { user: UserProfile }) {
+  return <CrudPage title="Customers" subtitle="Manage the customer master and contact details." list={api.customers.list} create={can(user, 'customers.add_customer') ? api.customers.create : undefined} update={api.customers.update} remove={api.customers.delete} canEdit={can(user, 'customers.change_customer')} canDelete={can(user, 'customers.delete_customer')} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'address', label: 'Address' }]} columns={[{ key: 'name', label: 'Customer' }, { key: 'phone', label: 'Phone' }, { key: 'address', label: 'Address' }, { key: 'created_at', label: 'Created' }]} />;
 }
 
-export function SuppliersPage() {
-  return <CrudPage title="Suppliers" subtitle="Supplier master data and purchasing contacts." list={api.suppliers.list} create={api.suppliers.create} update={api.suppliers.update} canDelete={false} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Supplier' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'is_active', label: 'Status' }]} />;
+export function SuppliersPage({ user }: { user: UserProfile }) {
+  return <CrudPage title="Suppliers" subtitle="Supplier master data and purchasing contacts." list={api.suppliers.list} create={can(user, 'suppliers.add_supplier') ? api.suppliers.create : undefined} update={api.suppliers.update} canEdit={can(user, 'suppliers.change_supplier')} canDelete={false} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Supplier' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
 type EmployeePageOptions = {
@@ -33,7 +34,7 @@ function EmployeePageLoading() {
   );
 }
 
-export function EmployeesPage() {
+export function EmployeesPage({ user }: { user: UserProfile }) {
   const [options, setOptions] = useState<EmployeePageOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,9 +119,11 @@ export function EmployeesPage() {
       subtitle="Staff directory, reporting structure and organizational assignment."
       searchPlaceholder="Search by username, name or email"
       list={api.employees.list}
-      create={api.employees.create}
+      create={can(user, 'accounts.add_employee') ? api.employees.create : undefined}
       update={api.employees.update}
       remove={api.employees.delete}
+      canEdit={can(user, 'accounts.change_employee')}
+      canDelete={can(user, 'accounts.delete_employee')}
       fields={[
         { key: 'user', label: 'User', type: 'select', options: userOptions, required: true, createOnly: true },
         {
