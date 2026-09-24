@@ -226,9 +226,9 @@ class Command(BaseCommand):
 
         warehouse = StockLocation.objects.create(name="Main Warehouse - Nasr City", site=branch, location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True)
         sales_locations = {
-            "sales_1": StockLocation.objects.create(name="Van 01 - Ahmed Fathy", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_1"], is_active=True),
-            "sales_2": StockLocation.objects.create(name="Van 02 - Mariam Adel", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_2"], is_active=True),
-            "manager": StockLocation.objects.create(name="Van 03 - Sara Elmasry", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["manager"], is_active=True),
+            "sales_1": StockLocation.objects.create(name="Van 01 - Ahmed Fathy", site=branch, location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_1"], is_active=True),
+            "sales_2": StockLocation.objects.create(name="Van 02 - Mariam Adel", site=branch, location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_2"], is_active=True),
+            "manager": StockLocation.objects.create(name="Van 03 - Sara Elmasry", site=branch, location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["manager"], is_active=True),
         }
 
         accounts = ensure_default_accounts(company)
