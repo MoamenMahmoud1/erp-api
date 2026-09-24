@@ -1,9 +1,4 @@
-"""Cache active authentication-session state for fast request authentication.
-
-PostgreSQL remains the source of truth for every AuthSession, including revoked
-and expired records. Redis stores only the small snapshot needed by hot-path
-request authentication and expires with the current access token.
-"""
+"""Cache the authorization snapshot used by request authentication."""
 
 from datetime import datetime, timezone as datetime_timezone
 
@@ -20,7 +15,7 @@ def auth_session_cache_key(session_id):
 
 
 def cache_active_session(*, auth_session, user, access_token):
-    """Store the authorization snapshot for exactly the access-token lifetime."""
+    """Store the current authorization state for the access-token lifetime."""
     expires_at = datetime.fromtimestamp(
         int(access_token["exp"]),
         tz=datetime_timezone.utc,
@@ -68,7 +63,7 @@ def delete_auth_session_caches(session_ids):
 
 
 def delete_all_auth_session_caches():
-    """Invalidate every active authorization snapshot after global RBAC changes."""
+    """Invalidate active authorization snapshots.""
     from authsession.models import AuthSession
 
     session_ids = AuthSession.objects.filter(
