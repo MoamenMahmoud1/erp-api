@@ -119,5 +119,5 @@ cannot write them. There is no independently editable balance column.
 
 ## Money
 
-Decimal + ROUND_HALF_UP + no silent clamping (see `docs/MONEY_CONVENTION.md`
-and `common/money.py`). No floats anywhere in financial math.
+Decimal + ROUND_HALF_UP + no silent clamping (see `docs/development/money-convention.md`
+and `backend/common/money.py`). No floats anywhere in financial math.
