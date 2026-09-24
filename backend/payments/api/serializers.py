@@ -21,6 +21,10 @@ class RefundInputSerializer(serializers.Serializer):
 
 
 class PaymentAllocationSerializer(serializers.ModelSerializer):
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    effective_total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refundable_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     class Meta:
         model = PaymentAllocation
         fields = (
@@ -36,6 +40,7 @@ class PaymentAllocationSerializer(serializers.ModelSerializer):
 
 
 class PaymentRefundSerializer(serializers.ModelSerializer):
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
     shift_id = serializers.IntegerField(source="shift.id", read_only=True, allow_null=True)
 
@@ -49,6 +54,10 @@ class PaymentRefundSerializer(serializers.ModelSerializer):
 
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):
+    total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    effective_total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    refundable_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     customer_name = serializers.CharField(source="customer.name", read_only=True)
     site_name = serializers.CharField(source="site.name", read_only=True, allow_null=True)
     shift_id = serializers.IntegerField(source="shift.id", read_only=True, allow_null=True)
