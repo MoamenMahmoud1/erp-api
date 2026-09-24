@@ -19,6 +19,10 @@ class PaymentTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     objects = PaymentTransactionQuerySet.as_manager()
 
+    class TransferStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+
     class Meta:
         ordering = ("-created_at",)
         indexes = [
@@ -37,6 +41,33 @@ class PaymentTransaction(models.Model):
         ]
 
     @property
+    def transfer_accepted(self) -> bool:
+        if self.transfer_amount <= 0:
+            return True
+        return bool(getattr(self, "_transfer_approved", False))
+
+    @property
+    def transfer_status(self) -> str:
+        if self.transfer_amount <= 0:
+            return "not_applicable"
+        return self.TransferStatus.ACCEPTED if self.transfer_accepted else self.TransferStatus.PENDING
+
+    @property
+    def effective_transfer_amount(self) -> Decimal:
+        return self.transfer_amount if self.transfer_accepted else Decimal("0.00")
+
+    @property
+    def effective_total_amount(self) -> Decimal:
+        return quantize_money(self.cash_amount + self.effective_transfer_amount)
+
+    @property
+    def effective_total_amount(self) -> Decimal:
+        return quantize_money(
+            self.cash_amount
+            + (self.transfer_amount if self.transaction.transfer_accepted else Decimal("0.00"))
+        )
+
+    @property
     def total_amount(self) -> Decimal:
         return quantize_money(self.cash_amount + self.transfer_amount)
 
@@ -46,7 +77,7 @@ class PaymentTransaction(models.Model):
 
     @property
     def refundable_amount(self) -> Decimal:
-        return quantize_money(self.total_amount - self.refunded_amount)
+        return quantize_money(self.effective_total_amount - self.refunded_amount)
 
     def __str__(self):
         return f"Tx {self.pk} ({self.customer_id})"
