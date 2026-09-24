@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
-import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
+import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconSettings, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
@@ -76,6 +76,7 @@ const sections: NavSection[] = [
 export function Shell({ user, children }: { user: UserProfile; children: ReactNode }) {
   const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -121,6 +122,16 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     if (!searchMatches.length) return;
     navigate(searchMatches[0].to);
     setSearch('');
+  }
+
+  async function openAdmin() {
+    setAdminLoading(true);
+    try {
+      const result = await api.auth.openAdmin();
+      window.location.assign(result.url);
+    } finally {
+      setAdminLoading(false);
+    }
   }
 
   const roleLabel = user.role?.name || (user.is_superuser ? 'Administrator' : 'User');
@@ -184,6 +195,19 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                   <Menu.Item closeMenuOnClick={false} disabled leftSection={<IconBuilding size={16} />} rightSection={user.current_shift ? <Badge color="teal" size="sm">Shift open</Badge> : undefined}>
                     {siteLabel}
                   </Menu.Item>
+                  {user.is_superuser && (
+                    <>
+                      <Menu.Divider />
+                      <Menu.Label>Administration</Menu.Label>
+                      <Menu.Item
+                        leftSection={<IconSettings size={16} />}
+                        disabled={adminLoading}
+                        onClick={openAdmin}
+                      >
+                        {adminLoading ? 'Opening admin…' : 'Admin'}
+                      </Menu.Item>
+                    </>
+                  )}
                   <Menu.Divider />
                   <Menu.Label>Account</Menu.Label>
                   <Menu.Item leftSection={<IconPower size={16} />} color="red" onClick={logout}>Sign out</Menu.Item>
