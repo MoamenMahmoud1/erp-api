@@ -193,6 +193,7 @@ def cancel_invoice(invoice_id, actor=None):
     if actor is not None:
         require_customer_assignment(customer=invoice.customer, user=actor)
     shift = _required_shift(actor, invoice)
+    effective_actor_id = actor.pk if actor is not None else invoice.created_by_id
     if invoice.net_paid_amount > 0:
         raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
     if invoice.status == Invoice.Status.CONFIRMED:
@@ -218,7 +219,6 @@ def cancel_invoice(invoice_id, actor=None):
             source_location=sale.source_location,
         )
 
-        effective_actor_id = actor.pk if actor is not None else invoice.created_by_id
         movement = StockMovement.objects.create(
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
