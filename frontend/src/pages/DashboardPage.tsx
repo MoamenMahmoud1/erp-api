@@ -61,7 +61,7 @@ function Panel({ title, subtitle, right, children }: { title: string; subtitle?:
   );
 }
 
-function RiskRow({ label, count, units, color, to }: { label: string; count: unknown; units?: unknown; color: string; to: string }) {
+function RiskRow({ label, count, units, color, to, canOpen = true }: { label: string; count: unknown; units?: unknown; color: string; to: string; canOpen?: boolean }) {
   const numericCount = Number(count || 0);
   return (
     <Group className="dashboard-risk-row" justify="space-between" wrap="nowrap" gap="md">
