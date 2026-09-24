@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.conf import settings
+from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone
 
@@ -37,6 +39,8 @@ class Command(BaseCommand):
 
     @transaction.atomic
     def handle(self, *args, **options):
+        if not settings.DEBUG:
+            raise CommandError("Demo seed data is disabled when DEBUG=False.")
         User = get_user_model()
 
         if User.objects.filter(username=self.DEMO_ADMIN_USERNAME).exists():
