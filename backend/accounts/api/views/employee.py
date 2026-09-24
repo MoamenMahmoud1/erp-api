@@ -125,7 +125,7 @@ class RoleViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ("name", "role_profile__name", "role_profile__description")
 
     def get_queryset(self):
-        groups = Group.objects.select_related("role_profile")
+        groups = Group.objects.filter(role_profile__isnull=False).select_related("role_profile")
         if not self.request.user.is_superuser:
             groups = groups.annotate(
                 _role_level=Coalesce("role_profile__level", Value(0), output_field=IntegerField())
