@@ -6,6 +6,7 @@ from django.test import TestCase
 
 from accounts.models import Employee, EmployeeShift, RoleProfile
 from accounts.services.employee_shift import ShiftError, start_shift
+from customer_assignments.models import CustomerAssignment
 from customers.models import Customer
 from invoices.models import Invoice, InvoiceItem
 from organization.models import Company, Site
