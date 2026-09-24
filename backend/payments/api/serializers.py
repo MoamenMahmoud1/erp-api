@@ -23,7 +23,15 @@ class RefundInputSerializer(serializers.Serializer):
 class PaymentAllocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentAllocation
-        fields = ("id", "invoice", "cash_amount", "transfer_amount", "total_amount", "created_at")
+        fields = (
+            "id",
+            "invoice",
+            "cash_amount",
+            "transfer_amount",
+            "total_amount",
+            "effective_total_amount",
+            "created_at",
+        )
         read_only_fields = fields
 
 
