@@ -205,6 +205,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 raise ValidationError({"department": "The department does not belong to the employee's site or parent branch."})
 
         site_ids = visible_site_ids(actor) if actor else None
+        if department is not None and department.site_id and site_ids is not None:
+            if not Site.objects.filter(pk=department.site_id, pk__in=site_ids).exists():
+                raise ValidationError({"department": "The department is outside your allowed site scope."})
         actor_scope = RoleProfile.scope_for_user(actor) if actor else RoleProfile.Scope.SITE
         if work_site and actor_scope != RoleProfile.Scope.COMPANY:
             if site_ids is None or not work_site.__class__.objects.filter(pk=work_site.pk, pk__in=site_ids).exists():
