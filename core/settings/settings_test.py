@@ -52,4 +52,10 @@ PROJECT_APP_LABELS = [
     "auditlog",
     "notifications",
 ]
-MIGRATION_MODULES = {label: None for label in PROJECT_APP_LABELS}
+MIGRATIONLESS_TEST_APPS = PROJECT_APP_LABELS + [
+    "admin",
+    "auth",
+    "contenttypes",
+    "sessions",
+]
+MIGRATION_MODULES = {label: None for label in MIGRATIONLESS_TEST_APPS}
