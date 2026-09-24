@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .api.views import EmployeeViewSet, RoleViewSet
 from .api.views.current_user import CurrentUserView
 from .api.views.login import CsrfTokenView, LoginView
+from .api.views.admin_session import AdminSessionView
 from .api.views.logout import LogoutAllView, LogoutView
 from .api.views.password_change import PasswordChangeView
 from .api.views.password_reset import PasswordResetConfirmView, PasswordResetRequestView
@@ -26,6 +27,7 @@ urlpatterns = [
     path("auth/email/change/", EmailChangeRequestView.as_view(), name="email-change"),
     path("auth/email/change/confirm/", EmailChangeConfirmView.as_view(), name="email-change-confirm"),
     path("auth/login/", LoginView.as_view(), name="login"),
+    path("auth/admin/session/", AdminSessionView.as_view(), name="admin-session"),
     path("auth/refresh/", RefreshView.as_view(), name="refresh"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/logout-all/", LogoutAllView.as_view(), name="logout-all"),
