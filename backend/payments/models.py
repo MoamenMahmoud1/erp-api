@@ -61,13 +61,6 @@ class PaymentTransaction(models.Model):
         return quantize_money(self.cash_amount + self.effective_transfer_amount)
 
     @property
-    def effective_total_amount(self) -> Decimal:
-        return quantize_money(
-            self.cash_amount
-            + (self.transfer_amount if self.transaction.transfer_accepted else Decimal("0.00"))
-        )
-
-    @property
     def total_amount(self) -> Decimal:
         return quantize_money(self.cash_amount + self.transfer_amount)
 
@@ -100,6 +93,17 @@ class PaymentAllocation(models.Model):
         ]
 
     @property
+    def effective_total_amount(self) -> Decimal:
+        return quantize_money(
+            self.cash_amount
+            + (
+                self.transfer_amount
+                if self.transaction.transfer_accepted
+                else Decimal("0.00")
+            )
+        )
+
+    @property
     def total_amount(self) -> Decimal:
         return quantize_money(self.cash_amount + self.transfer_amount)
 
@@ -109,7 +113,7 @@ class PaymentAllocation(models.Model):
 
     @property
     def refundable_amount(self) -> Decimal:
-        return quantize_money(self.total_amount - self.refunded_amount)
+        return quantize_money(self.effective_total_amount - self.refunded_amount)
 
     def __str__(self):
         return f"Alloc {self.pk} -> invoice {self.invoice_id}"
