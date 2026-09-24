@@ -17,6 +17,7 @@ class CeleryConfigurationTests(SimpleTestCase):
             {
                 "reconcile-company-counters",
                 "rebuild-recent-approval-notifications",
+                "purge-idempotency-keys",
             },
         )
         self.assertEqual(
@@ -26,4 +27,8 @@ class CeleryConfigurationTests(SimpleTestCase):
         self.assertEqual(
             schedule["rebuild-recent-approval-notifications"]["task"],
             "notifications.tasks.rebuild_recent_approval_notifications",
+        )
+        self.assertEqual(
+            schedule["purge-idempotency-keys"]["task"],
+            "payments.tasks.purge_idempotency_keys",
         )
