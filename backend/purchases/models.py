@@ -28,6 +28,7 @@ class Purchase(models.Model):
     class Meta:
         ordering = ("-created_at",)
         indexes = [
+            models.Index(fields=("supplier", "created_at"), name="purchase_supplier_created_idx"),
             models.Index(fields=("site", "created_at"), name="purchase_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="purchase_shift_created_idx"),
         ]
@@ -57,6 +58,9 @@ class PurchaseItem(models.Model):
     batch = models.ForeignKey("inventory.InventoryBatch", on_delete=models.PROTECT, null=True, blank=True, related_name="purchase_items")
 
     class Meta:
+        indexes = [
+            models.Index(fields=("product",), name="purchase_item_product_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("purchase", "product"), name="purchase_item_unique_product"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="purchase_item_quantity_positive"),
