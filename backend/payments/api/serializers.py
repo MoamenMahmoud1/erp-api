@@ -23,8 +23,6 @@ class RefundInputSerializer(serializers.Serializer):
 class PaymentAllocationSerializer(serializers.ModelSerializer):
     total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     effective_total_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
-    refundable_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
     class Meta:
         model = PaymentAllocation
         fields = (
