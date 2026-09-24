@@ -1,6 +1,12 @@
 from django.urls import path
 
-from payments.api.views import CollectionView, RefundView, TransactionDetailView, TransactionListView
+from payments.api.views import (
+    CollectionView,
+    RefundView,
+    TransactionDetailView,
+    TransactionListView,
+    TransferApprovalView,
+)
 
 app_name = "payments"
 
@@ -9,4 +15,9 @@ urlpatterns = [
     path("refunds/", RefundView.as_view(), name="payment-refund"),
     path("transactions/", TransactionListView.as_view(), name="payment-transaction-list"),
     path("transactions/<int:pk>/", TransactionDetailView.as_view(), name="payment-transaction-detail"),
+    path(
+        "transactions/<int:pk>/approve-transfer/",
+        TransferApprovalView.as_view(),
+        name="payment-transfer-approve",
+    ),
 ]
