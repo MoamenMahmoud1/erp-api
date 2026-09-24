@@ -140,6 +140,9 @@ def create_sales_return(
     return_destination_location_id=None,
     return_source_location_id=None,
 ):
+    if actor is not None and created_by_id != actor.pk:
+        raise InvalidBusinessOperation("The return creator must match the authenticated actor.")
+
     invoice_qs = Invoice.objects.visible_to(actor) if actor is not None else Invoice.objects
     invoice = (
         invoice_qs.select_for_update()
