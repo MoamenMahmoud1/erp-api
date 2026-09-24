@@ -1,3 +1,5 @@
+from django.contrib.auth import logout as django_logout
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -25,6 +27,10 @@ class LogoutView(NoStoreResponseMixin, APIView):
                 refresh_token=refresh_token,
                 device_id=device_id,
             )
+
+        django_logout(request)
+
+        django_logout(request)
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)
