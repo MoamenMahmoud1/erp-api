@@ -168,6 +168,7 @@ class StockMovement(models.Model):
             models.Index(fields=("shift", "created_at"), name="stock_move_shift_created_idx"),
             models.Index(fields=("source_location", "created_at"), name="stock_move_source_created_idx"),
             models.Index(fields=("destination_location", "created_at"), name="stock_move_dest_created_idx"),
+            models.Index(fields=("created_at", "id"), name="stock_move_created_id_idx"),
         ]
         permissions = [
             ("transfer_stock", "Can transfer stock"),
