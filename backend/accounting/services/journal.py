@@ -2,7 +2,22 @@
 
 Business events create balanced journal entries, which are posted before
 they are included in ledger and report queries.
-"""Raised when an accounting journal violates a business rule."""
+"""
+
+from decimal import Decimal
+
+from django.db import transaction
+from django.db.models import Max, Sum
+from django.utils import timezone
+
+from accounting.models import Account, JournalEntry, JournalLine
+from auditlog.services import record_event
+from common.exceptions import InvalidBusinessOperation, InvalidStateTransition
+from organization.models import Company
+
+
+class JournalEntryError(InvalidBusinessOperation):
+    """Raised when an accounting journal violates a business rule."""
 
 
 def get_default_company():
