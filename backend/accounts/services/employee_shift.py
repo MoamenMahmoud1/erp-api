@@ -134,11 +134,36 @@ def start_shift(*, user, opening_cash=Decimal("0.00"), vehicle_id=None):
 
 
 def _shift_payment_totals(shift):
+    from django.db.models import Case, DecimalField, Exists, F, OuterRef, Value, When
     from payments.models import PaymentRefund, PaymentTransaction
+    from accounting.models import JournalEntry
 
-    collected = PaymentTransaction.objects.filter(shift_id=shift.pk).aggregate(
-        cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
-        transfer=Coalesce(Sum("transfer_amount"), Decimal("0.00")),
+    accepted_transfer = JournalEntry.objects.filter(
+        source_type="payment.transfer.approval",
+        source_id=OuterRef("pk"),
+        status=JournalEntry.Status.POSTED,
+    )
+    collected = (
+        PaymentTransaction.objects
+        .filter(shift_id=shift.pk)
+        .annotate(_transfer_approved=Exists(accepted_transfer))
+        .aggregate(
+            cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
+            transfer=Coalesce(
+                Sum(
+                    Case(
+                        When(
+                            transfer_amount__gt=0,
+                            _transfer_approved=True,
+                            then=F("transfer_amount"),
+                        ),
+                        default=Value(Decimal("0.00")),
+                        output_field=DecimalField(max_digits=12, decimal_places=2),
+                    )
+                ),
+                Decimal("0.00"),
+            ),
+        )
     )
     refunded = PaymentRefund.objects.filter(shift_id=shift.pk).aggregate(
         cash=Coalesce(Sum("cash_amount"), Decimal("0.00")),
