@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
+from accounts.models import RoleProfile
 from organization.models import Site
 from services.organization_scope import visible_site_ids
 
@@ -51,6 +52,12 @@ class SiteSerializer(serializers.ModelSerializer):
         actor = getattr(request, "user", None)
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         site_ids = visible_site_ids(actor) if actor else None
+        actor_scope = RoleProfile.scope_for_user(actor) if actor else RoleProfile.Scope.SITE
+        if self.instance is None and actor and not actor.is_superuser:
+            if actor_scope == RoleProfile.Scope.SITE:
+                raise serializers.ValidationError({"site_type": "Site-scoped users cannot create organizational sites."})
+            if actor_scope == RoleProfile.Scope.BRANCH and parent is None:
+                raise serializers.ValidationError({"parent": "Branch-scoped users must create sites under their visible branch."})
         if parent is not None and site_ids is not None:
             if not Site.objects.filter(pk=parent.pk, pk__in=site_ids).exists():
                 raise serializers.ValidationError({"parent": "The parent site is outside your allowed scope."})
