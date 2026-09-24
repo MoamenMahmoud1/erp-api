@@ -68,7 +68,7 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(admin_response.status_code, 200)
 
     def test_erp_logout_clears_admin_session(self):
-        self.client.force_login(self.superuser)
+        self.client.force_authenticate(user=self.superuser)
         session_response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(session_response.status_code, 200)
 
