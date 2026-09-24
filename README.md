@@ -11,7 +11,7 @@ erp-api/
 ├── infra/         Gateway and operational scripts
 ├── docs/          Current architecture/development/operations + historical notes
 ├── .github/       CI workflows
-├── .env.example   Local Compose environment template
+├── .env.example   Example environment template
 ├── compose.yaml   Single full-stack Docker Compose definition
 ├── README.md
 └── LICENSE
@@ -98,7 +98,7 @@ The PostgreSQL data volume is named \`erp-api_postgres_data\` and is intentional
 By default, Compose loads \`.env\`. The \`ENV_FILE\` variable can point to another environment file:
 
 \`\`\`bash
-ENV_FILE=.env.example docker compose --env-file .env.example config
+ENV_FILE=.env.prod docker compose --env-file .env.prod up -d --build
 \`\`\`
 
 This is useful for CI validation without committing real secrets.
