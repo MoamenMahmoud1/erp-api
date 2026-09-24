@@ -106,6 +106,9 @@ class InvoiceItem(models.Model):
     cost_price = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(Decimal("0"))])
 
     class Meta:
+        indexes = [
+            models.Index(fields=("product", "invoice"), name="invoice_item_product_invoice_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("invoice", "product"), name="invoices_unique_invoice_product"),
             models.CheckConstraint(condition=Q(quantity__gte=1), name="invoice_item_quantity_positive"),
