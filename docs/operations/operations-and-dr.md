@@ -20,8 +20,8 @@ For production, run a dedicated Celery worker and Beat scheduler if the schedule
 
 ## Database backups
 
-Run `scripts/backup_postgres.sh` with `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and optional `DB_HOST`, `DB_PORT`, `BACKUP_DIR`. Store dumps outside the application host, encrypt them at rest, and retain multiple recovery points.
+Run `infra/scripts/backup_postgres.sh` with `DB_NAME`, `DB_USER`, `DB_PASSWORD`, and optional `DB_HOST`, `DB_PORT`, `BACKUP_DIR`. Store dumps outside the application host, encrypt them at rest, and retain multiple recovery points.
 
-To restore, set `BACKUP_FILE` and run `scripts/restore_postgres.sh` against a maintenance database window.
+To restore, set `BACKUP_FILE` and run `infra/scripts/restore_postgres.sh` against a maintenance database window.
 
 A production deployment should test restores regularly rather than treating a successful dump as proof of recoverability.
