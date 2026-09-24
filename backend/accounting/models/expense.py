@@ -43,6 +43,8 @@ class Expense(models.Model):
         ordering = ("-expense_date", "-id")
         indexes = [
             models.Index(fields=("company", "expense_date"), name="expense_company_date_idx"),
+            models.Index(fields=("company", "expense_account", "expense_date"), name="expense_account_date_idx"),
+            models.Index(fields=("company", "payment_account", "expense_date"), name="expense_payment_date_idx"),
         ]
 
     def __str__(self):
