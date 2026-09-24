@@ -20,6 +20,7 @@ htmlcov/
 .ruff_cache/
 
 # Local / generated frontend files
+!frontend/.env
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
