@@ -32,6 +32,57 @@ jobs:
       - name: Build full-stack Compose images
         run: ENV_FILE=.env.example docker compose --env-file .env.example build --pull
 
+  full-stack-compose-smoke:
+    name: Full-stack Compose smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Start full stack
+        run: |
+          set -euo pipefail
+          ENV_FILE=.env.example docker compose --env-file .env.example up -d --build
+
+      - name: Wait for gateway health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 60); do
+            gateway_id="$(ENV_FILE=.env.example docker compose --env-file .env.example ps -q gateway)"
+            if [[ -n "$gateway_id" ]]; then
+              health="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}' "$gateway_id")"
+              echo "gateway health: $health"
+              if [[ "$health" == "healthy" ]]; then
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+
+          ENV_FILE=.env.example docker compose --env-file .env.example ps
+          ENV_FILE=.env.example docker compose --env-file .env.example logs gateway api frontend
+          exit 1
+
+      - name: Smoke test gateway routes
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error http://127.0.0.1:8080/health/live/ >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:8080/health/ready/ >/dev/null
+          curl --fail --silent --show-error http://127.0.0.1:8080/ >/dev/null
+
+      - name: Show stack status
+        if: always()
+        run: ENV_FILE=.env.example docker compose --env-file .env.example ps
+
+      - name: Dump gateway logs on failure
+        if: failure()
+        run: ENV_FILE=.env.example docker compose --env-file .env.example logs gateway api frontend
+
+      - name: Stop full stack
+        if: always()
+        run: ENV_FILE=.env.example docker compose --env-file .env.example down
+
   web-e2e:
     name: Web end-to-end smoke
     runs-on: ubuntu-latest
