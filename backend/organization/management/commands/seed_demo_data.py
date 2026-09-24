@@ -7,6 +7,7 @@ from django.conf import settings
 from django.core.management.base import CommandError
 from django.db import transaction
 from django.utils import timezone
+from decouple import config
 
 from accounting.models import Account
 from accounting.services import ensure_default_accounts
@@ -35,7 +36,6 @@ class Command(BaseCommand):
 
     DEMO_ADMIN_USERNAME = "demo_admin"
     DEMO_ADMIN_EMAIL = "admin@niletradedemo.local"
-    DEMO_PASSWORD = "DemoERP@2026!"
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -79,15 +79,19 @@ class Command(BaseCommand):
                 setattr(company, field, value)
             company.save(update_fields=(*company_updates, "updated_at"))
 
-        admin = User.objects.create_superuser(
-            username=self.DEMO_ADMIN_USERNAME,
-            email=self.DEMO_ADMIN_EMAIL,
-            password=self.DEMO_PASSWORD,
-            first_name="Omar",
-            last_name="Hassan",
-        )
-        admin.is_verified = True
-        admin.save(update_fields=("is_verified", "updated_at"))
+        demo_password = config("DEMO_ADMIN_PASSWORD", default="").strip()
+        admin = None
+        if demo_password:
+            admin = User.objects.create_superuser(
+                username=self.DEMO_ADMIN_USERNAME,
+                email=self.DEMO_ADMIN_EMAIL,
+                password=demo_password,
+                first_name="Omar",
+                last_name="Hassan",
+            )
+        if admin is not None:
+            admin.is_verified = True
+            admin.save(update_fields=("is_verified", "updated_at"))
 
         users = {
             "manager": self._create_user(User, "sara", "sara.elmasry@niletradedemo.local", "Sara", "Elmasry"),
@@ -161,7 +165,8 @@ class Command(BaseCommand):
         manager_employee = Employee.objects.create(user=users["manager"], work_site=branch, department=sales_dept)
         Employee.objects.create(user=users["sales_1"], manager=manager_employee, work_site=branch, department=sales_dept)
         Employee.objects.create(user=users["sales_2"], manager=manager_employee, work_site=branch, department=sales_dept)
-        Employee.objects.create(user=admin, work_site=hq, department=finance_dept)
+        if admin is not None:
+            Employee.objects.create(user=admin, work_site=hq, department=finance_dept)
 
         customers = {
             "cairo_retail": Customer.objects.create(name="Cairo Retail Hub", phone="+201022345678", address="Heliopolis, Cairo"),
@@ -228,7 +233,8 @@ class Command(BaseCommand):
         accounts = ensure_default_accounts(company)
         equity_account, _ = Account.objects.get_or_create(company=company, code="3000", defaults={"name": "Owner Equity", "account_type": Account.AccountType.EQUITY})
         operating_expense, _ = Account.objects.get_or_create(company=company, code="5200", defaults={"name": "Operating Expenses", "account_type": Account.AccountType.EXPENSE})
-        self._post_opening_balance(company=company, actor_id=admin.pk, cash_account=accounts["cash"], bank_account=accounts["bank"], equity_account=equity_account, entry_date=timezone.localdate(dates[0]))
+        actor_for_demo = admin or users["manager"]
+        self._post_opening_balance(company=company, actor_id=actor_for_demo.pk, cash_account=accounts["cash"], bank_account=accounts["bank"], equity_account=equity_account, entry_date=timezone.localdate(dates[0]))
 
         purchases = [
             self._create_purchase(supplier=suppliers["delta_foods"], actor=admin, when=dates[0], reference="PO-2026-0901", items=[(products["basmati_rice"], 100, "70.00"), (products["sunflower_oil"], 80, "60.00"), (products["detergent"], 50, "100.00")]),
@@ -236,13 +242,13 @@ class Command(BaseCommand):
             self._create_purchase(supplier=suppliers["cairo_home"], actor=admin, when=dates[2], reference="PO-2026-0903", items=[(products["tomato"], 100, "35.00"), (products["dishwash"], 80, "50.00"), (products["basmati_rice"], 50, "72.00"), (products["sunflower_oil"], 40, "62.00")]),
         ]
 
-        return_purchase(purchase_id=purchases[0].pk, created_by_id=admin.pk, actor=admin, reason="Packaging damage identified during receiving inspection", items=[{"purchase_item": purchases[0].items.get(product=products["basmati_rice"]), "quantity": 5}])
-        pay_supplier(supplier=suppliers["delta_foods"], cash_amount=Decimal("3000.00"), transfer_amount=Decimal("0.00"), paid_by_id=admin.pk, actor=admin, reference="SUP-PAY-0903")
-        pay_supplier(supplier=suppliers["nile_fmcg"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("6000.00"), paid_by_id=admin.pk, actor=admin, reference="SUP-PAY-0906")
+        return_purchase(purchase_id=purchases[0].pk, created_by_id=actor_for_demo.pk, actor=actor_for_demo, reason="Packaging damage identified during receiving inspection", items=[{"purchase_item": purchases[0].items.get(product=products["basmati_rice"]), "quantity": 5}])
+        pay_supplier(supplier=suppliers["delta_foods"], cash_amount=Decimal("3000.00"), transfer_amount=Decimal("0.00"), paid_by_id=actor_for_demo.pk, actor=actor_for_demo, reference="SUP-PAY-0903")
+        pay_supplier(supplier=suppliers["nile_fmcg"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("6000.00"), paid_by_id=actor_for_demo.pk, actor=actor_for_demo, reference="SUP-PAY-0906")
 
-        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_1"].pk, created_by=admin, reference="LOAD-0904-AHMED", items=[{"product": products["basmati_rice"], "quantity": 30}, {"product": products["sunflower_oil"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["dishwash"], "quantity": 15}])
-        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_2"].pk, created_by=admin, reference="LOAD-0904-MARIAM", items=[{"product": products["water"], "quantity": 60}, {"product": products["coffee"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["tissues"], "quantity": 20}])
-        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["manager"].pk, created_by=admin, reference="LOAD-0904-SARA", items=[{"product": products["basmati_rice"], "quantity": 25}, {"product": products["water"], "quantity": 60}, {"product": products["tomato"], "quantity": 25}, {"product": products["dishwash"], "quantity": 20}, {"product": products["coffee"], "quantity": 20}])
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_1"].pk, created_by=actor_for_demo, reference="LOAD-0904-AHMED", items=[{"product": products["basmati_rice"], "quantity": 30}, {"product": products["sunflower_oil"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["dishwash"], "quantity": 15}])
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["sales_2"].pk, created_by=actor_for_demo, reference="LOAD-0904-MARIAM", items=[{"product": products["water"], "quantity": 60}, {"product": products["coffee"], "quantity": 25}, {"product": products["detergent"], "quantity": 20}, {"product": products["tissues"], "quantity": 20}])
+        transfer_stock(source_id=warehouse.pk, destination_id=sales_locations["manager"].pk, created_by=actor_for_demo, reference="LOAD-0904-SARA", items=[{"product": products["basmati_rice"], "quantity": 25}, {"product": products["water"], "quantity": 60}, {"product": products["tomato"], "quantity": 25}, {"product": products["dishwash"], "quantity": 20}, {"product": products["coffee"], "quantity": 20}])
 
         invoices = [
             self._create_invoice(customer=customers["cairo_retail"], actor=admin, created_by=users["sales_1"], when=dates[2], items=[(products["basmati_rice"], 12), (products["sunflower_oil"], 8), (products["detergent"], 3)], coupon=coupon, discount=Decimal("218.40")),
