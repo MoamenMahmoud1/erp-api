@@ -43,7 +43,11 @@ jobs:
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           REDIS_URL: redis://127.0.0.1:6379/1
-        run: python manage.py makemigrations --noinput
+        run: |
+          python manage.py makemigrations --noinput \
+            accounts authsession organization customers customer_assignments \
+            products coupons invoices payments inventory purchases suppliers \
+            accounting auditlog notifications
 
       - name: Set up Node
         uses: actions/setup-node@v6
