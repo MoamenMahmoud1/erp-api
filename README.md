@@ -79,10 +79,10 @@ http://localhost:8080/api/v1/docs/redoc/
 View service logs with:
 
 \`\`\`bash
-docker compose logs -f erp-api-prod
-docker compose logs -f celery_worker
-docker compose logs -f celery_beat
-docker compose logs -f erp-gateway
+docker compose logs -f api
+docker compose logs -f worker
+docker compose logs -f beat
+docker compose logs -f gateway
 \`\`\`
 
 Stop the stack with:
