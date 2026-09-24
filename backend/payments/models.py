@@ -160,7 +160,7 @@ class PaymentRefund(models.Model):
 
 
 class IdempotencyKey(models.Model):
-    key = models.CharField(max_length=128, db_index=True)
+    key = models.CharField(max_length=128)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="idempotency_keys")
     path = models.CharField(max_length=500)
     request_signature = models.CharField(max_length=64)
