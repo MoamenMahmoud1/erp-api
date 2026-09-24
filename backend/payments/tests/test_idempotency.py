@@ -1,8 +1,9 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.management import call_command
 from django.db import IntegrityError
-from django.test import TransactionTestCase
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 
 from payments.models import IdempotencyKey, PaymentAllocation, PaymentRefund, PaymentTransaction
@@ -159,5 +160,32 @@ class IdempotencyServiceTests(PaymentTestMixin, TransactionTestCase):
         deleted = prune_idempotency_keys()
 
         self.assertEqual(deleted, 1)
+        self.assertFalse(IdempotencyKey.objects.filter(pk=old.pk).exists())
+        self.assertTrue(IdempotencyKey.objects.filter(pk=fresh.pk).exists())
+
+    @override_settings(IDEMPOTENCY_RETENTION_DAYS=90)
+    def test_purge_command_removes_records_older_than_configured_retention(self):
+        old = IdempotencyKey.objects.create(
+            key="old-key",
+            user=self.user,
+            path="/api/v1/payments/collections/",
+            request_signature="e" * 64,
+            response_status=201,
+            response_body={"id": 1},
+        )
+        IdempotencyKey.objects.filter(pk=old.pk).update(
+            created_at=timezone.now() - timedelta(days=91),
+        )
+        fresh = IdempotencyKey.objects.create(
+            key="fresh-key",
+            user=self.user,
+            path="/api/v1/payments/collections/",
+            request_signature="f" * 64,
+            response_status=201,
+            response_body={"id": 2},
+        )
+
+        call_command("purge_idempotency_keys")
+
         self.assertFalse(IdempotencyKey.objects.filter(pk=old.pk).exists())
         self.assertTrue(IdempotencyKey.objects.filter(pk=fresh.pk).exists())
