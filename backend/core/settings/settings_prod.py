@@ -1,18 +1,56 @@
+from django.core.exceptions import ImproperlyConfigured
+
 from .settings_base import *
 
 DEBUG = False
+
 SECRET_KEY = config("SECRET_KEY")
-SIMPLE_JWT["SIGNING_KEY"] = config("JWT_SIGNING_KEY")
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=lambda v: [s.strip() for s in v.split(",")])
-CORS_ALLOWED_ORIGINS = config(
-    "CORS_ALLOWED_ORIGINS",
-    cast=lambda value: [origin.strip() for origin in value.split(",") if origin.strip()],
-)
+JWT_SIGNING_KEY = config("JWT_SIGNING_KEY")
+
+if len(SECRET_KEY) < 32:
+    raise ImproperlyConfigured("SECRET_KEY must contain at least 32 characters.")
+if len(JWT_SIGNING_KEY) < 32:
+    raise ImproperlyConfigured("JWT_SIGNING_KEY must contain at least 32 characters.")
+
+SIMPLE_JWT["SIGNING_KEY"] = JWT_SIGNING_KEY
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in config("ALLOWED_HOSTS").split(",")
+    if host.strip()
+]
+if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+    raise ImproperlyConfigured(
+        "ALLOWED_HOSTS must contain explicit hostnames in production."
+    )
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in config("CORS_ALLOWED_ORIGINS").split(",")
+    if origin.strip()
+]
+if not CORS_ALLOWED_ORIGINS:
+    raise ImproperlyConfigured(
+        "CORS_ALLOWED_ORIGINS must contain at least one origin in production."
+    )
+if any(not origin.startswith("https://") for origin in CORS_ALLOWED_ORIGINS):
+    raise ImproperlyConfigured(
+        "All production CORS origins must use HTTPS."
+    )
+
 ENABLE_API_DOCS = config("ENABLE_API_DOCS", default=False, cast=bool)
-CSRF_TRUSTED_ORIGINS = config(
-    "CSRF_TRUSTED_ORIGINS",
-    cast=lambda value: [origin.strip() for origin in value.split(",") if origin.strip()],
-)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in config("CSRF_TRUSTED_ORIGINS").split(",")
+    if origin.strip()
+]
+if not CSRF_TRUSTED_ORIGINS:
+    raise ImproperlyConfigured(
+        "CSRF_TRUSTED_ORIGINS must contain at least one origin in production."
+    )
+if any(not origin.startswith("https://") for origin in CSRF_TRUSTED_ORIGINS):
+    raise ImproperlyConfigured(
+        "All production CSRF trusted origins must use HTTPS."
+    )
 
 # PostgreSQL Production
 DB_POOL_MIN_SIZE = config("DB_POOL_MIN_SIZE", default=1, cast=int)
@@ -64,6 +102,7 @@ CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 TRUST_PROXY_HEADERS = config("TRUST_PROXY_HEADERS", default=False, cast=bool)
