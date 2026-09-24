@@ -11,4 +11,6 @@ coverage
 .env
 .env.*
 !.env.example
+!.env.production
+!.env.production.example
 .DS_Store
