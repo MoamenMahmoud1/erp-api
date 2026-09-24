@@ -251,7 +251,7 @@ class Command(BaseCommand):
 
         collect(customer=customers["cairo_retail"], cash_amount=invoices[0].total, transfer_amount=Decimal("0.00"), collected_by_id=admin.pk, actor=admin)
         collect(customer=customers["delta_market"], cash_amount=Decimal("0.00"), transfer_amount=Decimal("800.00"), collected_by_id=admin.pk, actor=admin)
-        collect(customer=customers["almanara"], cash_amount=Decimal("0.00"), transfer_amount=invoices[3].total, collected_by_id=admin.pk, actor=admin)
+        collect(customer=customers["almanara"], cash_amount=invoices[3].total, transfer_amount=Decimal("0.00"), collected_by_id=admin.pk, actor=admin)
         create_sales_return(invoice_id=invoices[3].pk, created_by_id=admin.pk, actor=admin, reason="Customer returned two unopened rice units", items=[{"invoice_item": invoices[3].items.get(product=products["basmati_rice"]), "quantity": 2}])
 
         create_expense(amount=Decimal("2500.00"), expense_account=operating_expense.pk, payment_account=accounts["cash"].pk, expense_date=timezone.localdate(dates[0]), description="Warehouse utilities and local delivery fuel", reference="EXP-2026-0907", created_by_id=admin.pk, company=company)
