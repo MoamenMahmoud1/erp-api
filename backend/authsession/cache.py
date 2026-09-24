@@ -63,7 +63,7 @@ def delete_auth_session_caches(session_ids):
 
 
 def delete_all_auth_session_caches():
-    """Invalidate active authorization snapshots.""
+    """Invalidate active authorization snapshots."""
     from authsession.models import AuthSession
 
     session_ids = AuthSession.objects.filter(
