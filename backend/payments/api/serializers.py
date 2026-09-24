@@ -51,6 +51,7 @@ class PaymentTransactionSerializer(serializers.ModelSerializer):
         model = PaymentTransaction
         fields = (
             "id", "customer", "customer_name", "site", "site_name", "shift_id", "cash_amount", "transfer_amount",
-            "total_amount", "refunded_amount", "refundable_amount", "allocations", "refunds", "created_at",
+            "total_amount", "effective_total_amount", "transfer_status", "refunded_amount", "refundable_amount",
+            "allocations", "refunds", "created_at",
         )
         read_only_fields = fields
