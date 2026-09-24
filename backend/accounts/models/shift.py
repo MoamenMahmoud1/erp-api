@@ -42,6 +42,9 @@ class EmployeeShift(models.Model):
 
     class Meta:
         ordering = ("-business_date", "-opened_at")
+        indexes = [
+            models.Index(fields=("site", "business_date", "opened_at"), name="shift_site_date_opened_idx"),
+        ]
         permissions = (
             ("start_employee_shift", "Can start an employee shift"),
             ("close_employee_shift", "Can close an employee shift"),
