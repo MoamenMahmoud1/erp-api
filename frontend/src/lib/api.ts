@@ -1,6 +1,6 @@
 export type Json = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_API_URL || '/api/v1');
 let accessToken: string | null = null;
 const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
 

@@ -224,7 +224,7 @@ class Command(BaseCommand):
             valid_until=now + timedelta(days=30),
         )
 
-        warehouse = StockLocation.objects.create(name="Main Warehouse - Nasr City", location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True)
+        warehouse = StockLocation.objects.create(name="Main Warehouse - Nasr City", site=branch, location_type=StockLocation.LocationType.MAIN_WAREHOUSE, is_active=True)
         sales_locations = {
             "sales_1": StockLocation.objects.create(name="Van 01 - Ahmed Fathy", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_1"], is_active=True),
             "sales_2": StockLocation.objects.create(name="Van 02 - Mariam Adel", location_type=StockLocation.LocationType.SALES_VEHICLE, employee=users["sales_2"], is_active=True),
@@ -275,9 +275,12 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Realistic ERP demo data created successfully."))
         self.stdout.write("")
-        self.stdout.write("Demo login:")
-        self.stdout.write(f"  username: {self.DEMO_ADMIN_USERNAME}")
-        self.stdout.write(f"  password: {self.DEMO_PASSWORD}")
+        if admin is not None:
+            self.stdout.write("Demo login:")
+            self.stdout.write(f"  username: {self.DEMO_ADMIN_USERNAME}")
+            self.stdout.write("  password: configured via DEMO_ADMIN_PASSWORD")
+        else:
+            self.stdout.write("Demo admin was not created; set DEMO_ADMIN_PASSWORD to create one.")
         self.stdout.write("")
         self.stdout.write("Data includes:")
         self.stdout.write("  - Company, sites, departments, employees and sales vehicles")
