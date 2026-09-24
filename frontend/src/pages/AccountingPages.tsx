@@ -5,8 +5,9 @@ import { notifications } from '@mantine/notifications';
 import { Link } from 'react-router-dom';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
+import { can } from '../components/PermissionGuard';
 import { RecordsPage } from '../components/RecordsPage';
-import { api, query, type Paginated } from '../lib/api';
+import { api, query, type Paginated, type UserProfile } from '../lib/api';
 
 const money = (value: unknown) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const accountTypeOptions = [{ value: 'asset', label: 'Asset' }, { value: 'liability', label: 'Liability' }, { value: 'equity', label: 'Equity' }, { value: 'revenue', label: 'Revenue' }, { value: 'expense', label: 'Expense' }];
@@ -28,7 +29,7 @@ export function AccountingHomePage() {
 
 type AccountOptions = { accounts: Paginated };
 
-export function AccountsPage() {
+export function AccountsPage({ user }: { user: UserProfile }) {
   const [data, setData] = useState<AccountOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +47,7 @@ export function AccountsPage() {
   if (error) return <Card className="glass" radius="xl" p="xl" withBorder><Text fw={800}>Accounts unavailable</Text><Text c="dimmed" mt="xs">{error}</Text></Card>;
   if (!data) return <Card className="glass" radius="xl" p={56} withBorder><Group justify="center"><Loader size="sm" /></Group><Text ta="center" size="sm" c="dimmed" mt="md">Loading account hierarchy…</Text></Card>;
 
-  return <CrudPage title="Accounts" singularTitle="Account" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={api.accounting.createAccount} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account', type: 'select', options, clearable: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
+  return <CrudPage title="Accounts" singularTitle="Account" subtitle="Chart of accounts used by the posting engine and reports." list={api.accounting.accounts} create={can(user, 'accounting.add_account') ? api.accounting.createAccount : undefined} update={api.accounting.updateAccount} remove={api.accounting.deleteAccount} canEdit={can(user, 'accounting.change_account')} canDelete={can(user, 'accounting.delete_account')} fields={[{ key: 'code', label: 'Code', required: true }, { key: 'name', label: 'Name', required: true }, { key: 'account_type', label: 'Account type', type: 'select', options: accountTypeOptions, required: true }, { key: 'parent', label: 'Parent account', type: 'select', options, clearable: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'code', label: 'Code' }, { key: 'name', label: 'Account' }, { key: 'account_type', label: 'Type' }, { key: 'normal_side', label: 'Normal side' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
 function JournalDetails({ data }: { data: Record<string, unknown> }) {
@@ -67,8 +68,8 @@ function JournalDetails({ data }: { data: Record<string, unknown> }) {
   return <Stack gap="lg"><SimpleGrid cols={{ base: 1, sm: 2 }}><Card withBorder radius="lg"><Text size="xs" c="dimmed">ENTRY</Text><Text fw={900} size="xl">{String(data.number || '—')}</Text><Text size="sm" c="dimmed" mt="xs">{String(data.entry_date || '—')}</Text></Card><Card withBorder radius="lg"><Text size="xs" c="dimmed">STATUS</Text><Badge mt="xs" color={status === 'posted' ? 'teal' : 'yellow'} size="lg">{status || '—'}</Badge><Text size="sm" c="dimmed" mt="sm">Reference: {String(data.reference || '—')}</Text></Card></SimpleGrid><Card withBorder radius="lg"><Group justify="space-between" align="flex-start" wrap="wrap"><div><Text fw={800}>{String(data.description || 'Journal entry')}</Text><Text size="sm" c="dimmed" mt={4}>{lines.length} line{lines.length === 1 ? '' : 's'}</Text></div><div><Text size="xs" c="dimmed">SOURCE</Text>{sourcePath ? <Button component={Link} to={sourcePath} variant="subtle" px={0}>{sourceText}</Button> : <Text fw={800} mt={3}>{sourceText}</Text>}</div></Group><Group gap="lg" mt="md"><div><Text size="xs" c="dimmed">Created by</Text><Text fw={700} mt={2}>{String(data.created_by_name || data.created_by_username || '—')}</Text></div><div><Text size="xs" c="dimmed">Posted by</Text><Text fw={700} mt={2}>{String(data.posted_by_name || data.posted_by_username || '—')}</Text></div></Group><Table.ScrollContainer minWidth={620} mt="md"><Table highlightOnHover><Table.Thead><Table.Tr><Table.Th>Account</Table.Th><Table.Th>Description</Table.Th><Table.Th ta="right">Debit</Table.Th><Table.Th ta="right">Credit</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{lines.map((line, index) => <Table.Tr key={String(line.id ?? index)}><Table.Td><Text fw={700}>{String(line.account_name || 'Unknown account')}</Text><Text size="xs" c="dimmed">{String(line.account_code || '')}</Text></Table.Td><Table.Td>{String(line.description || '—')}</Table.Td><Table.Td ta="right">{money(line.debit)}</Table.Td><Table.Td ta="right">{money(line.credit)}</Table.Td></Table.Tr>)}</Table.Tbody></Table></Table.ScrollContainer></Card></Stack>;
 }
 
-export function JournalsPage() {
-  return <RecordsPage eyebrow="ACCOUNTING" title="Journal entries" subtitle="Posted and draft accounting entries generated by ERP operations." list={api.accounting.journalEntries} details={{ load: api.accounting.journalEntry, render: (data) => <JournalDetails data={data} /> }} columns={[{ key: 'number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'status', label: 'Status', format: (value) => <Badge color={String(value) === 'posted' ? 'teal' : 'yellow'} variant="light">{String(value)}</Badge> }]} actions={[{ label: 'Post', color: 'teal', visible: (row) => String(row.status) === 'draft', run: (row) => api.accounting.postJournalEntry(Number(row.id)) }]} />;
+export function JournalsPage({ user }: { user: UserProfile }) {
+  return <RecordsPage eyebrow="ACCOUNTING" title="Journal entries" subtitle="Posted and draft accounting entries generated by ERP operations." list={api.accounting.journalEntries} details={{ load: api.accounting.journalEntry, render: (data) => <JournalDetails data={data} /> }} columns={[{ key: 'number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'status', label: 'Status', format: (value) => <Badge color={String(value) === 'posted' ? 'teal' : 'yellow'} variant="light">{String(value)}</Badge> }]} actions={[{ label: 'Post', color: 'teal', visible: (row) => can(user, 'accounting.post_journal_entry') && String(row.status) === 'draft', run: (row) => api.accounting.postJournalEntry(Number(row.id)) }]} />;
 }
 
 export function StatementsPage() {

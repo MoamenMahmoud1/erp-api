@@ -1,0 +1,40 @@
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
+
+from .views import health_live, health_ready, version_view
+
+urlpatterns = [
+    path("health/live/", health_live, name="health-live"),
+    path("health/ready/", health_ready, name="health-ready"),
+    path("api/v1/system/version/", version_view, name="system-version"),
+    path("api/v1/", include(("accounts.urls", "accounts"), namespace="accounts")),
+    path("api/v1/organization/", include(("organization.urls", "organization"), namespace="organization")),
+    path("api/v1/customers/", include(("customers.urls", "customers"), namespace="customers")),
+    path("api/v1/products/", include(("products.urls", "products"), namespace="products")),
+    path("api/v1/", include(("coupons.urls", "coupons"), namespace="coupons")),
+    path("api/v1/", include(("invoices.urls", "invoices"), namespace="invoices")),
+    path("api/v1/", include(("common.api_urls", "common"), namespace="common")),
+    path("api/v1/notifications/", include(("notifications.urls", "notifications"), namespace="notifications")),
+    path("api/v1/payments/", include(("payments.urls", "payments"), namespace="payments")),
+    path("api/v1/purchases/", include("purchases.urls")),
+    path("api/v1/suppliers/", include("suppliers.urls")),
+    path("api/v1/inventory/", include(("inventory.urls", "inventory"), namespace="inventory")),
+    path("api/v1/accounting/", include(("accounting.urls", "accounting"), namespace="accounting")),
+    path("admin/", admin.site.urls),
+]
+
+if getattr(settings, "ENABLE_API_DOCS", False):
+    urlpatterns.extend([
+        path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
+        path("api/v1/docs/swagger/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+        path("api/v1/docs/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
+    ])
+
+if settings.DEBUG:
+    if "silk" in settings.INSTALLED_APPS:
+        urlpatterns.append(path("silk/", include("silk.urls", namespace="silk")))
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

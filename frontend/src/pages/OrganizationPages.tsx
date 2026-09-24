@@ -4,7 +4,8 @@ import { Button, Card, Group, Loader, SimpleGrid, Stack, Text, TextInput, Title 
 import { notifications } from '@mantine/notifications';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
-import { api, type Paginated } from '../lib/api';
+import { can } from '../components/PermissionGuard';
+import { api, type Paginated, type UserProfile } from '../lib/api';
 
 const siteTypeOptions: CrudOption[] = [
   { value: 'head_office', label: 'Head office' },
@@ -12,7 +13,7 @@ const siteTypeOptions: CrudOption[] = [
   { value: 'store', label: 'Store' },
 ];
 
-export function CompanyPage() {
+export function CompanyPage({ user }: { user: UserProfile }) {
   const [company, setCompany] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,7 +53,7 @@ export function CompanyPage() {
           <SimpleGrid cols={{ base: 1, md: 2 }}>
             {Object.keys(form).map((key) => <TextInput key={key} label={key.replaceAll('_', ' ')} value={form[key]} onChange={(event) => setForm((current) => ({ ...current, [key]: event.currentTarget.value }))} required={key === 'name'} />)}
           </SimpleGrid>
-          <Group justify="space-between" mt="xl"><Text size="xs" c="dimmed">Company ID: {String(company?.id || '—')}</Text><Button type="submit" loading={saving}>Save company</Button></Group>
+          <Group justify="space-between" mt="xl"><Text size="xs" c="dimmed">Company ID: {String(company?.id || '—')}</Text>{can(user, 'organization.change_company') && <Button type="submit" loading={saving}>Save company</Button>}</Group>
         </form>
       </Card>
     </Stack>
@@ -74,7 +75,7 @@ function useSiteOptions() {
   return { data, error };
 }
 
-export function SitesPage() {
+export function SitesPage({ user }: { user: UserProfile }) {
   const { data, error } = useSiteOptions();
   const options = useMemo<CrudOption[]>(() => (data?.sites.results || []).map((site) => ({
     value: String(site.id),
@@ -89,9 +90,11 @@ export function SitesPage() {
       title="Sites"
       subtitle="Branches, stores and other organization locations."
       list={api.organization.sites}
-      create={api.organization.createSite}
+      create={can(user, 'organization.add_site') ? api.organization.createSite : undefined}
       update={api.organization.updateSite}
       remove={api.organization.deleteSite}
+      canEdit={can(user, 'organization.change_site')}
+      canDelete={can(user, 'organization.delete_site')}
       fields={[
         { key: 'code', label: 'Code', required: true },
         { key: 'name', label: 'Name', required: true },
@@ -109,7 +112,7 @@ export function SitesPage() {
   );
 }
 
-export function DepartmentsPage() {
+export function DepartmentsPage({ user }: { user: UserProfile }) {
   const { data, error } = useSiteOptions();
   const options = useMemo<CrudOption[]>(() => (data?.sites.results || []).map((site) => ({
     value: String(site.id),
@@ -124,9 +127,11 @@ export function DepartmentsPage() {
       title="Departments"
       subtitle="Organizational departments and reporting structure."
       list={api.organization.departments}
-      create={api.organization.createDepartment}
+      create={can(user, 'organization.add_department') ? api.organization.createDepartment : undefined}
       update={api.organization.updateDepartment}
       remove={api.organization.deleteDepartment}
+      canEdit={can(user, 'organization.change_department')}
+      canDelete={can(user, 'organization.delete_department')}
       fields={[
         { key: 'code', label: 'Code', required: true },
         { key: 'name', label: 'Name', required: true },

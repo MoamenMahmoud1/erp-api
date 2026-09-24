@@ -2,17 +2,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, Center, Loader, Text } from '@mantine/core';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
+import { can } from '../components/PermissionGuard';
+import type { UserProfile } from '../lib/api';
 import { api, type Paginated } from '../lib/api';
 
-export function CouponsPage() {
+export function CouponsPage({ user }: { user: UserProfile }) {
   return (
     <CrudPage
       title="Coupons"
       subtitle="Discount rules available to sales invoices."
       list={api.coupons.list}
-      create={api.coupons.create}
+      create={can(user, 'coupons.add_coupon') ? api.coupons.create : undefined}
       update={api.coupons.update}
       remove={api.coupons.delete}
+      canEdit={can(user, 'coupons.change_coupon')}
+      canDelete={can(user, 'coupons.delete_coupon')}
       fields={[
         { key: 'code', label: 'Code', required: true },
         { key: 'discount_type', label: 'Discount type', type: 'select', options: [{ value: 'fixed', label: 'Fixed amount' }, { value: 'percentage', label: 'Percentage' }], required: true },
@@ -37,7 +41,7 @@ export function CouponsPage() {
 
 type ProductOptions = { products: Paginated };
 
-export function CartonPricingPage() {
+export function CartonPricingPage({ user }: { user: UserProfile }) {
   const [data, setData] = useState<ProductOptions | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,9 +64,11 @@ export function CartonPricingPage() {
       title="Carton pricing"
       subtitle="Pack sizes and carton prices for the product catalog."
       list={api.products.cartonPricings}
-      create={api.products.createCartonPricing}
+      create={can(user, 'products.add_cartonpricing') ? api.products.createCartonPricing : undefined}
       update={api.products.updateCartonPricing}
       remove={api.products.deleteCartonPricing}
+      canEdit={can(user, 'products.change_cartonpricing')}
+      canDelete={can(user, 'products.delete_cartonpricing')}
       fields={[
         { key: 'product', label: 'Product', type: 'select', options: productOptions, required: true },
         { key: 'name', label: 'Label', required: true },

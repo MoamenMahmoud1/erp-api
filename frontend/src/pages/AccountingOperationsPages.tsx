@@ -5,12 +5,13 @@ import { notifications } from '@mantine/notifications';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 
 import { CrudPage, type CrudOption } from '../components/CrudPage';
+import { can } from '../components/PermissionGuard';
 import { RecordsPage } from '../components/RecordsPage';
-import { api, query, type Paginated } from '../lib/api';
+import { api, query, type Paginated, type UserProfile } from '../lib/api';
 
 const money = (value: unknown) => Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function ExpensesPage() {
+export function ExpensesPage({ user }: { user: UserProfile }) {
   const [accounts, setAccounts] = useState<Paginated | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,14 +28,14 @@ export function ExpensesPage() {
 
   const expenseList = (requestQuery: string) => api.accounting.expenses(requestQuery) as Promise<Paginated>;
 
-  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList} create={api.accounting.createExpense} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
+  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList} create={can(user, 'accounting.add_expense') ? api.accounting.createExpense : undefined} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
 }
 
-export function PeriodsPage() {
-  return <PeriodWorkspace />;
+export function PeriodsPage({ user }: { user: UserProfile }) {
+  return <PeriodWorkspace user={user} />;
 }
 
-function PeriodWorkspace() {
+function PeriodWorkspace({ user }: { user: UserProfile }) {
   const [modal, setModal] = useState(false);
   const [name, setName] = useState('');
   const [start, setStart] = useState<string | null>(null);
@@ -58,7 +59,7 @@ function PeriodWorkspace() {
     } finally { setSaving(false); }
   }
 
-  return <Stack gap="xl"><Group justify="space-between" align="flex-end"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Periods</Title><Text c="dimmed" mt={4}>Control which accounting dates are open for posting.</Text></div><Button onClick={() => setModal(true)} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>New period</Button></Group><RecordsPage reloadKey={reloadKey} eyebrow="ACCOUNTING" title="Open and closed periods" subtitle="Period locking is enforced by the accounting posting service." list={api.accounting.periods} columns={[{ key: 'name', label: 'Period' }, { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' }, { key: 'is_closed', label: 'Closed' }, { key: 'closed_at', label: 'Closed at' }]} actions={[{ label: 'Close', color: 'red', visible: (row) => !row.is_closed, run: (row) => api.accounting.closePeriod(Number(row.id)) }]} /><Modal opened={modal} onClose={() => !saving && setModal(false)} title="New accounting period" centered><Stack><TextInput label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} required /><DatePickerInput label="Start date" value={start} onChange={setStart} required /><DatePickerInput label="End date" value={end} onChange={setEnd} required /><Button loading={saving} onClick={() => void create()}>Create period</Button></Stack></Modal></Stack>;
+  return <Stack gap="xl"><Group justify="space-between" align="flex-end"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Periods</Title><Text c="dimmed" mt={4}>Control which accounting dates are open for posting.</Text></div>{can(user, 'accounting.add_accountingperiod') && <Button onClick={() => setModal(true)} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>New period</Button>}</Group><RecordsPage reloadKey={reloadKey} eyebrow="ACCOUNTING" title="Open and closed periods" subtitle="Period locking is enforced by the accounting posting service." list={api.accounting.periods} columns={[{ key: 'name', label: 'Period' }, { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' }, { key: 'is_closed', label: 'Closed' }, { key: 'closed_at', label: 'Closed at' }]} actions={[{ label: 'Close', color: 'red', visible: (row) => can(user, 'accounting.close_accountingperiod') && !row.is_closed, run: (row) => api.accounting.closePeriod(Number(row.id)) }]} /><Modal opened={modal} onClose={() => !saving && setModal(false)} title="New accounting period" centered><Stack><TextInput label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} required /><DatePickerInput label="Start date" value={start} onChange={setStart} required /><DatePickerInput label="End date" value={end} onChange={setEnd} required />{can(user, 'accounting.add_accountingperiod') && <Button loading={saving} onClick={() => void create()}>Create period</Button>}</Stack></Modal></Stack>;
 }
 
 export function GeneralLedgerPage() {
