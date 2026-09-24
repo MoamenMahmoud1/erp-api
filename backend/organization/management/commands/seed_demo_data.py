@@ -80,6 +80,7 @@ class Command(BaseCommand):
             company.save(update_fields=(*company_updates, "updated_at"))
 
         demo_password = config("DEMO_ADMIN_PASSWORD", default="").strip()
+        demo_user_password = config("DEMO_USER_PASSWORD", default="").strip() or None
         admin = None
         if demo_password:
             admin = User.objects.create_superuser(
@@ -94,9 +95,9 @@ class Command(BaseCommand):
             admin.save(update_fields=("is_verified", "updated_at"))
 
         users = {
-            "manager": self._create_user(User, "sara", "sara.elmasry@niletradedemo.local", "Sara", "Elmasry"),
-            "sales_1": self._create_user(User, "ahmed", "ahmed.fathy@niletradedemo.local", "Ahmed", "Fathy"),
-            "sales_2": self._create_user(User, "mariam", "mariam.adel@niletradedemo.local", "Mariam", "Adel"),
+            "manager": self._create_user(User, "sara", "sara.elmasry@niletradedemo.local", "Sara", "Elmasry", password=demo_user_password),
+            "sales_1": self._create_user(User, "ahmed", "ahmed.fathy@niletradedemo.local", "Ahmed", "Fathy", password=demo_user_password),
+            "sales_2": self._create_user(User, "mariam", "mariam.adel@niletradedemo.local", "Mariam", "Adel", password=demo_user_password),
         }
 
         hq = Site.objects.create(
@@ -289,8 +290,17 @@ class Command(BaseCommand):
         self.stdout.write("  - Posted accounting entries feeding P&L / BS / CF / AR / AP / analytics")
 
     @staticmethod
-    def _create_user(User, username, email, first_name, last_name):
-        return User.objects.create_user(username=username, email=email, password="DemoERP@2026!", first_name=first_name, last_name=last_name, is_active=True, is_verified=True)
+    def _create_user(User, username, email, first_name, last_name, *, password=None):
+        from secrets import token_urlsafe
+        return User.objects.create_user(
+            username=username,
+            email=email,
+            password=password or token_urlsafe(24),
+            first_name=first_name,
+            last_name=last_name,
+            is_active=True,
+            is_verified=True,
+        )
 
     @staticmethod
     def _create_purchase(*, supplier, actor, when, reference, items):
