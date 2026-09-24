@@ -15,7 +15,7 @@ jobs:
   backend-images:
     name: Backend production images
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -26,8 +26,11 @@ jobs:
       - name: Build worker image
         run: docker build --pull --target worker -t erp-api-worker:ci backend
 
-      - name: Validate compose configuration
-        run: docker compose -f infra/compose.yaml config
+      - name: Validate full-stack Compose configuration
+        run: ENV_FILE=.env.example docker compose --env-file .env.example config
+
+      - name: Build full-stack Compose images
+        run: ENV_FILE=.env.example docker compose --env-file .env.example build --pull
 
   web-e2e:
     name: Web end-to-end smoke
