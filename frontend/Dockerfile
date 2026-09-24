@@ -7,9 +7,9 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
-# Vite loads frontend/.env.production automatically for a production build.
-# Keep a safe same-origin example as the fallback for clean CI/checkouts.
-RUN if [ ! -f .env.production ]; then cp .env.production.example .env.production; fi     && npm run build
+# The single frontend/.env file is loaded automatically by Vite for both
+# development and production builds.
+RUN npm run build
 
 FROM nginx:1.29-alpine AS runtime
 
