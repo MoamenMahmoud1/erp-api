@@ -7,10 +7,9 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
-ARG VITE_API_URL=/api/v1
-ENV VITE_API_URL=${VITE_API_URL}
-
-RUN npm run build
+# Vite loads frontend/.env.production automatically for a production build.
+# Keep a safe same-origin example as the fallback for clean CI/checkouts.
+RUN if [ ! -f .env.production ]; then cp .env.production.example .env.production; fi     && npm run build
 
 FROM nginx:1.29-alpine AS runtime
 
