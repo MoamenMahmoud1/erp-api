@@ -61,7 +61,7 @@ class PurchaseReturnTests(TestCase):
         )
         self.assertTrue(
             StockMovement.objects.filter(
-                reference=f"Return Purchase #{self.purchase.pk}",
+                reference__startswith="source:purchase.return:",
                 movement_type=StockMovement.MovementType.PURCHASE_RETURN,
             ).exists()
         )
