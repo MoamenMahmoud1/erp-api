@@ -114,6 +114,8 @@ class StockTransferRequestAPITests(TestCase):
         Employee.objects.create(user=self.rep, work_site=site)
         Employee.objects.create(user=self.manager, work_site=site)
         self.customer = Customer.objects.create(name="Return Customer")
+        from customer_assignments.models import CustomerAssignment
+        CustomerAssignment.objects.create(customer=self.customer, employee=self.rep.employee)
         self.product = Product.objects.create(
             name="Approved Widget",
             purchase_price="50.00",
