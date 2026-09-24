@@ -126,7 +126,7 @@ export function App() {
   if (location.pathname === '/' && !can(user!, 'accounting.view_financial_reports')) return <Navigate to={defaultPath(user!)} replace />;
 
   const securedRoutes = [
-    { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage /> },
+    { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage user={user!} /> },
     { path: '/insights', permission: 'accounting.view_financial_reports', element: <BusinessInsightsPage /> },
     { path: '/shift', permission: 'accounts.start_employee_shift', element: <ShiftPage user={user!} /> },
     { path: '/sales', permission: 'invoices.view_invoice', element: <SalesPage user={user!} /> },
