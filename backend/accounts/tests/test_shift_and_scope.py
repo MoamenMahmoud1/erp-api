@@ -50,6 +50,31 @@ class EmployeeShiftTests(TestCase):
         with self.assertRaises(ShiftError):
             start_shift(user=self.user)
 
+    def test_pending_transfer_is_excluded_from_shift_close_total(self):
+        from payments.models import PaymentTransaction
+
+        start_shift(user=self.user, opening_cash=Decimal("100.00"))
+        PaymentTransaction.objects.create(
+            customer=Customer.objects.create(name="Transfer Customer"),
+            site=self.branch,
+            shift=EmployeeShift.objects.get(employee=self.employee, status=EmployeeShift.Status.OPEN),
+            collected_by=self.user,
+            cash_amount=Decimal("0.00"),
+            transfer_amount=Decimal("75.00"),
+        )
+
+        from accounts.services.employee_shift import close_shift
+
+        shift, totals = close_shift(
+            user=self.user,
+            closing_cash=Decimal("100.00"),
+            closing_transfer=Decimal("0.00"),
+        )
+
+        self.assertEqual(totals["expected_cash"], Decimal("100.00"))
+        self.assertEqual(totals["expected_transfer"], Decimal("0.00"))
+        self.assertEqual(shift.closing_transfer, Decimal("0.00"))
+
     def test_required_shift_blocks_invoice_creation_context(self):
         product = Product.objects.create(name="Product", purchase_price=Decimal("10"), selling_price=Decimal("20"))
         customer = Customer.objects.create(name="Customer")
