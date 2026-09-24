@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
@@ -28,6 +28,7 @@ class AssignedCustomerApiTests(TestCase):
             is_staff=True,
         )
         user.groups.add(group)
+        user.user_permissions.add(Permission.objects.get(codename="view_customer"))
         employee = Employee.objects.create(user=user)
 
         assigned = Customer.objects.create(name="Assigned Customer")
