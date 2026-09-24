@@ -144,6 +144,14 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         self.assertEqual(approved.transfer_status, "accepted")
         self.assertEqual(approved.effective_total_amount, Decimal("100.00"))
         self.assertEqual(invoice.status, Invoice.Status.PAID)
+        approved_again = approve_bank_transfer(
+            transaction_id=tx.pk,
+            actor_id=self.user.pk,
+            actor=self.user,
+        )
+        self.assertEqual(approved_again.pk, tx.pk)
+        self.assertEqual(approved_again.transfer_status, "accepted")
+
         self.assertEqual(invoice.outstanding_amount, Decimal("0.00"))
         self.assertTrue(
             JournalEntry.objects.filter(
