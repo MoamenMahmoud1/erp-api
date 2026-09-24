@@ -95,9 +95,10 @@ class OrganizationPermissionAPITests(OrganizationAPITestBase):
         response = self.client.post(
             reverse("organization:site-list"),
             {
-                "code": "BR-02",
-                "name": "Alexandria Branch",
-                "site_type": Site.Type.BRANCH,
+                "parent": self.branch.pk,
+                "code": "ST-02",
+                "name": "Alexandria Store",
+                "site_type": Site.Type.STORE,
                 "address_line_1": "Test address",
                 "city": "Alexandria",
                 "country_code": "EG",
