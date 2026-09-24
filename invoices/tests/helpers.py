@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 
 from accounts.models import Employee
+from customer_assignments.models import CustomerAssignment
 from customers.models import Customer
 from inventory.models import StockLocation
 from organization.models import Company, Site
