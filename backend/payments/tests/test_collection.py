@@ -4,7 +4,12 @@ from django.test import TransactionTestCase
 
 from invoices.models import Invoice
 from payments.models import PaymentAllocation, PaymentTransaction
-from payments.services import NoConfirmableInvoicesError, OverpaymentError, collect
+from payments.services import (
+    NoConfirmableInvoicesError,
+    OverpaymentError,
+    approve_bank_transfer,
+    collect,
+)
 
 from .helpers import PaymentTestMixin
 
@@ -99,3 +104,55 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
                 collected_by_id=self.user.pk,
                 actor=self.user,
             )
+
+    
+    def test_transfer_payment_stays_pending_until_approval(self):
+        invoice = self.create_invoice(total="100.00")
+        tx = collect(
+            customer=self.customer,
+            cash_amount=Decimal("0"),
+            transfer_amount=Decimal("100"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
+        )
+        invoice.refresh_from_db()
+        tx.refresh_from_db()
+
+        self.assertEqual(tx.transfer_status, "pending")
+        self.assertEqual(tx.effective_total_amount, Decimal("0.00"))
+        self.assertEqual(invoice.status, Invoice.Status.CONFIRMED)
+        self.assertEqual(invoice.outstanding_amount, Decimal("100.00"))
+
+    def test_approved_transfer_counts_as_paid(self):
+        invoice = self.create_invoice(total="100.00")
+        tx = collect(
+            customer=self.customer,
+            cash_amount=Decimal("0"),
+            transfer_amount=Decimal("100"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
+        )
+
+        approved = approve_bank_transfer(
+            transaction_id=tx.pk,
+            actor_id=self.user.pk,
+            actor=self.user,
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(approved.transfer_status, "accepted")
+        self.assertEqual(approved.effective_total_amount, Decimal("100.00"))
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.outstanding_amount, Decimal("0.00"))
+
+    def test_mixed_collection_counts_only_cash_before_transfer_approval(self):
+        invoice = self.create_invoice(total="100.00")
+        tx = collect(
+            customer=self.customer,
+            cash_amount=Decimal("30"),
+            transfer_amount=Decimal("70"),
+            collected_by_id=self.user.pk,
+            actor=self.user,
+        )
+        invoice.refresh_from_db()
+        self.assertEqual(tx.effective_total_amount, Decimal("30.00"))
+        self.assertEqual(invoice.outstanding_amount, Decimal("70.00"))
