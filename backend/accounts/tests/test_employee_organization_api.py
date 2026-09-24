@@ -146,12 +146,9 @@ class EmployeeOrganizationAPITests(TestCase):
         roles = {item["id"]: item for item in response.data["results"]}
         self.assertIn(self.employee_role.group.pk, roles)
         self.assertIn(self.secondary_role.group.pk, roles)
-        self.assertIn(self.unconfigured_role.pk, roles)
+        self.assertNotIn(self.unconfigured_role.pk, roles)
         self.assertNotIn(self.admin_role.group.pk, roles)
         self.assertEqual(roles[self.secondary_role.group.pk]["name"], self.secondary_role.name)
-        self.assertEqual(roles[self.unconfigured_role.pk]["level"], 0)
-        self.assertEqual(roles[self.unconfigured_role.pk]["scope"], RoleProfile.Scope.SITE)
-        self.assertFalse(roles[self.unconfigured_role.pk]["requires_shift"])
 
     def test_create_and_update_employee_role_directly(self):
         target_user = self.create_target_user(suffix="direct-role")
@@ -194,30 +191,24 @@ class EmployeeOrganizationAPITests(TestCase):
         target_user.refresh_from_db()
         self.assertFalse(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
 
-    def test_create_and_update_employee_groups(self):
+    def test_legacy_group_ids_are_rejected(self):
         target_user = self.create_target_user(suffix="groups")
-        response = self.client.post(
-            self.employee_list_url,
-            {
-                "user": target_user.pk,
-                "manager": self.actor.pk,
-                "work_site": self.branch.pk,
-                "department": self.branch_department.pk,
-                "group_ids": [self.secondary_role.group.pk],
-            },
+        employee = Employee.objects.create(
+            user=target_user,
+            manager=self.actor,
+            work_site=self.branch,
+            department=self.branch_department,
+        )
+
+        response = self.client.patch(
+            reverse("accounts:employee-detail", kwargs={"pk": employee.pk}),
+            {"group_ids": [self.secondary_role.group.pk]},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual({group["id"] for group in response.data["groups"]}, {self.secondary_role.group.pk})
-        target_user.refresh_from_db()
-        self.assertTrue(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
-        self.assertFalse(target_user.groups.filter(pk=self.employee_role.group.pk).exists())
-        employee = Employee.objects.get(user=target_user)
-        response = self.client.patch(reverse("accounts:employee-detail", kwargs={"pk": employee.pk}), {"group_ids": []}, format="json")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        target_user.refresh_from_db()
-        self.assertFalse(target_user.groups.filter(pk=self.secondary_role.group.pk).exists())
-        self.assertEqual(response.data["groups"], [])
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("group_ids", response.data)
+
 
     def test_create_employee_rejects_equal_or_higher_group_role(self):
         target_user = self.create_target_user(suffix="elevated")
@@ -228,7 +219,7 @@ class EmployeeOrganizationAPITests(TestCase):
                 "manager": self.actor.pk,
                 "work_site": self.branch.pk,
                 "department": self.branch_department.pk,
-                "group_ids": [self.admin_role.group.pk],
+                "role_id": self.admin_role.group.pk,
             },
             format="json",
         )
