@@ -4,13 +4,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: \${DB_NAME:-erp_api}
-      POSTGRES_USER: \${DB_USER:-erp_api}
-      POSTGRES_PASSWORD: \${DB_PASSWORD:?DB_PASSWORD must be set}
+      POSTGRES_DB: ${DB_NAME:-erp_api}
+      POSTGRES_USER: ${DB_USER:-erp_api}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $\${POSTGRES_USER} -d $\${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,12 +32,12 @@ services:
       target: web
     restart: "no"
     env_file:
-      - \${ENV_FILE:-.env}
+      - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: \${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
-      DB_NAME: \${DB_NAME:-erp_api}
-      DB_USER: \${DB_USER:-erp_api}
-      DB_PASSWORD: \${DB_PASSWORD:?DB_PASSWORD must be set}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DB_NAME: ${DB_NAME:-erp_api}
+      DB_USER: ${DB_USER:-erp_api}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_HOST: db
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
@@ -55,17 +55,17 @@ services:
       target: web
     restart: unless-stopped
     env_file:
-      - \${ENV_FILE:-.env}
+      - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: \${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
-      DB_NAME: \${DB_NAME:-erp_api}
-      DB_USER: \${DB_USER:-erp_api}
-      DB_PASSWORD: \${DB_PASSWORD:?DB_PASSWORD must be set}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DB_NAME: ${DB_NAME:-erp_api}
+      DB_USER: ${DB_USER:-erp_api}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_HOST: db
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
-      WEB_CONCURRENCY: \${WEB_CONCURRENCY:-4}
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-4}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -94,21 +94,21 @@ services:
       target: worker
     restart: unless-stopped
     env_file:
-      - \${ENV_FILE:-.env}
+      - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: \${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
-      DB_NAME: \${DB_NAME:-erp_api}
-      DB_USER: \${DB_USER:-erp_api}
-      DB_PASSWORD: \${DB_PASSWORD:?DB_PASSWORD must be set}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DB_NAME: ${DB_NAME:-erp_api}
+      DB_USER: ${DB_USER:-erp_api}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_HOST: db
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
-      FIREBASE_ENABLED: \${FIREBASE_ENABLED:-false}
-      FIREBASE_PROJECT_ID: \${FIREBASE_PROJECT_ID:-}
-      FIREBASE_CREDENTIALS_FILE: \${FIREBASE_CREDENTIALS_FILE:-}
-      GOOGLE_APPLICATION_CREDENTIALS: \${GOOGLE_APPLICATION_CREDENTIALS:-}
-      FCM_ANDROID_CHANNEL_ID: \${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -123,21 +123,21 @@ services:
       target: worker
     restart: unless-stopped
     env_file:
-      - \${ENV_FILE:-.env}
+      - ${ENV_FILE:-.env}
     environment:
-      DJANGO_SETTINGS_MODULE: \${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
-      DB_NAME: \${DB_NAME:-erp_api}
-      DB_USER: \${DB_USER:-erp_api}
-      DB_PASSWORD: \${DB_PASSWORD:?DB_PASSWORD must be set}
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-core.settings.settings_dev}
+      DB_NAME: ${DB_NAME:-erp_api}
+      DB_USER: ${DB_USER:-erp_api}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set}
       DB_HOST: db
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
-      FIREBASE_ENABLED: \${FIREBASE_ENABLED:-false}
-      FIREBASE_PROJECT_ID: \${FIREBASE_PROJECT_ID:-}
-      FIREBASE_CREDENTIALS_FILE: \${FIREBASE_CREDENTIALS_FILE:-}
-      GOOGLE_APPLICATION_CREDENTIALS: \${GOOGLE_APPLICATION_CREDENTIALS:-}
-      FCM_ANDROID_CHANNEL_ID: \${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
     depends_on:
       migrate:
         condition: service_completed_successfully
