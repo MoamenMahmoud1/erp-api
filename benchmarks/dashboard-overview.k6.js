@@ -4,6 +4,10 @@ import { check, fail } from 'k6';
 const BASE_URL = __ENV.BASE_URL || 'http://127.0.0.1:8080';
 const IDENTIFIER = __ENV.ERP_USERNAME;
 const PASSWORD = __ENV.ERP_PASSWORD;
+const TOKEN_POOL = (__ENV.JWT_TOKENS || '')
+  .split(',')
+  .map((token) => token.trim())
+  .filter(Boolean);
 
 export const options = {
   discardResponseBodies: true,
@@ -70,20 +74,27 @@ function login() {
 }
 
 export function setup() {
-  if (!IDENTIFIER || !PASSWORD) {
-    fail('Set ERP_USERNAME and ERP_PASSWORD.');
+  if (TOKEN_POOL.length === 0 && (!IDENTIFIER || !PASSWORD)) {
+    fail('Set ERP_USERNAME and ERP_PASSWORD, or provide JWT_TOKENS.');
   }
 
-  return { accessToken: login() };
+  return {
+    accessToken: TOKEN_POOL.length > 0 ? null : login(),
+  };
 }
 
 export default function (data) {
+  const accessToken =
+    TOKEN_POOL.length > 0
+      ? TOKEN_POOL[(__VU - 1) % TOKEN_POOL.length]
+      : data.accessToken;
+
   const response = http.get(
     `${BASE_URL}/api/v1/accounting/analytics/overview/`,
     {
       headers: {
         Accept: 'application/json',
-        Authorization: `Bearer ${data.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
       tags: { endpoint: 'dashboard_overview' },
     },
