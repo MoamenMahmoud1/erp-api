@@ -197,6 +197,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "notifications.tasks.rebuild_recent_approval_notifications",
         "schedule": crontab(minute="*/1"),
     },
+    "purge-idempotency-keys": {
+        "task": "payments.tasks.purge_idempotency_keys",
+        "schedule": crontab(hour=3, minute=15),
+    },
 }
 
 SPECTACULAR_SETTINGS = {
