@@ -4,7 +4,20 @@ DEBUG = True
 SECRET_KEY = config("SECRET_KEY", default="dev-local-secret-key-not-for-production")
 SIMPLE_JWT["SIGNING_KEY"] = config("JWT_SIGNING_KEY", default="dev-local-jwt-key-not-for-production")
 ENABLE_API_DOCS = True
-ALLOWED_HOSTS = ["*"]
+def _hosts_from_env(name):
+    value = config(name, default="")
+    return [host.strip() for host in value.split(",") if host.strip()]
+
+
+DEV_ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+]
+
+ALLOWED_HOSTS = list(dict.fromkeys([
+    *DEV_ALLOWED_HOSTS,
+    *_hosts_from_env("ALLOWED_HOSTS"),
+]))
 AUTH_COOKIE_SECURE = False
 
 # The React/Vite development server runs on port 5173.
