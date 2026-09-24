@@ -270,7 +270,7 @@ class Command(BaseCommand):
         draft_purchase = Purchase.objects.create(supplier=suppliers["delta_foods"], created_by=actor_for_demo, reference="PO-DRAFT-2026-0910")
         PurchaseItem.objects.create(purchase=draft_purchase, product=products["coffee"], quantity=20, unit_purchase_price=Decimal("122.00"))
 
-        draft_invoice = Invoice.objects.create(customer=customers["walk_in"], created_by=users["sales_2"], status=Invoice.Status.DRAFT)
+        draft_invoice = Invoice.objects.create(\n            customer=customers["walk_in"],\n            site=branch,\n            created_by=users["sales_2"],\n            status=Invoice.Status.DRAFT,\n        )
         InvoiceItem.objects.create(invoice=draft_invoice, product=products["coffee"], quantity=4, unit_price=products["coffee"].selling_price, cost_price=products["coffee"].purchase_price)
 
         self.stdout.write(self.style.SUCCESS("Realistic ERP demo data created successfully."))
@@ -317,7 +317,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _create_invoice(*, customer, actor, created_by, when, items, coupon=None, discount=Decimal("0")):
-        invoice = Invoice.objects.create(customer=customer, created_by=created_by, coupon=coupon, coupon_discount=discount)
+        invoice = Invoice.objects.create(\n            customer=customer,\n            site=getattr(getattr(created_by, "employee", None), "work_site", None),\n            created_by=created_by,\n            coupon=coupon,\n            coupon_discount=discount,\n        )
         for product, quantity in items:
             InvoiceItem.objects.create(invoice=invoice, product=product, quantity=quantity, unit_price=product.selling_price, cost_price=product.purchase_price)
         Invoice.objects.filter(pk=invoice.pk).update(created_at=when)
