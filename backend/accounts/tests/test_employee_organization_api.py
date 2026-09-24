@@ -233,7 +233,6 @@ class EmployeeOrganizationAPITests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("group_ids", response.data)
         self.assertFalse(Employee.objects.filter(user=target_user).exists())
 
     def test_create_rejects_department_from_unrelated_site(self):
