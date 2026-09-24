@@ -31,6 +31,8 @@ class Purchase(models.Model):
             models.Index(fields=("supplier", "created_at"), name="purchase_supplier_created_idx"),
             models.Index(fields=("site", "created_at"), name="purchase_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="purchase_shift_created_idx"),
+            models.Index(fields=("created_at", "id"), name="purchase_created_id_idx"),
+            models.Index(fields=("status", "created_at"), name="purchase_status_created_idx"),
         ]
         permissions = [
             ("confirm_purchase", "Can confirm purchase"),
