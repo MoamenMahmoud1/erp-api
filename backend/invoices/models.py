@@ -25,7 +25,7 @@ class Invoice(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_invoices")
     coupon = models.ForeignKey("coupons.Coupon", null=True, blank=True, on_delete=models.PROTECT)
     coupon_discount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0"))
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT, db_index=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     objects = InvoiceQuerySet.as_manager()
