@@ -12,7 +12,7 @@ celery[redis]==5.6.2
 firebase-admin==7.5.0
 
 # Database
-psycopg[binary,pool]==3.3.4
+psycopg[binary,pool]==3.3.6
 
 # API / application services
 django-cors-headers==4.9.0
