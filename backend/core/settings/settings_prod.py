@@ -100,12 +100,17 @@ TRUST_PROXY_HEADERS = config("TRUST_PROXY_HEADERS", default=False, cast=bool)
 USE_X_FORWARDED_HOST = TRUST_PROXY_HEADERS
 if TRUST_PROXY_HEADERS:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-TRUSTED_PROXY_IPS = config(
-    "TRUSTED_PROXY_IPS",
-    default="",
-    cast=lambda value: tuple(
-        item.strip() for item in value.split(",") if item.strip()
-    ),
+TRUSTED_PROXY_IPS = tuple(
+    dict.fromkeys(
+        (
+            "127.0.0.1",
+            *(
+                item.strip()
+                for item in config("TRUSTED_PROXY_IPS", default="").split(",")
+                if item.strip()
+            ),
+        )
+    )
 )
 
 # Email SMTP from ENV
