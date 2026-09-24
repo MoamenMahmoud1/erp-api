@@ -5,6 +5,7 @@ from django.test import TransactionTestCase
 
 from auditlog.models import AuditEvent
 from accounting.models import JournalEntry
+from accounts.models import Employee
 from common.exceptions import InsufficientStock, InvalidBusinessOperation, InvalidStateTransition
 from inventory.models import StockBalance, StockLocation, StockMovement
 from invoices.models import Invoice, InvoiceItem
@@ -46,6 +47,7 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
             email="invoice-approver@example.com",
             password="StrongPass123!",
         )
+        Employee.objects.create(user=approver, work_site=self.site)
 
         ConfirmInvoice()(invoice.pk, actor=approver)
 
