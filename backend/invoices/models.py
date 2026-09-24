@@ -70,7 +70,10 @@ class Invoice(models.Model):
     @property
     def paid_amount(self):
         from common.money import quantize_money
-        return quantize_money(sum((item.total_amount for item in self.payment_allocations.all()), Decimal("0")))
+        allocations = self.payment_allocations.select_related("transaction").all()
+        return quantize_money(
+            sum((item.effective_total_amount for item in allocations), Decimal("0"))
+        )
 
     @property
     def refunded_amount(self):
