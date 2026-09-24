@@ -1,6 +1,6 @@
 # ERP API
 
-Production-oriented ERP platform with a Django/DRF backend and a React/TypeScript web client. The complementary Flutter mobile client lives in [`sales_erp`](https://github.com/MoamenMahmoud1/sales_erp).
+ERP platform with a Django/DRF backend and a React/TypeScript web client. The complementary Flutter mobile client lives in [`sales_erp`](https://github.com/MoamenMahmoud1/sales_erp).
 
 ## Repository structure
 
@@ -16,13 +16,13 @@ erp-api/
 └── LICENSE
 ```
 
-The repository is intentionally split at the service boundary: backend code does not depend on the frontend source tree, the frontend does not contain Django code, and project-level container orchestration lives under `infra/`.
+The repository is split at the service boundary. Container orchestration lives under `infra/`.
 
 ## Backend
 
 Built with **Django 6**, **Django REST Framework**, **PostgreSQL**, **Redis**, **Celery**, and **Gunicorn**.
 
-The backend is a modular monolith. Domain apps own their models, querysets, API layer, permissions, services and tests. Transactional financial and inventory operations use database transactions and row-level locking.
+The backend is a modular monolith. Domain apps own their models, querysets, API layer, permissions, services and tests. Financial and inventory operations use database transactions and row-level locking.
 
 Core capabilities include organization and role-based access control, customer assignment and employee shifts, invoices and returns, purchases, inventory movements and stock transfers, payments/refunds, accounting journals and reports, product intelligence, notifications, and idempotent critical writes.
 
@@ -59,7 +59,7 @@ python manage.py migrate --run-syncdb
 python manage.py runserver
 ```
 
-Project migration files are intentionally not committed. Development and test settings therefore use Django's migrationless/syncdb path to build the current schema from model state.
+Development and test settings use the same migration history as production.
 
 ## Tests
 
@@ -83,7 +83,7 @@ Historical phase and implementation notes are kept under `docs/history/` and are
 
 ## Quality and security
 
-The repository uses GitHub Actions, Django system/deploy checks, domain-focused tests, Docker multi-stage builds, PostgreSQL and Redis-backed services, Gunicorn WSGI deployment, and OpenAPI generation with drf-spectacular.
+The repository uses GitHub Actions, Django checks, domain-focused tests, Docker builds, PostgreSQL, Redis, Gunicorn, and OpenAPI generation with drf-spectacular.
 
 Ruff remains available as an optional local development tool; it is not part of the GitHub CI pipeline.
 

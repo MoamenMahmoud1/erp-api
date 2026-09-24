@@ -1,34 +1,7 @@
-"""Core accounting journal services.
+"""Accounting journal services.
 
-Responsibilities:
-    - Validate double-entry journal lines.
-    - Create and post journal entries.
-    - Read the general ledger and trial balance.
-
-Architecture::
-
-    Business event
-        |
-        v
-    automation.py
-        |
-        v
-    journal.py
-        |
-        +--> JournalEntry
-        |       |
-        |       +--> JournalLine --> Account
-        |       +--> JournalLine --> Account
-        |
-        +--> General Ledger / Trial Balance
-
-Write flow: validate -> create (DRAFT) -> post (POSTED)
-Read flow: POSTED lines -> ledger/reporting
-
-Invariant: Total Debit == Total Credit
-
-Business-specific mappings (sales, purchases, payments, returns) belong in
-``automation.py`` and are intentionally kept out of this module.
+Business events create balanced journal entries, which are posted before
+they are included in ledger and report queries.
 """
 
 from decimal import Decimal
@@ -48,11 +21,7 @@ class JournalEntryError(InvalidBusinessOperation):
 
 
 def get_default_company():
-    """Return the company used as the default accounting context.
-
-    Raises:
-        JournalEntryError: If no default company exists.
-    """
+    """Return the configured company."""
     try:
         return Company.objects.get(singleton_marker=True)
     except Company.DoesNotExist as exc:
@@ -118,11 +87,7 @@ def create_journal_entry(
     lines,
     company=None,
 ):
-    """Create a validated journal entry in ``DRAFT`` state.
-
-    The company is locked while allocating the next journal number. Entries
-    cannot be created inside a closed accounting period.
-    """
+    """Create a validated draft journal entry."""
     company = company or get_default_company()
     company = Company.objects.select_for_update().get(pk=company.pk)
 
@@ -165,11 +130,7 @@ def create_journal_entry(
 
 @transaction.atomic
 def post_journal_entry(*, entry_id, actor_id, company=None):
-    """Move a valid journal entry from ``DRAFT`` to ``POSTED``.
-
-    The entry is locked during the transition and validated again immediately
-    before posting. Posted entries are the source for ledger and statements.
-    """
+    """Post a draft journal entry after validating it again."""
     entry = (
         JournalEntry.objects.select_for_update()
         .select_related("company")

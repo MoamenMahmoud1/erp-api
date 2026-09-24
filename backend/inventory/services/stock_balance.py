@@ -81,9 +81,6 @@ class StockBalanceService:
         if quantity <= 0:
             raise ValueError("Quantity must be greater than zero.")
 
-        # Keep the same lock order as decrease(): aggregate first, then batch.
-        # Otherwise two concurrent operations can lock the two rows in opposite
-        # order and deadlock.
         aggregate = (
             StockBalance.objects
             .select_for_update()

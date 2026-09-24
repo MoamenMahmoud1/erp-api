@@ -53,7 +53,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=("get",), url_path="options")
     def options(self, request):
-        """Return assignable users for the employee form without trusting client-supplied IDs."""
+        """Return users that can be assigned to an employee."""
         users = User.objects.filter(
             is_active=True,
             employee__isnull=True,
@@ -93,7 +93,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=("get",), url_path="groups")
     def groups(self, request):
         """Legacy alias: every Django Group is a Role now."""
-        groups = Group.objects.select_related("role_profile").order_by("name", "pk")
+        groups = Group.objects.filter(role_profile__isnull=False).select_related("role_profile").order_by("name", "pk")
         if not request.user.is_superuser:
             groups = groups.annotate(
                 _role_level=Coalesce("role_profile__level", Value(0), output_field=IntegerField())
@@ -125,7 +125,7 @@ class RoleViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = ("name", "role_profile__name", "role_profile__description")
 
     def get_queryset(self):
-        groups = Group.objects.select_related("role_profile")
+        groups = Group.objects.filter(role_profile__isnull=False).select_related("role_profile")
         if not self.request.user.is_superuser:
             groups = groups.annotate(
                 _role_level=Coalesce("role_profile__level", Value(0), output_field=IntegerField())
