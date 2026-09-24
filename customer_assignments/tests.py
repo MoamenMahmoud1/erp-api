@@ -24,6 +24,7 @@ class AssignedCustomerApiTests(TestCase):
         user = User.objects.create_user(
             username="assigned-customer-rep",
             password="StrongPass123!",
+            email="assigned-customer-rep@example.com",
             is_staff=True,
         )
         user.groups.add(group)
