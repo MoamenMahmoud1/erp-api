@@ -10,7 +10,13 @@ from invoices.models import Invoice
 from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer, RefundInputSerializer
 from payments.models import PaymentTransaction
 from payments.permissions import CollectionPermission, RefundPermission, TransactionReadPermission
-from payments.services import NoConfirmableInvoicesError, OverpaymentError, process_idempotent, refund_payment
+from payments.services import (
+    NoConfirmableInvoicesError,
+    OverpaymentError,
+    approve_bank_transfer,
+    process_idempotent,
+    refund_payment,
+)
 
 
 class CollectionView(generics.GenericAPIView):
@@ -82,6 +88,28 @@ class RefundView(generics.GenericAPIView):
             return Response({"detail": str(exc), "code": "refund_invalid"}, status=400)
         log_operation("payment.refund", user=request.user.pk, invoice=invoice.pk)
         return Response({"invoice": invoice.pk, "paid_amount": invoice.paid_amount, "outstanding_amount": invoice.outstanding_amount})
+
+
+class TransferApprovalView(generics.GenericAPIView):
+    permission_classes = (CollectionPermission,)
+    throttle_classes = (SensitiveActionThrottle,)
+
+    def post(self, request, pk, *args, **kwargs):
+        try:
+            payment = approve_bank_transfer(
+                transaction_id=pk,
+                actor_id=request.user.pk,
+                actor=request.user,
+            )
+        except (InvalidBusinessOperation, InvalidMoney) as exc:
+            return Response(
+                {"detail": str(exc), "code": "transfer_approval_invalid"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            PaymentTransactionSerializer(payment).data,
+            status=status.HTTP_200_OK,
+        )
 
 
 class TransactionListView(generics.ListAPIView):
