@@ -29,6 +29,8 @@ class PaymentTransaction(models.Model):
             models.Index(fields=("customer", "created_at"), name="pay_tx_cust_created_idx"),
             models.Index(fields=("site", "created_at"), name="pay_tx_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="pay_tx_shift_created_idx"),
+            models.Index(fields=("collected_by", "created_at"), name="pay_tx_collector_created_idx"),
+            models.Index(fields=("created_at", "id"), name="pay_tx_created_id_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="payment_tx_cash_non_negative"),
@@ -104,13 +106,12 @@ class PaymentAllocation(models.Model):
 
     @property
     def effective_total_amount(self) -> Decimal:
+        approved = getattr(self, "_transfer_approved", None)
+        if approved is None:
+            approved = self.transaction.transfer_accepted
         return quantize_money(
             self.cash_amount
-            + (
-                self.transfer_amount
-                if self.transaction.transfer_accepted
-                else Decimal("0.00")
-            )
+            + (self.transfer_amount if approved else Decimal("0.00"))
         )
 
     @property
