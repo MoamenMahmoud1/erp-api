@@ -129,7 +129,7 @@ jobs:
         working-directory: backend
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 2
       matrix:
         include:
           - suite: authentication
