@@ -162,14 +162,14 @@ export function PaymentDetailsPage() {
 
 const linkButton = (to: string, labelText: string, icon: React.ReactNode) => <Button component={Link} to={to} leftSection={icon} radius="lg">{labelText}</Button>;
 
-export function SalesPage() {
+export function SalesPage({ user }: { user: UserProfile }) {
   return (
     <RecordsPage
       eyebrow="COMMAND CENTER"
       title="Sales"
       subtitle="Search, review and confirm customer invoices without leaving the sales workspace."
       searchPlaceholder="Search invoices by customer, salesperson or reference…"
-      topContent={linkButton('/sales/new', 'New sale', <IconPlus size={16} />)}
+      topContent={can(user, 'invoices.add_invoice') ? linkButton('/sales/new', 'New sale', <IconPlus size={16} />) : null}
       list={api.invoices.list}
       details={{ load: api.invoices.get, render: invoiceDetails }}
       columns={[
@@ -183,21 +183,21 @@ export function SalesPage() {
         { key: 'created_at', label: 'Created', format: dateTime },
       ]}
       actions={[
-        { label: 'Confirm', color: 'teal', visible: draftOnly, confirm: 'Confirm this invoice? This will post the sale and affect inventory/accounting.', run: (row) => api.invoices.confirm(Number(row.id)) },
-        { label: 'Cancel', color: 'red', visible: draftOnly, confirm: 'Cancel this draft invoice?', run: (row) => api.invoices.cancel(Number(row.id)) },
+        { label: 'Confirm', color: 'teal', visible: (row) => can(user, 'invoices.confirm_invoice') && draftOnly(row), confirm: 'Confirm this invoice? This will post the sale and affect inventory/accounting.', run: (row) => api.invoices.confirm(Number(row.id)) },
+        { label: 'Cancel', color: 'red', visible: (row) => can(user, 'invoices.cancel_invoice') && draftOnly(row), confirm: 'Cancel this draft invoice?', run: (row) => api.invoices.cancel(Number(row.id)) },
       ]}
     />
   );
 }
 
-export function PurchasesPage() {
+export function PurchasesPage({ user }: { user: UserProfile }) {
   return (
     <RecordsPage
       eyebrow="COMMAND CENTER"
       title="Purchases"
       subtitle="Track supplier purchases, receiving batches and confirmation workflow."
       searchPlaceholder="Search purchases by supplier, reference or status…"
-      topContent={linkButton('/purchases/new', 'New purchase', <IconPlus size={16} />)}
+      topContent={can(user, 'purchases.add_purchase') ? linkButton('/purchases/new', 'New purchase', <IconPlus size={16} />) : null}
       list={api.purchases.list}
       details={{ load: api.purchases.get, render: purchaseDetails }}
       columns={[
@@ -209,21 +209,21 @@ export function PurchasesPage() {
         { key: 'created_at', label: 'Created', format: dateTime },
       ]}
       actions={[
-        { label: 'Confirm', color: 'teal', visible: draftOnly, confirm: 'Confirm this purchase? It will receive stock into inventory.', run: (row) => api.purchases.confirm(Number(row.id)) },
-        { label: 'Cancel', color: 'red', visible: draftOnly, confirm: 'Cancel this draft purchase?', run: (row) => api.purchases.cancel(Number(row.id)) },
+        { label: 'Confirm', color: 'teal', visible: (row) => can(user, 'purchases.confirm_purchase') && draftOnly(row), confirm: 'Confirm this purchase? It will receive stock into inventory.', run: (row) => api.purchases.confirm(Number(row.id)) },
+        { label: 'Cancel', color: 'red', visible: (row) => can(user, 'purchases.cancel_purchase') && draftOnly(row), confirm: 'Cancel this draft purchase?', run: (row) => api.purchases.cancel(Number(row.id)) },
       ]}
     />
   );
 }
 
-export function PaymentsPage() {
+export function PaymentsPage({ user }: { user: UserProfile }) {
   return (
     <RecordsPage
       eyebrow="OPERATIONS"
       title="Payments"
       subtitle="Collections, refunds and payment transaction history."
       searchPlaceholder="Search payments by customer or reference…"
-      topContent={<Group gap="xs"><Button component={Link} to="/payments/collect" leftSection={<IconCreditCard size={16} />} radius="lg">Collect</Button><Button component={Link} to="/payments/supplier" variant="light" leftSection={<IconTruckFallback />} radius="lg">Pay supplier</Button></Group>}
+      topContent={<Group gap="xs">{can(user, 'payments.process_collection') && <Button component={Link} to="/payments/collect" leftSection={<IconCreditCard size={16} />} radius="lg">Collect</Button>}{can(user, 'purchases.process_supplier_payment') && <Button component={Link} to="/payments/supplier" variant="light" leftSection={<IconTruckFallback />} radius="lg">Pay supplier</Button>}</Group>}
       list={api.payments.transactions}
       details={{ load: async (id) => { const result = await api.payments.transactions(`?id=${id}&page_size=1`); return result.results[0] || null; }, render: paymentDetails }}
       columns={[{ key: 'id', label: '#' }, { key: 'customer_name', label: 'Customer' }, { key: 'total_amount', label: 'Amount', format: money }, { key: 'cash_amount', label: 'Cash', format: money }, { key: 'transfer_amount', label: 'Bank / transfer', format: money }, { key: 'created_at', label: 'Date', format: dateTime }]}
@@ -235,14 +235,14 @@ function IconTruckFallback() {
   return <IconPackage size={16} />;
 }
 
-export function InventoryPage() {
+export function InventoryPage({ user }: { user: UserProfile }) {
   return (
     <RecordsPage
       eyebrow="OPERATIONS"
       title="Inventory"
       subtitle="Live stock balances by product and location. Use movements and transfer for stock operations."
       searchPlaceholder="Search inventory by product or location…"
-      topContent={linkButton('/inventory/transfer', 'Transfer stock', <IconPackage size={16} />)}
+      topContent={can(user, 'inventory.transfer_stock') ? linkButton('/inventory/transfer', 'Transfer stock', <IconPackage size={16} />) : null}
       list={api.inventory.stock}
       details={{ load: async (id) => { const result = await api.inventory.stock(`?id=${id}&page_size=1`); return result.results[0] || null; } }}
       columns={[{ key: 'id', label: '#' }, { key: 'product_name', label: 'Product' }, { key: 'location_name', label: 'Location' }, { key: 'quantity', label: 'Quantity', format: (value) => Number(value || 0).toLocaleString() }, { key: 'updated_at', label: 'Updated', format: dateTime }]}
