@@ -18,13 +18,19 @@ class AccountingPeriodError(InvalidBusinessOperation):
 
 
 def assert_period_open(*, entry_date, company):
-    """Reject accounting work dated inside a closed period."""
-    if AccountingPeriod.objects.filter(
-        company=company,
-        is_closed=True,
-        start_date__lte=entry_date,
-        end_date__gte=entry_date,
-    ).exists():
+    """Reject accounting work dated inside a closed period while serializing close/post races."""
+    company = Company.objects.select_for_update().get(pk=company.pk)
+    period = (
+        AccountingPeriod.objects
+        .select_for_update()
+        .filter(
+            company=company,
+            start_date__lte=entry_date,
+            end_date__gte=entry_date,
+        )
+        .first()
+    )
+    if period is not None and period.is_closed:
         raise AccountingPeriodError(
             f"Accounting period is closed for {entry_date.isoformat()}."
         )
@@ -58,6 +64,7 @@ def create_period(*, name, start_date, end_date, company):
 @transaction.atomic
 def close_period(*, period_id, actor_id, company):
     """Close a period after ensuring no draft journals remain inside it."""
+    Company.objects.select_for_update().get(pk=company.pk)
     period = AccountingPeriod.objects.select_for_update().get(
         pk=period_id,
         company=company,
