@@ -63,6 +63,7 @@ class EmployeeShiftTests(TestCase):
         shift = start_shift(user=self.user)
         product = Product.objects.create(name="Product", purchase_price=Decimal("10"), selling_price=Decimal("20"))
         customer = Customer.objects.create(name="Customer")
+        CustomerAssignment.objects.create(customer=customer, employee=self.employee)
         from invoices.services.create import CreateInvoice
 
         invoice = CreateInvoice()(created_by=self.user, validated_data={"customer": customer, "items": [{"product": product, "quantity": 1}]})
