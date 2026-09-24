@@ -29,7 +29,7 @@ HTTP/API
   |
   +--> products/api/intelligence.py
           |
-          +--> products/services/intelligence.py
+          +--> backend/products/services/intelligence.py
 
 Dashboard
   |
@@ -86,7 +86,7 @@ Operational analytics accept a `site` filter so branch/store sales, purchases, s
 
 ## Product intelligence v1
 
-`products/services/intelligence.py` is an explainable heuristic layer, not machine learning.
+`backend/products/services/intelligence.py` is an explainable heuristic layer, not machine learning.
 
 For active products it calculates:
 
@@ -165,9 +165,9 @@ The current Beat schedule contains only the daily counter reconciliation. Heavy 
 Focused tests include:
 
 ```bash
-python manage.py test organization.tests.test_metrics
-python manage.py test core.tests.test_celery
-python manage.py test products.tests.test_intelligence
+python backend/manage.py test organization.tests.test_metrics
+python backend/manage.py test core.tests.test_celery
+python backend/manage.py test products.tests.test_intelligence
 ```
 
 The counter tests verify transactional create/delete updates and daily-style drift repair. Product-intelligence tests continue to use real Django models and database relationships. Branch-aware invoice, purchase, employee, and inventory behavior should be covered by the existing domain/API test suites before deployment.

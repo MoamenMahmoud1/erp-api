@@ -29,7 +29,7 @@ Run the backend separately:
 
 ```bash
 source ../venv/bin/activate
-python ../manage.py runserver
+python ../backend/manage.py runserver
 ```
 
 ## Checks and production build

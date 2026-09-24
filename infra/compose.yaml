@@ -33,7 +33,7 @@ services:
   # They do not build or run the Django web image.
   celery_worker:
     build:
-      context: .
+      context: ../backend
       target: worker
     restart: unless-stopped
     command: celery -A core worker -l info
@@ -59,7 +59,7 @@ services:
 
   celery_beat:
     build:
-      context: .
+      context: ../backend
       target: worker
     restart: unless-stopped
     command: celery -A core beat -l info

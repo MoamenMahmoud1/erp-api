@@ -1,3 +1,5 @@
+> **Historical document.** This file describes an earlier implementation phase and is not the current repository source of truth.
+
 # P2 accounting scope
 
 The current ERP domain is a sales, purchases, inventory, payments and core-accounting backend. P2 hardening now covers historical inventory valuation, report scaling, request telemetry, cache/dependency readiness, database recovery tooling, and background report/intelligence jobs.

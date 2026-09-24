@@ -1,3 +1,5 @@
+> **Historical document.** This file describes an earlier implementation phase and is not the current repository source of truth.
+
 # P0/P1 Business Logic Implementation
 
 The ERP API is sync-first. Native async is intentionally reserved for isolated operations that materially benefit from asynchronous I/O.

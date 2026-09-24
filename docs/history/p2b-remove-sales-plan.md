@@ -1,3 +1,5 @@
+> **Historical document.** This file describes an earlier implementation phase and is not the current repository source of truth.
+
 # Phase 2B — `sales` removed, true domain separation (COMPLETED)
 
 ## Outcome
