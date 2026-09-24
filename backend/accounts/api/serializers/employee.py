@@ -227,7 +227,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def _set_role_groups(user, group):
         user.groups.set([group] if group is not None else [])
 
-    @staticmethod
     @transaction.atomic
     def create(self, validated_data):
         role = validated_data.pop("_role_assignment", serializers.empty)
@@ -239,7 +238,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         role = validated_data.pop("_role_assignment", serializers.empty)
-        groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().update(instance, validated_data)
         if role is not serializers.empty:
             self._set_role_groups(employee.user, role)
