@@ -6,6 +6,7 @@ from common.exceptions import InsufficientStock, InvalidBusinessOperation, Inval
 from inventory.models import StockBalance, StockLocation, StockMovement
 from invoices.models import Invoice, InvoiceItem
 from invoices.services import CancelInvoice, ConfirmInvoice, CreateInvoice, InvoiceNotFound
+from payments.models import PaymentAllocation, PaymentTransaction
 from .helpers import InvoiceTestMixin
 
 
@@ -93,7 +94,6 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
 
     def test_cancel_rejects_partial_payment(self):
         invoice = self.create_invoice(status=Invoice.Status.CONFIRMED)
-        from payments.models import PaymentAllocation, PaymentTransaction
         tx = PaymentTransaction.objects.create(
             customer=self.customer,
             collected_by=self.user,
