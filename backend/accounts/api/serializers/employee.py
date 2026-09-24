@@ -125,14 +125,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
     groups = GroupSummarySerializer(source="user.groups", many=True, read_only=True)
     role_id = serializers.PrimaryKeyRelatedField(
         source="_role_assignment",
-        queryset=Group.objects.all().select_related("role_profile"),
+        queryset=Group.objects.filter(role_profile__isnull=False).select_related("role_profile"),
         allow_null=True,
-        required=False,
-        write_only=True,
-    )
-    group_ids = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=Group.objects.all(),
         required=False,
         write_only=True,
     )
@@ -193,9 +187,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         requested_role = attrs.get("_role_assignment", serializers.empty)
         requested_groups = attrs.get("group_ids", serializers.empty)
 
-        if requested_role is not serializers.empty and requested_groups is not serializers.empty:
-            raise ValidationError({"role_id": "Use role_id instead of group_ids when assigning an employee role."})
-
         if actor and user and not RoleProfile.can_manage_user(actor, user):
             raise ValidationError({"user": "You cannot manage an employee with an equal or higher role."})
 
@@ -204,15 +195,8 @@ class EmployeeSerializer(serializers.ModelSerializer):
             if RoleProfile.level_for_group(requested_role) >= actor_level:
                 raise ValidationError({"role_id": "You can only assign a role below your own role level."})
 
-        if requested_groups is not serializers.empty and actor and not actor.is_superuser:
-            actor_level = RoleProfile.level_for_user(actor)
-            invalid_groups = [
-                group
-                for group in requested_groups
-                if RoleProfile.level_for_group(group) >= actor_level
-            ]
-            if invalid_groups:
-                raise ValidationError({"group_ids": "You can only assign groups whose roles are below your own role level."})
+        if isinstance(self.initial_data, dict) and "group_ids" in self.initial_data:
+            raise ValidationError({"group_ids": "Use role_id to assign an employee role."})
 
         if manager and not Employee.objects.visible_to(actor).filter(pk=manager.pk).exists():
             raise ValidationError({"manager": "You cannot assign a manager outside your visible employee tree."})
@@ -246,18 +230,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
         user.groups.set([group] if group is not None else [])
 
     @staticmethod
-    def _set_legacy_role_groups(user, groups):
-        user.groups.set(groups)
-
     @transaction.atomic
     def create(self, validated_data):
         role = validated_data.pop("_role_assignment", serializers.empty)
-        groups = validated_data.pop("group_ids", serializers.empty)
         employee = super().create(validated_data)
         if role is not serializers.empty:
             self._set_role_groups(employee.user, role)
-        elif groups is not serializers.empty:
-            self._set_legacy_role_groups(employee.user, groups)
         return employee
 
     @transaction.atomic
@@ -267,6 +245,4 @@ class EmployeeSerializer(serializers.ModelSerializer):
         employee = super().update(instance, validated_data)
         if role is not serializers.empty:
             self._set_role_groups(employee.user, role)
-        elif groups is not serializers.empty:
-            self._set_legacy_role_groups(employee.user, groups)
         return employee
