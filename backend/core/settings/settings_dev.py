@@ -82,31 +82,3 @@ CACHES = {
 TRUSTED_PROXY_IPS = ()
 
 SESSION_ENGINE = 'django.contrib.sessions.backends.db'
-
-# Project migration files are intentionally not committed. Keep local development
-# consistent with the migrationless test database and let Django's syncdb path
-# create the current schema from model state.
-PROJECT_APP_LABELS = [
-    "accounts",
-    "authsession",
-    "organization",
-    "customers",
-    "customer_assignments",
-    "products",
-    "coupons",
-    "invoices",
-    "payments",
-    "inventory",
-    "purchases",
-    "suppliers",
-    "accounting",
-    "auditlog",
-    "notifications",
-]
-MIGRATIONLESS_DEV_APPS = PROJECT_APP_LABELS + [
-    "admin",
-    "auth",
-    "contenttypes",
-    "sessions",
-]
-MIGRATION_MODULES = {label: None for label in MIGRATIONLESS_DEV_APPS}
