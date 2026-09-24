@@ -90,6 +90,8 @@ class Invoice(models.Model):
     @property
     def outstanding_amount(self):
         from common.money import quantize_money
+        if self.status == self.Status.RETURNED:
+            return Decimal("0.00")
         return max(Decimal("0.00"), quantize_money(self.total - self.net_paid_amount))
 
 
