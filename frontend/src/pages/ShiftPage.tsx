@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Group, Loader, NumberInput, Select, SimpleGrid, Stack, Text, Textarea, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { can } from '../components/PermissionGuard';
-import type { UserProfile } from '../lib/api';
-
 import { api, type EmployeeShift, type Paginated, type UserProfile } from '../lib/api';
 
 type Props = { user: UserProfile };
