@@ -22,6 +22,23 @@ class AccountSerializer(serializers.ModelSerializer):
         account_type = attrs.get("account_type", getattr(self.instance, "account_type", None))
         if parent and parent.account_type != account_type:
             raise serializers.ValidationError({"parent": "A child account must use the same account type as its parent."})
+
+        company = getattr(self.instance, "company", None)
+        if company is None:
+            company = getattr(self.context.get("request"), "accounting_company", None)
+        if parent and self.instance is not None and parent.pk == self.instance.pk:
+            raise serializers.ValidationError({"parent": "An account cannot be its own parent."})
+        if parent and company is not None and parent.company_id != company.pk:
+            raise serializers.ValidationError({"parent": "The parent account must belong to the same company."})
+
+        if parent:
+            visited = {self.instance.pk} if self.instance is not None else set()
+            current = parent
+            while current is not None:
+                if current.pk in visited:
+                    raise serializers.ValidationError({"parent": "The account hierarchy cannot contain cycles."})
+                visited.add(current.pk)
+                current = current.parent
         return attrs
 
 
