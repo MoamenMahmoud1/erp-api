@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from accounting.models import Account, AccountingPeriod, Expense, JournalEntry, JournalLine
-from accounting.services import create_journal_entry
+from accounting.services import create_journal_entry, get_default_company
 from invoices.models import InvoiceReturn
 from payments.models import PaymentRefund
 from purchases.models import PurchaseReturn
@@ -23,9 +23,7 @@ class AccountSerializer(serializers.ModelSerializer):
         if parent and parent.account_type != account_type:
             raise serializers.ValidationError({"parent": "A child account must use the same account type as its parent."})
 
-        company = getattr(self.instance, "company", None)
-        if company is None:
-            company = getattr(self.context.get("request"), "accounting_company", None)
+        company = getattr(self.instance, "company", None) or get_default_company()
         if parent and self.instance is not None and parent.pk == self.instance.pk:
             raise serializers.ValidationError({"parent": "An account cannot be its own parent."})
         if parent and company is not None and parent.company_id != company.pk:
