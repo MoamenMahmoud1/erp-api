@@ -14,6 +14,10 @@ export function InventoryLocationsPage() {
       title="Locations"
       subtitle="Sales vehicles and warehouses organized by branch or store."
       searchPlaceholder="Search locations by name, site or employee…"
+      filters={[
+        { key: 'location_type', label: 'Type', type: 'select', options: [{ value: 'MAIN_WAREHOUSE', label: 'Main warehouse' }, { value: 'SALES_VEHICLE', label: 'Sales vehicle' }] },
+        { key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+      ]}
       list={api.inventory.locations}
       columns={[
         { key: 'id', label: '#' },
@@ -35,6 +39,12 @@ export function InventoryMovementsPage() {
       title="Movements"
       subtitle="Stock transfers and movements across branches, stores and locations."
       searchPlaceholder="Search movements by reference, product, location or employee…"
+      filters={[
+        { key: 'movement_type', label: 'Movement type', type: 'select', options: [{ value: 'PURCHASE', label: 'Purchase' }, { value: 'PURCHASE_RETURN', label: 'Purchase return' }, { value: 'TRANSFER', label: 'Transfer' }, { value: 'SALE', label: 'Sale' }, { value: 'SALEABLE_RETURN', label: 'Saleable return' }, { value: 'DAMAGED_RETURN', label: 'Damaged return' }] },
+        { key: 'created_date_from', label: 'From date', type: 'date' },
+        { key: 'created_date_to', label: 'To date', type: 'date' },
+        { key: 'created_by_name', label: 'Created by', type: 'text', placeholder: 'Name or username' },
+      ]}
       list={api.inventory.movements}
       columns={[
         { key: 'id', label: '#' },
