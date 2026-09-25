@@ -83,6 +83,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   const [showWelcome, setShowWelcome] = useState(() => (
     typeof window !== 'undefined' && window.sessionStorage.getItem('erp-show-welcome') === '1'
   ));
+  const [closingWelcome, setClosingWelcome] = useState(false);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -258,8 +259,13 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   }).format(new Date());
 
   function dismissWelcome() {
+    if (closingWelcome) return;
     if (typeof window !== 'undefined') window.sessionStorage.removeItem('erp-show-welcome');
-    setShowWelcome(false);
+    setClosingWelcome(true);
+    window.setTimeout(() => {
+      setShowWelcome(false);
+      setClosingWelcome(false);
+    }, 320);
   }
 
   return (
@@ -427,7 +433,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
         <AppShell.Main className="page-enter">
           {showWelcome && (
-            <section className="welcome-panel" aria-label="Welcome to ERP Workspace">
+            <section className={`welcome-panel${closingWelcome ? ' is-closing' : ''}`} aria-label="Welcome to ERP Workspace">
               <div className="welcome-copy">
                 <div className="welcome-kicker">
                   <span className="welcome-status-dot" aria-hidden="true" />
@@ -435,7 +441,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                 </div>
                 <Text className="welcome-title" fw={850}>{greeting}, {firstName}.</Text>
                 <Text className="welcome-subtitle">
-                  Your operational desk is ready. Review the numbers, control the movement of stock, and keep every transaction traceable.
+                  Your workspace is ready. Review the numbers, control stock, and keep every transaction traceable.
                 </Text>
                 <Group className="welcome-meta" gap="xs" wrap="wrap">
                   <span>{roleLabel}</span>
