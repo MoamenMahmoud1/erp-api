@@ -1,0 +1,1 @@
+ADMIN_AUTH_SESSION_SESSION_KEY = "_erp_admin_auth_session_id"
