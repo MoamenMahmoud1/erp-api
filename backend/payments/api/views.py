@@ -1,11 +1,12 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, status
+from rest_framework import filters, generics, status
 from rest_framework.response import Response
 
 from authentication.throttling import SensitiveActionThrottle
 from common.exceptions import InvalidBusinessOperation, InvalidMoney
 from common.pagination import StandardPagination
 from common.observability import log_operation
+from payments.api.filters import PaymentTransactionFilter
 from invoices.models import Invoice
 from payments.api.serializers import CollectionSerializer, PaymentTransactionSerializer, RefundInputSerializer
 from payments.models import PaymentTransaction
@@ -116,8 +117,17 @@ class TransactionListView(generics.ListAPIView):
     serializer_class = PaymentTransactionSerializer
     pagination_class = StandardPagination
     permission_classes = (TransactionReadPermission,)
-    filter_backends = (DjangoFilterBackend,)
-    filterset_fields = ("id", "customer", "collected_by")
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_class = PaymentTransactionFilter
+    search_fields = (
+        "customer__name",
+        "collected_by__username",
+        "collected_by__email",
+        "collected_by__first_name",
+        "collected_by__last_name",
+    )
+    ordering_fields = ("created_at", "cash_amount", "transfer_amount")
+    ordering = ("-created_at", "-id")
 
     def get_queryset(self):
         return PaymentTransaction.objects.visible_to(self.request.user).with_payment_data().order_by("-created_at")
