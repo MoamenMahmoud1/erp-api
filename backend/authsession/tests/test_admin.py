@@ -45,6 +45,7 @@ class AuthSessionAdminTests(TestCase):
             self.model_admin.list_filter,
         )
         self.assertEqual(self.model_admin.date_hierarchy, "created_at")
+        self.assertEqual(self.model_admin.list_filter[0].parameter_name, "revoked")
         self.assertIn("user__username", self.model_admin.search_fields)
         self.assertIn("user__email", self.model_admin.search_fields)
 
