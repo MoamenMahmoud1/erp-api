@@ -95,7 +95,7 @@ class CustomUserAdmin(BaseUserAdmin):
         return True
 
     def delete_queryset(self, request, queryset):
-        super().delete_queryset(queryset.exclude(pk=request.user.pk))
+        super().delete_queryset(request, queryset.exclude(pk=request.user.pk))
 
 
 class RoleProfileInline(admin.StackedInline):
