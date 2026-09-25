@@ -26,19 +26,22 @@ class AdminAccessTests(TestCase):
             is_staff=True,
         )
 
-    def test_anonymous_cannot_reach_admin(self):
+    def test_anonymous_is_redirected_to_frontend_login(self):
         response = self.client.get("/admin/")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "http://localhost:3000/login")
 
-    def test_staff_without_superuser_cannot_reach_admin(self):
+    def test_staff_without_superuser_is_redirected_to_frontend_login(self):
         self.client.force_login(self.staff_user)
         response = self.client.get("/admin/")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "http://localhost:3000/login")
 
     def test_superuser_requires_bound_erp_session(self):
         self.client.force_login(self.superuser)
         response = self.client.get("/admin/")
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "http://localhost:3000/login")
 
     def _bind_admin_session(self, client):
         auth_session = AuthSession.objects.create(
@@ -142,7 +145,7 @@ class AdminSessionBridgeTests(TestCase):
         admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 200)
 
-    def test_revoking_bound_auth_session_closes_admin_session(self):
+    def test_revoking_bound_auth_session_redirects_to_frontend_login(self):
         auth_session = authenticate_stateful_client(self.client, user=self.superuser)
         session_response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(session_response.status_code, 200)
@@ -152,7 +155,8 @@ class AdminSessionBridgeTests(TestCase):
         AuthSession.objects.filter(pk=auth_session.pk).update(revoked_at=timezone.now())
 
         admin_response = self.admin_browser.get("/admin/")
-        self.assertEqual(admin_response.status_code, 404)
+        self.assertEqual(admin_response.status_code, 302)
+        self.assertEqual(admin_response["Location"], "http://localhost:3000/login")
 
     def test_erp_logout_clears_admin_session(self):
         authenticate_stateful_client(self.client, user=self.superuser)
@@ -164,7 +168,8 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(logout_response.status_code, 204)
 
         admin_response = self.admin_browser.get("/admin/")
-        self.assertEqual(admin_response.status_code, 404)
+        self.assertEqual(admin_response.status_code, 302)
+        self.assertEqual(admin_response["Location"], "http://localhost:3000/login")
 
 
 class AdminModelSurfaceTests(TestCase):
