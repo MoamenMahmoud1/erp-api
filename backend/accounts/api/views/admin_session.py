@@ -8,14 +8,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
 from authsession.http import NoStoreResponseMixin
+from authsession.permissions import CurrentAuthSessionPermission
 
 
 @method_decorator(csrf_protect, name="dispatch")
 class AdminSessionView(NoStoreResponseMixin, APIView):
     """Bridge the authenticated ERP session into a Django Admin session."""
 
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticated, CurrentAuthSessionPermission)
 
     def post(self, request, *args, **kwargs):
         if not request.user.is_superuser:
@@ -35,6 +37,9 @@ class AdminSessionView(NoStoreResponseMixin, APIView):
             request,
             user,
             backend="django.contrib.auth.backends.ModelBackend",
+        )
+        request.session[ADMIN_AUTH_SESSION_SESSION_KEY] = str(
+            request.auth_session.pk
         )
 
         return Response(
