@@ -2,6 +2,7 @@ import django_filters
 from django.db.models import Exists, OuterRef, Q
 
 from accounting.models import JournalEntry
+from accounting.services import get_default_company
 from payments.models import PaymentTransaction
 
 
@@ -37,6 +38,7 @@ class PaymentTransactionFilter(django_filters.FilterSet):
     def filter_transfer_status(self, queryset, name, value):
         value = value.strip().lower()
         approval = JournalEntry.objects.filter(
+            company=get_default_company(),
             source_type="payment.transfer.approval",
             source_id=OuterRef("pk"),
             status=JournalEntry.Status.POSTED,
