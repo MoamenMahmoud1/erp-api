@@ -6,8 +6,12 @@ import uuid
 from contextvars import ContextVar
 
 from django.conf import settings
+from django.contrib.auth import logout as django_logout
 from django.http import Http404
+from django.utils import timezone
 
+from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
+from authsession.models import AuthSession
 from core.proxy import is_trusted_proxy, normalize_ip
 
 CORRELATION_HEADER = "HTTP_X_REQUEST_ID"
@@ -105,7 +109,7 @@ class TrustedProxyHeadersMiddleware:
 
 
 class AdminAccessMiddleware:
-    """Keep Django Admin completely inaccessible except to superusers."""
+    """Allow Django Admin only through an active ERP AuthSession bridge."""
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -114,5 +118,19 @@ class AdminAccessMiddleware:
         if request.path == "/admin" or request.path.startswith("/admin/"):
             user = getattr(request, "user", None)
             if not user or not user.is_authenticated or not user.is_superuser:
+                raise Http404
+
+            session_id = request.session.get(ADMIN_AUTH_SESSION_SESSION_KEY)
+            active_admin_session = False
+            if session_id:
+                active_admin_session = AuthSession.objects.filter(
+                    pk=session_id,
+                    user_id=user.pk,
+                    revoked_at__isnull=True,
+                    expires_at__gt=timezone.now(),
+                ).exists()
+
+            if not active_admin_session:
+                django_logout(request)
                 raise Http404
         return self.get_response(request)
