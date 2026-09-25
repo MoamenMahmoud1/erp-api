@@ -85,6 +85,7 @@ class AdminSessionBridgeTests(TestCase):
 class AdminModelSurfaceTests(TestCase):
     def test_frontend_managed_models_are_not_registered_in_admin(self):
         from django.contrib import admin as django_admin
+        from accounting.models.journal import JournalEntry
         from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement
         from organization.models import Department, Site
         from accounts.models import Employee
@@ -104,6 +105,7 @@ class AdminModelSurfaceTests(TestCase):
             StockBalance,
             StockBatchBalance,
             StockMovement,
+            JournalEntry,
         )
         for model in hidden_models:
             self.assertNotIn(model, django_admin.site._registry)
