@@ -27,16 +27,12 @@ class JournalEntryFilter(django_filters.FilterSet):
         value = value.strip()
         if not value:
             return queryset
-        lookup = {
-            f"{field}__username__icontains": value,
-            f"{field}__email__icontains": value,
-            f"{field}__first_name__icontains": value,
-            f"{field}__last_name__icontains": value,
-        }
-        query = Q(**lookup)
-        for key in list(lookup)[1:]:
-            query |= Q(**{key: value})
-        return queryset.filter(query)
+        return queryset.filter(
+            Q(**{f"{field}__username__icontains": value})
+            | Q(**{f"{field}__email__icontains": value})
+            | Q(**{f"{field}__first_name__icontains": value})
+            | Q(**{f"{field}__last_name__icontains": value})
+        )
 
     def filter_created_by_name(self, queryset, name, value):
         return self._filter_user_name(queryset, value, "created_by")
