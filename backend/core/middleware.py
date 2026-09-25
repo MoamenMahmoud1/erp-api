@@ -7,7 +7,7 @@ from contextvars import ContextVar
 
 from django.conf import settings
 from django.contrib.auth import logout as django_logout
-from django.http import Http404
+from django.http import HttpResponseRedirect
 from django.utils import timezone
 
 from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
@@ -114,11 +114,15 @@ class AdminAccessMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
 
+    @staticmethod
+    def _frontend_login_url():
+        return f"{settings.FRONTEND_URL.rstrip('/')}/login"
+
     def __call__(self, request):
         if request.path == "/admin" or request.path.startswith("/admin/"):
             user = getattr(request, "user", None)
             if not user or not user.is_authenticated or not user.is_superuser:
-                raise Http404
+                return HttpResponseRedirect(self._frontend_login_url())
 
             session_id = request.session.get(ADMIN_AUTH_SESSION_SESSION_KEY)
             active_admin_session = False
@@ -132,5 +136,5 @@ class AdminAccessMiddleware:
 
             if not active_admin_session:
                 django_logout(request)
-                raise Http404
+                return HttpResponseRedirect(self._frontend_login_url())
         return self.get_response(request)
