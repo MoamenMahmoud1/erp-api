@@ -223,8 +223,6 @@ a { color: inherit; text-decoration: none; }
   min-width: 0;
   align-self: center;
   padding-right: 16px;
-}
-.welcome-copy {
   animation: welcome-copy-in 520ms cubic-bezier(.22, .61, .36, 1) 70ms both;
 }
 
