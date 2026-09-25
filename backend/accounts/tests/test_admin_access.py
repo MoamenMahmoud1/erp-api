@@ -29,19 +29,19 @@ class AdminAccessTests(TestCase):
     def test_anonymous_is_redirected_to_frontend_login(self):
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "http://localhost:3000/login")
+        self.assertEqual(response["Location"], "/login")
 
     def test_staff_without_superuser_is_redirected_to_frontend_login(self):
         self.client.force_login(self.staff_user)
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "http://localhost:3000/login")
+        self.assertEqual(response["Location"], "/login")
 
     def test_superuser_requires_bound_erp_session(self):
         self.client.force_login(self.superuser)
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response["Location"], "http://localhost:3000/login")
+        self.assertEqual(response["Location"], "/login")
 
     def _bind_admin_session(self, client):
         auth_session = AuthSession.objects.create(
@@ -156,7 +156,7 @@ class AdminSessionBridgeTests(TestCase):
 
         admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 302)
-        self.assertEqual(admin_response["Location"], "http://localhost:3000/login")
+        self.assertEqual(admin_response["Location"], "/login")
 
     def test_erp_logout_clears_admin_session(self):
         authenticate_stateful_client(self.client, user=self.superuser)
@@ -169,7 +169,7 @@ class AdminSessionBridgeTests(TestCase):
 
         admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 302)
-        self.assertEqual(admin_response["Location"], "http://localhost:3000/login")
+        self.assertEqual(admin_response["Location"], "/login")
 
 
 class AdminModelSurfaceTests(TestCase):
