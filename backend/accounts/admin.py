@@ -88,14 +88,7 @@ class CustomUserAdmin(BaseUserAdmin):
         return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
-        if not request.user.is_superuser:
-            return False
-        if obj is not None and obj.pk == request.user.pk:
-            return False
-        return True
-
-    def delete_queryset(self, request, queryset):
-        super().delete_queryset(request, queryset.exclude(pk=request.user.pk))
+        return bool(request.user and request.user.is_superuser)
 
 
 class RoleProfileInline(admin.StackedInline):
