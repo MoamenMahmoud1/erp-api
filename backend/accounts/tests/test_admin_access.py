@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.test import Client, TestCase
+from django.test import Client, RequestFactory, TestCase
 from rest_framework.test import APIClient
 
 
@@ -45,6 +45,15 @@ class AdminAccessTests(TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertFalse(get_user_model().objects.filter(pk=target.pk).exists())
+
+    def test_superuser_cannot_delete_themselves(self):
+        from django.contrib import admin as django_admin
+
+        model_admin = django_admin.site._registry[get_user_model()]
+        request = RequestFactory().get("/admin/")
+        request.user = self.superuser
+
+        self.assertFalse(model_admin.has_delete_permission(request, self.superuser))
 
 
 class AdminSessionBridgeTests(TestCase):
@@ -97,19 +106,6 @@ class AdminSessionBridgeTests(TestCase):
 
 
 class AdminModelSurfaceTests(TestCase):
-    def test_superuser_cannot_delete_themselves(self):
-        User = get_user_model()
-        admin_user = User.objects.get(pk=self._get_superuser_pk())
-        from django.contrib import admin as django_admin
-
-        model_admin = django_admin.site._registry[User]
-        request = self.client.request().wsgi_request if False else None
-        self.assertTrue(admin_user.is_superuser)
-
-    def _get_superuser_pk(self):
-        User = get_user_model()
-        return User.objects.filter(is_superuser=True).values_list("pk", flat=True).first()
-
     def test_frontend_managed_models_are_not_registered_in_admin(self):
         from django.contrib import admin as django_admin
         from accounting.models.journal import JournalEntry
@@ -143,7 +139,6 @@ class AdminModelSurfaceTests(TestCase):
         from customer_assignments.models import CustomerAssignment
         from inventory.models import StockMovementItem, StockTransferRequest
         from accounts.models import RoleProfile
-        from django.contrib.auth import get_user_model
 
         visible_models = (
             get_user_model(),
