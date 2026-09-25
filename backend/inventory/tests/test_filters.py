@@ -16,8 +16,10 @@ class StockMovementFilterTests(InventoryTestMixin, TestCase):
             source_location=self.warehouse,
             destination_location=self.vehicle,
             created_by=self.user,
-            created_at=timezone.now() - timedelta(days=2),
             reference="FILTER-REF",
+        )
+        StockMovement.objects.filter(pk=movement.pk).update(
+            created_at=timezone.now() - timedelta(days=2)
         )
         filtered = StockMovementFilter(
             {
