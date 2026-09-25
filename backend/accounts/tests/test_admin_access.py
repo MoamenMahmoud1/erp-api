@@ -5,7 +5,11 @@ from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
 from django.utils import timezone
 
+from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
 from authsession.models import AuthSession
+from authsession.services import start_auth_session
+from authsession.http import ClientContext
+from core.testing.auth import authenticate_stateful_client
 from rest_framework.test import APIClient
 
 
@@ -33,10 +37,23 @@ class AdminAccessTests(TestCase):
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 404)
 
-    def test_superuser_can_reach_admin(self):
+    def test_superuser_requires_bound_erp_session(self):
         self.client.force_login(self.superuser)
         response = self.client.get("/admin/")
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 404)
+
+    def _bind_admin_session(self, client):
+        auth_session = AuthSession.objects.create(
+            user=self.superuser,
+            device_id=uuid.uuid4(),
+            current_refresh_jti=uuid.uuid4(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+        client.force_login(self.superuser)
+        session = client.session
+        session[ADMIN_AUTH_SESSION_SESSION_KEY] = str(auth_session.pk)
+        session.save()
+        return auth_session
 
     def test_superuser_can_delete_another_user(self):
         target = get_user_model().objects.create_user(
@@ -44,7 +61,7 @@ class AdminAccessTests(TestCase):
             email="target@example.com",
             password="StrongTargetPassword123!",
         )
-        self.client.force_login(self.superuser)
+        self._bind_admin_session(self.client)
         response = self.client.post(
             f"/admin/accounts/customusermodel/{target.pk}/delete/",
             {"post": "yes"},
@@ -114,22 +131,37 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_superuser_gets_django_admin_session(self):
-        self.client.force_authenticate(user=self.superuser)
+        auth_session = authenticate_stateful_client(self.client, user=self.superuser)
         response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.data["url"].endswith("/admin/"))
 
         self.admin_browser.cookies.update(self.client.cookies)
+        self.assertEqual(
+            self.admin_browser.session.get(ADMIN_AUTH_SESSION_SESSION_KEY),
+            str(auth_session.pk),
+        )
         admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 200)
 
-    def test_erp_logout_clears_admin_session(self):
-        self.client.force_authenticate(user=self.superuser)
+    def test_revoking_bound_auth_session_closes_admin_session(self):
+        auth_session = authenticate_stateful_client(self.client, user=self.superuser)
         session_response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(session_response.status_code, 200)
         self.admin_browser.cookies.update(self.client.cookies)
 
-        self.client.force_authenticate(user=self.superuser)
+        self.assertEqual(self.admin_browser.get("/admin/").status_code, 200)
+        AuthSession.objects.filter(pk=auth_session.pk).update(revoked_at=timezone.now())
+
+        admin_response = self.admin_browser.get("/admin/")
+        self.assertEqual(admin_response.status_code, 404)
+
+    def test_erp_logout_clears_admin_session(self):
+        authenticate_stateful_client(self.client, user=self.superuser)
+        session_response = self.client.post("/api/v1/auth/admin/session/", {})
+        self.assertEqual(session_response.status_code, 200)
+        self.admin_browser.cookies.update(self.client.cookies)
+
         logout_response = self.client.post("/api/v1/auth/logout/", {})
         self.assertEqual(logout_response.status_code, 204)
 
