@@ -114,7 +114,9 @@ class AdminAccessMiddleware:
 
     @staticmethod
     def _frontend_login_url():
-        return f"{settings.FRONTEND_URL.rstrip('/')}/login"
+        # Keep the redirect on the same origin so the gateway serves the SPA
+        # entrypoint for /login consistently in local and production.
+        return "/login"
 
     def __call__(self, request):
         if request.path == "/admin" or request.path.startswith("/admin/"):
