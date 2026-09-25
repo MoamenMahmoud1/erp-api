@@ -77,6 +77,9 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => (
+    typeof window !== 'undefined' && window.sessionStorage.getItem('erp-show-welcome') === '1'
+  ));
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -136,6 +139,19 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
   const roleLabel = user.role?.name || (user.is_superuser ? 'Administrator' : 'User');
   const siteLabel = user.employee?.site?.name || 'Company-wide';
+  const firstName = user.first_name || user.username;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const dateLabel = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date());
+
+  function dismissWelcome() {
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('erp-show-welcome');
+    setShowWelcome(false);
+  }
 
   return (
     <div className="app-bg">
@@ -268,7 +284,52 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
           </div>
         )}
 
-        <AppShell.Main className="page-enter">{children}</AppShell.Main>
+        <AppShell.Main className="page-enter">
+          {showWelcome && (
+            <section className="welcome-panel" aria-label="Welcome to ERP Workspace">
+              <div className="welcome-copy">
+                <div className="welcome-kicker">
+                  <span className="welcome-status-dot" aria-hidden="true" />
+                  <Text size="xs" fw={800} tt="uppercase" lts=".11em">Workspace ready</Text>
+                </div>
+                <Text className="welcome-title" fw={850}>{greeting}, {firstName}.</Text>
+                <Text className="welcome-subtitle">
+                  Your operational desk is ready. Review the numbers, control the movement of stock, and keep every transaction traceable.
+                </Text>
+                <Group className="welcome-meta" gap="xs" wrap="wrap">
+                  <span>{roleLabel}</span>
+                  <span>{siteLabel}</span>
+                  <span>{user.current_shift ? 'Shift open' : 'No active shift'}</span>
+                  <span>{dateLabel}</span>
+                </Group>
+              </div>
+
+              <div className="welcome-visual" aria-hidden="true">
+                <div className="welcome-visual-label">
+                  <span>CONTROL VIEW</span>
+                  <strong>Operational pulse</strong>
+                </div>
+                <svg className="welcome-ledger-chart" viewBox="0 0 440 180" role="presentation">
+                  <g className="welcome-grid">
+                    <path d="M12 28H428M12 76H428M12 124H428" />
+                    <path d="M84 12V156M188 12V156M292 12V156M396 12V156" />
+                  </g>
+                  <path className="welcome-chart-line" d="M14 132 C48 126, 56 102, 88 108 S128 122, 154 92 S194 62, 222 78 S256 112, 286 72 S330 34, 360 56 S394 64, 426 28" />
+                  <path className="welcome-chart-base" d="M14 148H426" />
+                  <circle className="welcome-chart-point" cx="426" cy="28" r="5" />
+                </svg>
+                <div className="welcome-visual-footer">
+                  <span>Sales</span>
+                  <span>Inventory</span>
+                  <span>Accounting</span>
+                </div>
+              </div>
+
+              <button className="welcome-dismiss" type="button" onClick={dismissWelcome} aria-label="Dismiss welcome panel">×</button>
+            </section>
+          )}
+          {children}
+        </AppShell.Main>
       </AppShell>
     </div>
   );
