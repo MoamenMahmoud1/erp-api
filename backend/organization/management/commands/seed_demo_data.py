@@ -322,7 +322,13 @@ class Command(BaseCommand):
 
     @staticmethod
     def _create_invoice(*, customer, actor, created_by, when, items, coupon=None, discount=Decimal("0")):
-        invoice = Invoice.objects.create(\n            customer=customer,\n            site=getattr(getattr(created_by, "employee", None), "work_site", None),\n            created_by=created_by,\n            coupon=coupon,\n            coupon_discount=discount,\n        )
+        invoice = Invoice.objects.create(
+            customer=customer,
+            site=getattr(getattr(created_by, "employee", None), "work_site", None),
+            created_by=created_by,
+            coupon=coupon,
+            coupon_discount=discount,
+        )
         for product, quantity in items:
             InvoiceItem.objects.create(invoice=invoice, product=product, quantity=quantity, unit_price=product.selling_price, cost_price=product.purchase_price)
         Invoice.objects.filter(pk=invoice.pk).update(created_at=when)
