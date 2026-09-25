@@ -6,31 +6,21 @@ from authsession.cache import delete_auth_session_caches
 from authsession.models import AuthSession
 
 
-class RevokedStatusFilter(admin.SimpleListFilter):
-    title = "Session status"
+class RevokedFilter(admin.SimpleListFilter):
+    title = "Revoked"
     parameter_name = "session_status"
 
     def lookups(self, request, model_admin):
         return (
-            ("active", "Active"),
-            ("revoked", "Revoked"),
-            ("expired", "Expired"),
+            ("yes", "Yes"),
+            ("no", "No"),
         )
 
     def queryset(self, request, queryset):
-        now = timezone.now()
-        if self.value() == "active":
-            return queryset.filter(
-                revoked_at__isnull=True,
-                expires_at__gt=now,
-            )
-        if self.value() == "revoked":
+        if self.value() == "yes":
             return queryset.filter(revoked_at__isnull=False)
-        if self.value() == "expired":
-            return queryset.filter(
-                revoked_at__isnull=True,
-                expires_at__lte=now,
-            )
+        if self.value() == "no":
+            return queryset.filter(revoked_at__isnull=True)
         return queryset
 
 
@@ -48,7 +38,7 @@ class AuthSessionAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = (
-        RevokedStatusFilter,
+        RevokedFilter,
         "created_at",
         "expires_at",
     )
