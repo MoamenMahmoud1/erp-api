@@ -18,6 +18,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       await api.auth.login(identifier.trim(), password);
+      window.sessionStorage.setItem('erp-show-welcome', '1');
       navigate('/', { replace: true });
     } catch (error) {
       notifications.show({
@@ -157,7 +158,21 @@ export function LoginPage() {
             </Text>
           </div>
 
-          <div className="login-brand-footer">
+          <div className="login-ledger-visual" aria-hidden="true">
+              <div className="login-ledger-heading">
+                <span>CONTROL LEDGER</span>
+                <span>LIVE</span>
+              </div>
+              <div className="login-ledger-grid">
+                <span /><span /><span /><span />
+                <span /><span /><span /><span />
+                <span /><span /><span /><span />
+              </div>
+              <svg viewBox="0 0 420 120" className="login-ledger-line">
+                <path d="M8 94 C44 88, 62 62, 96 72 S140 90, 170 54 S212 30, 242 48 S282 78, 314 42 S360 38, 412 16" />
+              </svg>
+            </div>
+            <div className="login-brand-footer">
             <span className="login-security-icon" aria-hidden="true"><IconShieldCheck size={16} /></span>
             <div>
               <Text size="sm" fw={700}>Role-based workspace</Text>
