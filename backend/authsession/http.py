@@ -50,16 +50,59 @@ def get_client_ip(request):
     if not forwarded_chain or any(value is None for value in forwarded_chain):
         return remote_address
 
-    address_chain = [*forwarded_chain, remote_address]
-    while len(address_chain) > 1 and is_trusted_proxy(address_chain[-1]):
-        address_chain.pop()
-    return address_chain[-1]
+    # The gateway is the immediate trusted proxy. Preserve the left-most
+    # client address supplied by the trusted edge proxy instead of storing
+    # the edge/tunnel address itself.
+    return forwarded_chain[0]
+
+
+def get_browser_name(user_agent):
+    ua = user_agent.lower()
+    if "edg/" in ua:
+        return "Edge"
+    if "opr/" in ua or "opera" in ua:
+        return "Opera"
+    if "firefox/" in ua:
+        return "Firefox"
+    if "chrome/" in ua and "edg/" not in ua:
+        return "Chrome"
+    if "safari/" in ua and "chrome/" not in ua:
+        return "Safari"
+    return "Browser"
+
+
+def get_device_type(user_agent):
+    ua = user_agent.lower()
+    if "iphone" in ua:
+        return "iPhone"
+    if "ipad" in ua:
+        return "iPad"
+    if "android" in ua:
+        return "Android"
+    if "windows phone" in ua:
+        return "Windows Phone"
+    if "windows" in ua:
+        return "Windows"
+    if "macintosh" in ua or "mac os x" in ua:
+        return "macOS"
+    if "linux" in ua:
+        return "Linux"
+    return "Unknown device"
+
+
+def get_device_name(request):
+    provided_name = request.headers.get("X-Device-Name", "").strip()
+    if provided_name:
+        return provided_name[:100]
+
+    user_agent = request.headers.get("User-Agent", "")[:1000]
+    return f"{get_device_type(user_agent)} · {get_browser_name(user_agent)}"[:100]
 
 
 def get_client_context(request, *, device_id=None):
     return ClientContext(
         device_id=device_id or get_device_id(request) or uuid.uuid4(),
-        device_name=request.headers.get("X-Device-Name", "")[:100],
+        device_name=get_device_name(request),
         user_agent=request.headers.get("User-Agent", "")[:1000],
         ip_address=get_client_ip(request),
     )
