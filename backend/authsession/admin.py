@@ -3,12 +3,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from authsession.cache import delete_auth_session_caches
+from authsession.http import get_browser_name, get_device_type
 from authsession.models import AuthSession
 
 
 class RevokedFilter(admin.SimpleListFilter):
     title = "Revoked"
-    parameter_name = "session_status"
+    parameter_name = "revoked"
 
     def lookups(self, request, model_admin):
         return (
@@ -29,7 +30,7 @@ class AuthSessionAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "user",
-        "device_name",
+        "device",
         "ip_address",
         "created_at",
         "last_refreshed_at",
@@ -69,6 +70,13 @@ class AuthSessionAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin.display(description="Device", ordering="device_name")
+    def device(self, obj):
+        if obj.device_name:
+            return obj.device_name
+        user_agent = obj.user_agent or ""
+        return f"{get_device_type(user_agent)} · {get_browser_name(user_agent)}"
 
     @admin.display(description="Status", ordering="revoked_at")
     def status(self, obj):
