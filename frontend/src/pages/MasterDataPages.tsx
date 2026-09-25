@@ -120,9 +120,10 @@ export function EmployeesPage({ user }: { user: UserProfile }) {
       subtitle="Staff directory, reporting structure and organizational assignment."
       searchPlaceholder="Search by username, name or email"
       filters={[
+        { key: 'employee', label: 'Employee', type: 'text', placeholder: 'Name, username or email' },
         { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions },
         { key: 'department', label: 'Department', type: 'select', options: departmentOptions },
-        { key: 'manager', label: 'Manager', type: 'select', options: managerOptions },
+        { key: 'manager', label: 'Reports to', type: 'select', options: managerOptions },
       ]}
       list={api.employees.list}
       create={can(user, 'accounts.add_employee') ? api.employees.create : undefined}
