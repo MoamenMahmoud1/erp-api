@@ -219,8 +219,8 @@ export function PurchasesPage({ user }: { user: UserProfile }) {
       list={api.purchases.list}
       filters={[
         { key: 'status', label: 'Status', type: 'select', options: [{ value: 'DRAFT', label: 'Draft' }, { value: 'CONFIRMED', label: 'Confirmed' }, { value: 'CANCELLED', label: 'Cancelled' }] },
-        { key: 'created_at_after', label: 'From date/time', type: 'date' },
-        { key: 'created_at_before', label: 'To date/time', type: 'date' },
+        { key: 'created_date_from', label: 'From date', type: 'date' },
+        { key: 'created_date_to', label: 'To date', type: 'date' },
         { key: 'created_by_name', label: 'Created by', type: 'text', placeholder: 'Name or username' },
       ]}
       details={{ load: api.purchases.get, render: purchaseDetails }}
