@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge, Button, Group, Loader, Modal, NumberInput, Pagination, Paper, ScrollArea, Select, SimpleGrid, Stack, Table, Text, TextInput, Title } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { IconEye, IconFilter, IconRefresh, IconSearch } from '@tabler/icons-react';
@@ -93,6 +93,9 @@ export function RecordsPage({
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailData, setDetailData] = useState<Record<string, unknown> | null>(null);
   const pageSize = 20;
+  const requestVersion = useRef(0);
+  const filterKey = JSON.stringify(filterValues);
+  const previousFilterKey = useRef(filterKey);
 
   async function load(
     targetPage = page,
@@ -133,22 +136,8 @@ export function RecordsPage({
     setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
   }
 
-  async function applyFilters() {
-    if (page === 1) {
-      await load(1, search, filterValues);
-    } else {
-      setPage(1);
-    }
-  }
-
-  async function clearFilters() {
-    const cleared = Object.fromEntries(filters.map((filter) => [filter.key, '']));
-    setFilterValues(cleared);
-    if (page === 1) {
-      await load(1, search, cleared);
-    } else {
-      setPage(1);
-    }
+  function clearFilters() {
+    setFilterValues(Object.fromEntries(filters.map((filter) => [filter.key, ''])));
   }
 
   async function runAction(action: Action, row: Record<string, unknown>) {
@@ -284,7 +273,7 @@ export function RecordsPage({
             </SimpleGrid>
             <Group justify="flex-end" mt="md">
               {Object.values(filterValues).some(Boolean) && <Button variant="subtle" onClick={() => void clearFilters()}>Clear filters</Button>}
-              <Button leftSection={<IconFilter size={15} />} onClick={() => void applyFilters()}>Apply filters</Button>
+              <Text size="xs" c="dimmed">Filters update automatically.</Text>
             </Group>
           </Paper>
         )}
