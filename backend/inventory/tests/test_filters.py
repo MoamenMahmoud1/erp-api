@@ -26,7 +26,7 @@ class StockMovementFilterTests(InventoryTestMixin, TestCase):
                 "movement_type": "TRANSFER",
                 "created_date_from": (timezone.localdate() - timedelta(days=3)).isoformat(),
                 "created_date_to": (timezone.localdate() - timedelta(days=1)).isoformat(),
-                "created_by_name": "rep-user",
+                "created_by_name": "stock-user",
             },
             queryset=StockMovement.objects.all(),
         ).qs
