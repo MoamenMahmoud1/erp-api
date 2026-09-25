@@ -120,6 +120,15 @@ def send_notification_push(notification_id: int) -> int:
                     aps=messaging.Aps(sound="default"),
                 ),
             ),
+            webpush=(
+                messaging.WebpushConfig(
+                    fcm_options=messaging.WebpushFCMOptions(
+                        link=settings.FIREBASE_WEB_NOTIFICATION_LINK,
+                    ),
+                )
+                if settings.FIREBASE_WEB_NOTIFICATION_LINK.lower().startswith("https://")
+                else None
+            ),
         )
         response = messaging.send_each_for_multicast(message, app=app)
 
