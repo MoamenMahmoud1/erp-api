@@ -23,19 +23,8 @@ fetch("/api/v1/notifications/web-config/", {
     firebase.initializeApp(config.firebase);
     const messaging = firebase.messaging();
 
-    messaging.onBackgroundMessage((payload) => {
-      const title = payload?.notification?.title || "ERP notification";
-      const body = payload?.notification?.body || "";
-      const notificationData = payload?.data || {};
-
-      return self.registration.showNotification(title, {
-        body,
-        icon: "/favicon.svg",
-        badge: "/favicon.svg",
-        data: notificationData,
-        tag: notificationData.notification_id || undefined,
-      });
-    });
+    // FCM automatically displays notification payloads while the app is in
+    // the background. Do not render them again here to avoid duplicates.
   })
   .catch(() => {
     // Push delivery is best-effort. The main application still has durable
