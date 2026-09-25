@@ -79,13 +79,24 @@ export function GeneralLedgerPage() {
   const requestVersion = useRef(0);
   useEffect(() => { api.accounting.accounts('?page_size=50').then(setAccounts).catch((error) => notifications.show({ title: 'Unable to load accounts', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' })); }, []);
   async function load() {
-    if (!account) { notifications.show({ title: 'Select an account', message: 'Choose an account before loading the ledger.', color: 'yellow' }); return; }
-    if (from && to && to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
+    if (!account || (from && to && to < from)) return;
+    const request = ++requestVersion.current;
     setLoading(true);
-    try { setData(await api.accounting.generalLedger(query({ account: Number(account), from: from || undefined, to: to || undefined })) as Record<string, unknown>); }
-    catch (error) { notifications.show({ title: 'Ledger failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
-    finally { setLoading(false); }
+    try {
+      const result = await api.accounting.generalLedger(query({ account: Number(account), from: from || undefined, to: to || undefined })) as Record<string, unknown>;
+      if (request === requestVersion.current) setData(result);
+    } catch (error) {
+      if (request === requestVersion.current) notifications.show({ title: 'Ledger failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' });
+    } finally {
+      if (request === requestVersion.current) setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    if (!account || (from && to && to < from)) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [account, from, to]);
   const selected = data?.account as Record<string, unknown> | undefined;
   const lines = (data?.lines || []) as Record<string, unknown>[];
   const accountOptions = accounts.results.map((row) => ({ value: String(row.id), label: `${row.code || 'No code'} · ${row.name || 'Unnamed account'}` }));
@@ -97,13 +108,26 @@ export function TrialBalancePage() {
   const [to, setTo] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
   async function load() {
-    if (from && to && to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
+    if (from && to && to < from) return;
+    const request = ++requestVersion.current;
     setLoading(true);
-    try { setData(await api.accounting.trialBalance(query({ from: from || undefined, to: to || undefined })) as Record<string, unknown>); }
-    catch (error) { notifications.show({ title: 'Trial balance failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
-    finally { setLoading(false); }
+    try {
+      const result = await api.accounting.trialBalance(query({ from: from || undefined, to: to || undefined })) as Record<string, unknown>;
+      if (request === requestVersion.current) setData(result);
+    } catch (error) {
+      if (request === requestVersion.current) notifications.show({ title: 'Trial balance failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' });
+    } finally {
+      if (request === requestVersion.current) setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    if (from && to && to < from) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [from, to]);
   const rows = (data?.rows || []) as Record<string, unknown>[];
-  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Trial balance</Title><Text c="dimmed" mt={4}>A compact control report that verifies total debits equal total credits.</Text></div><Card className="glass" withBorder radius="lg"><Group align="flex-end"><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Button loading={loading} onClick={() => void load()}>Run report</Button></Group></Card>{data && <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL DEBIT</Text><Text size="xl" fw={900}>{money(data.total_debit)}</Text></Card><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL CREDIT</Text><Text size="xl" fw={900}>{money(data.total_credit)}</Text></Card><Card className="glass" withBorder><Badge color={data.balanced ? 'teal' : 'red'} size="lg">{data.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card></SimpleGrid>}{data && <RecordsPage searchable={false} clientPaginated eyebrow="CONTROL REPORT" title="Account totals" subtitle="Grouped posted journal activity by account." list={async () => ({ count: rows.length, next: null, previous: null, results: rows })} columns={[{ key: 'account__code', label: 'Code' }, { key: 'account__name', label: 'Account' }, { key: 'account__account_type', label: 'Type' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
+  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Trial balance</Title><Text c="dimmed" mt={4}>A compact control report that verifies total debits equal total credits.</Text></div><Card className="glass" withBorder radius="lg"><Group align="flex-end"><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Text size="xs" c="dimmed" mt={8}>Updates automatically.</Text></Group></Card>{data && <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL DEBIT</Text><Text size="xl" fw={900}>{money(data.total_debit)}</Text></Card><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL CREDIT</Text><Text size="xl" fw={900}>{money(data.total_credit)}</Text></Card><Card className="glass" withBorder><Badge color={data.balanced ? 'teal' : 'red'} size="lg">{data.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card></SimpleGrid>}{data && <RecordsPage searchable={false} clientPaginated eyebrow="CONTROL REPORT" title="Account totals" subtitle="Grouped posted journal activity by account." list={async () => ({ count: rows.length, next: null, previous: null, results: rows })} columns={[{ key: 'account__code', label: 'Code' }, { key: 'account__name', label: 'Account' }, { key: 'account__account_type', label: 'Type' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
 }
