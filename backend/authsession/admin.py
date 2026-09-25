@@ -6,7 +6,6 @@ from authsession.cache import delete_auth_session_caches
 from authsession.models import AuthSession
 
 
-@admin.register(AuthSession)
 class RevokedStatusFilter(admin.SimpleListFilter):
     title = "Session status"
     parameter_name = "session_status"
