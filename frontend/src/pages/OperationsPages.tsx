@@ -291,6 +291,7 @@ export function InventoryPage({ user }: { user: UserProfile }) {
       subtitle="Live stock balances by product and location. Use movements and transfer for stock operations."
       searchPlaceholder="Search inventory by product or location…"
       topContent={can(user, 'inventory.transfer_stock') ? linkButton('/inventory/transfer', 'Transfer stock', <IconPackage size={16} />) : null}
+      filters={[{ key: 'min_quantity', label: 'Minimum quantity', type: 'number', placeholder: 'e.g. 10' }]}
       list={api.inventory.stock}
       details={{ load: async (id) => { const result = await api.inventory.stock(`?id=${id}&page_size=1`); return result.results[0] || null; } }}
       columns={[{ key: 'id', label: '#' }, { key: 'product_name', label: 'Product' }, { key: 'location_name', label: 'Location' }, { key: 'quantity', label: 'Quantity', format: (value) => Number(value || 0).toLocaleString() }, { key: 'updated_at', label: 'Updated', format: dateTime }]}
