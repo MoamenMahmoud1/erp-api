@@ -169,8 +169,8 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         approved_again = approve_bank_transfer(
             transaction_id=tx.pk,
-            actor_id=self.user.pk,
-            actor=self.user,
+            actor_id=approver.pk,
+            actor=approver,
         )
         self.assertEqual(approved_again.pk, tx.pk)
         self.assertEqual(approved_again.transfer_status, "accepted")
@@ -217,8 +217,8 @@ class CollectionServiceTests(PaymentTestMixin, TransactionTestCase):
         with self.assertRaisesMessage(TransferApprovalError, "overpay"):
             approve_bank_transfer(
                 transaction_id=second.pk,
-                actor_id=self.user.pk,
-                actor=self.user,
+                actor_id=approver.pk,
+                actor=approver,
             )
 
         invoice.refresh_from_db()
