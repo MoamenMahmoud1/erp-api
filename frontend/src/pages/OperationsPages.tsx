@@ -183,6 +183,12 @@ export function SalesPage({ user }: { user: UserProfile }) {
       searchPlaceholder="Search invoices by customer, salesperson or reference…"
       topContent={can(user, 'invoices.add_invoice') ? linkButton('/sales/new', 'New sale', <IconPlus size={16} />) : null}
       list={api.invoices.list}
+      filters={[
+        { key: 'status', label: 'Status', type: 'select', options: [{ value: 'draft', label: 'Draft' }, { value: 'confirmed', label: 'Confirmed' }, { value: 'cancelled', label: 'Cancelled' }, { value: 'paid', label: 'Paid' }, { value: 'returned', label: 'Returned' }] },
+        { key: 'created_date_from', label: 'From date', type: 'date' },
+        { key: 'created_date_to', label: 'To date', type: 'date' },
+        { key: 'created_by_name', label: 'Salesperson', type: 'text', placeholder: 'Name or username' },
+      ]}
       details={{ load: api.invoices.get, render: invoiceDetails }}
       columns={[
         { key: 'id', label: '#' },
@@ -211,6 +217,12 @@ export function PurchasesPage({ user }: { user: UserProfile }) {
       searchPlaceholder="Search purchases by supplier, reference or status…"
       topContent={can(user, 'purchases.add_purchase') ? linkButton('/purchases/new', 'New purchase', <IconPlus size={16} />) : null}
       list={api.purchases.list}
+      filters={[
+        { key: 'status', label: 'Status', type: 'select', options: [{ value: 'DRAFT', label: 'Draft' }, { value: 'CONFIRMED', label: 'Confirmed' }, { value: 'CANCELLED', label: 'Cancelled' }] },
+        { key: 'created_at_after', label: 'From date/time', type: 'date' },
+        { key: 'created_at_before', label: 'To date/time', type: 'date' },
+        { key: 'created_by_name', label: 'Created by', type: 'text', placeholder: 'Name or username' },
+      ]}
       details={{ load: api.purchases.get, render: purchaseDetails }}
       columns={[
         { key: 'id', label: '#' },
@@ -237,6 +249,12 @@ export function PaymentsPage({ user }: { user: UserProfile }) {
       searchPlaceholder="Search payments by customer or reference…"
       topContent={<Group gap="xs">{can(user, 'payments.process_collection') && <Button component={Link} to="/payments/collect" leftSection={<IconCreditCard size={16} />} radius="lg">Collect</Button>}{can(user, 'purchases.process_supplier_payment') && <Button component={Link} to="/payments/supplier" variant="light" leftSection={<IconTruckFallback />} radius="lg">Pay supplier</Button>}</Group>}
       list={api.payments.transactions}
+      filters={[
+        { key: 'created_date_from', label: 'From date', type: 'date' },
+        { key: 'created_date_to', label: 'To date', type: 'date' },
+        { key: 'transfer_status', label: 'Transfer status', type: 'select', options: [{ value: 'pending', label: 'Pending' }, { value: 'accepted', label: 'Accepted' }, { value: 'not_applicable', label: 'No bank transfer' }] },
+        { key: 'collected_by_name', label: 'Collected by', type: 'text', placeholder: 'Name or username' },
+      ]}
       details={{ load: async (id) => { const result = await api.payments.transactions(`?id=${id}&page_size=1`); return result.results[0] || null; }, render: paymentDetails }}
       columns={[
         { key: 'id', label: '#' },
