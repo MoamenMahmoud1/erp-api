@@ -85,10 +85,33 @@ async function refreshAccessToken() {
   refreshing = true;
   refreshPromise = (async () => {
     try {
-      if (!csrfToken) await getCsrfToken();
-      const response = await fetch(`${API_BASE}/auth/refresh/`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken } });
+      // Re-issue the CSRF token before every refresh attempt so a rotated or
+      // stale client-side token cannot turn a valid refresh session into logout.
+      await getCsrfToken();
+
+      let response = await fetch(`${API_BASE}/auth/refresh/`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
+      });
+
+      // A stale CSRF secret can happen after a long-lived tab/session. Refresh
+      // it once and retry the refresh before treating the auth session as lost.
+      if (response.status === 403) {
+        csrfToken = '';
+        await getCsrfToken();
+        response = await fetch(`${API_BASE}/auth/refresh/`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
+        });
+      }
+
       const data = (await parseResponse(response)) as { access?: string } | null;
-      if (!response.ok || !data?.access) { setAccessToken(null); return false; }
+      if (!response.ok || !data?.access) {
+        setAccessToken(null);
+        return false;
+      }
       setAccessToken(data.access);
       return true;
     } catch {
