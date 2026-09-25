@@ -89,6 +89,10 @@ export function SitesPage({ user }: { user: UserProfile }) {
     <CrudPage
       title="Sites"
       subtitle="Branches, stores and other organization locations."
+      filters={[
+        { key: 'site_type', label: 'Site type', type: 'select', options: siteTypeOptions },
+        { key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+      ]}
       list={api.organization.sites}
       create={can(user, 'organization.add_site') ? api.organization.createSite : undefined}
       update={api.organization.updateSite}
@@ -126,6 +130,10 @@ export function DepartmentsPage({ user }: { user: UserProfile }) {
     <CrudPage
       title="Departments"
       subtitle="Organizational departments and reporting structure."
+      filters={[
+        { key: 'site', label: 'Site', type: 'select', options },
+        { key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+      ]}
       list={api.organization.departments}
       create={can(user, 'organization.add_department') ? api.organization.createDepartment : undefined}
       update={api.organization.updateDepartment}
