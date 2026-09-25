@@ -65,6 +65,44 @@ function NotFound() {
   );
 }
 
+function NoWorkspaceAccess() {
+  return (
+    <Center mih="60vh" p="xl">
+      <Card className="surface-panel" radius="md" withBorder p="xl" maw={560} w="100%" ta="center">
+        <Text size="xl" fw={850}>Hello Customer</Text>
+        <Text c="dimmed" mt="xs">
+          Your account is signed in, but it does not currently have permission to view any ERP workspace area.
+        </Text>
+      </Card>
+    </Center>
+  );
+}
+
+const WORKSPACE_VIEW_PERMISSIONS = [
+  'accounting.view_financial_reports',
+  'invoices.view_invoice',
+  'purchases.view_purchase',
+  'inventory.view_stockbalance',
+  'inventory.view_stocklocation',
+  'payments.view_paymenttransaction',
+  'products.view_product',
+  'customers.view_customer',
+  'suppliers.view_supplier',
+  'accounts.view_employee',
+  'coupons.view_coupon',
+  'organization.view_company',
+  'organization.view_site',
+  'organization.view_department',
+  'accounting.view_account',
+  'accounting.view_journalentry',
+  'accounting.view_expense',
+  'accounting.view_accountingperiod',
+];
+
+function hasWorkspaceAccess(user: UserProfile) {
+  return user.is_superuser || WORKSPACE_VIEW_PERMISSIONS.some((permission) => can(user, permission));
+}
+
 function defaultPath(user: UserProfile) {
   if (user.role?.requires_shift && !user.current_shift && can(user, 'accounts.start_employee_shift')) return '/shift';
   if (can(user, 'accounting.view_financial_reports')) return '/';
@@ -72,7 +110,7 @@ function defaultPath(user: UserProfile) {
   if (can(user, 'purchases.view_purchase')) return '/purchases';
   if (can(user, 'inventory.view_stockbalance')) return '/inventory';
   if (can(user, 'accounts.start_employee_shift')) return '/shift';
-  return '/login';
+  return '/no-access';
 }
 
 export function App() {
@@ -124,6 +162,7 @@ export function App() {
   if (!user && location.pathname !== '/login') return null;
   if (location.pathname === '/login') return user ? <Navigate to={defaultPath(user)} replace /> : <LoginPage />;
   if (location.pathname === '/' && !can(user!, 'accounting.view_financial_reports')) return <Navigate to={defaultPath(user!)} replace />;
+  if (location.pathname === '/no-access') return hasWorkspaceAccess(user!) ? <Navigate to={defaultPath(user!)} replace /> : <Authenticated user={user!}><NoWorkspaceAccess /></Authenticated>;
 
   const securedRoutes = [
     { path: '/', permission: 'accounting.view_financial_reports', element: <DashboardPage user={user!} /> },
