@@ -5,6 +5,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounting.api.filters import ExpenseFilter, JournalEntryFilter
 from accounting.api.serializers import (
     AccountingPeriodSerializer,
     AccountSerializer,
@@ -56,7 +57,7 @@ class JournalEntryViewSet(viewsets.ModelViewSet):
     permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filterset_fields = ("status", "entry_date", "reference", "source_type")
+    filterset_class = JournalEntryFilter
     search_fields = ("description", "reference")
     ordering_fields = ("number", "entry_date", "created_at")
     ordering = ("-entry_date", "-number")
@@ -113,7 +114,7 @@ class ExpenseViewSet(viewsets.ModelViewSet):
     permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filterset_fields = ("expense_date", "expense_account", "payment_account")
+    filterset_class = ExpenseFilter
     search_fields = ("description", "reference")
     ordering_fields = ("expense_date", "amount", "created_at")
     ordering = ("-expense_date", "-id")
