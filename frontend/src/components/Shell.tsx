@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
-import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconSettings, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconBell, IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconSettings, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
@@ -77,6 +78,8 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
   const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState('');
   const [adminLoading, setAdminLoading] = useState(false);
+  const [webPushStatus, setWebPushStatus] = useState<'checking' | 'enabled' | 'available' | 'denied' | 'unsupported'>('checking');
+  const [webPushLoading, setWebPushLoading] = useState(false);
   const [showWelcome, setShowWelcome] = useState(() => (
     typeof window !== 'undefined' && window.sessionStorage.getItem('erp-show-welcome') === '1'
   ));
@@ -117,7 +120,113 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     setOpened(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const webPush = window.erpWebPush;
+    if (!webPush) {
+      setWebPushStatus('unsupported');
+      return;
+    }
+
+    const handleRegistered = async (event: Event) => {
+      const detail = (event as CustomEvent<{ installationId?: string; firebaseAppId?: string }>).detail;
+      if (!detail?.installationId) return;
+      try {
+        await api.notifications.registerDevice({
+          installation_id: detail.installationId,
+          platform: 'web',
+          firebase_app_id: detail.firebaseAppId || '',
+        });
+        setWebPushStatus('enabled');
+      } catch {
+        // Push registration is best-effort; the core workspace remains usable.
+      }
+    };
+
+    const handleUnregistered = async (event: Event) => {
+      const detail = (event as CustomEvent<{ installationId?: string }>).detail;
+      if (!detail?.installationId) return;
+      try {
+        await api.notifications.unregisterDevice(detail.installationId);
+      } finally {
+        setWebPushStatus('available');
+      }
+    };
+
+    const handleMessage = (event: Event) => {
+      const detail = (event as CustomEvent<{ payload?: { notification?: { title?: string; body?: string } } }>).detail;
+      const notification = detail?.payload?.notification;
+      if (!notification) return;
+      notifications.show({
+        title: notification.title || 'ERP notification',
+        message: notification.body || '',
+        autoClose: 6000,
+      });
+    };
+
+    window.addEventListener('erp-webpush-registered', handleRegistered);
+    window.addEventListener('erp-webpush-unregistered', handleUnregistered);
+    window.addEventListener('erp-webpush-message', handleMessage);
+
+    webPush.ready.then(async (state) => {
+      if (state.permission === 'granted') {
+        setWebPushStatus('enabled');
+        try {
+          await webPush.sync();
+        } catch {
+          setWebPushStatus('available');
+        }
+        return;
+      }
+      setWebPushStatus(
+        state.permission === 'denied'
+          ? 'denied'
+          : state.permission === 'default'
+            ? 'available'
+            : 'unsupported',
+      );
+    });
+
+    return () => {
+      window.removeEventListener('erp-webpush-registered', handleRegistered);
+      window.removeEventListener('erp-webpush-unregistered', handleUnregistered);
+      window.removeEventListener('erp-webpush-message', handleMessage);
+    };
+  }, [user.id]);
+
+  async function enableDesktopNotifications() {
+    setWebPushLoading(true);
+    try {
+      const result = await window.erpWebPush?.enable({ requestPermission: true });
+      if (result?.status === 'enabled') {
+        setWebPushStatus('enabled');
+        notifications.show({
+          title: 'Desktop notifications enabled',
+          message: 'This browser can now receive ERP push notifications.',
+        });
+      } else if (result?.status === 'denied') {
+        setWebPushStatus('denied');
+      } else {
+        setWebPushStatus('unsupported');
+      }
+    } catch {
+      notifications.show({
+        title: 'Notifications unavailable',
+        message: 'The browser could not enable ERP push notifications.',
+      });
+    } finally {
+      setWebPushLoading(false);
+    }
+  }
+
   async function logout() {
+    try {
+      const installationId = await window.erpWebPush?.disable();
+      if (installationId) {
+        await api.notifications.unregisterDevice(installationId);
+      }
+    } catch {
+      // Continue logout even if push cleanup fails.
+    }
     try { await api.auth.logout(); } finally { navigate('/login'); }
   }
 
@@ -190,6 +299,25 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               styles={{ input: { borderRadius: 'var(--erp-radius-sm)' } }}
             />
             <Group gap="xs">
+              <Tooltip label={
+                webPushStatus === 'enabled'
+                  ? 'Desktop notifications enabled'
+                  : webPushStatus === 'denied'
+                    ? 'Notifications blocked by browser'
+                    : 'Enable desktop notifications'
+              }>
+                <ActionIcon
+                  variant={webPushStatus === 'enabled' ? 'light' : 'subtle'}
+                  radius="sm"
+                  size="lg"
+                  onClick={enableDesktopNotifications}
+                  loading={webPushLoading}
+                  disabled={webPushStatus === 'denied' || webPushStatus === 'unsupported'}
+                  aria-label="Desktop notifications"
+                >
+                  <IconBell size={18} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
                 <ActionIcon variant="subtle" radius="sm" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
@@ -226,6 +354,19 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                   )}
                   <Menu.Divider />
                   <Menu.Label>Account</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconBell size={16} />}
+                    disabled={webPushStatus === 'denied' || webPushStatus === 'unsupported' || webPushLoading}
+                    onClick={enableDesktopNotifications}
+                  >
+                    {webPushStatus === 'enabled'
+                      ? 'Desktop notifications enabled'
+                      : webPushStatus === 'denied'
+                        ? 'Notifications blocked'
+                        : webPushLoading
+                          ? 'Enabling notifications…'
+                          : 'Enable desktop notifications'}
+                  </Menu.Item>
                   <Menu.Item leftSection={<IconPower size={16} />} color="red" onClick={logout}>Sign out</Menu.Item>
                 </Menu.Dropdown>
               </Menu>
