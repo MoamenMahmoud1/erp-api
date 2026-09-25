@@ -6,7 +6,7 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 
-from .models import Employee, RoleProfile
+from .models import RoleProfile
 
 User = get_user_model()
 
