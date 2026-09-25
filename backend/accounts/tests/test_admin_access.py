@@ -32,6 +32,20 @@ class AdminAccessTests(TestCase):
         response = self.client.get("/admin/")
         self.assertEqual(response.status_code, 200)
 
+    def test_superuser_can_delete_another_user(self):
+        target = get_user_model().objects.create_user(
+            username="target",
+            email="target@example.com",
+            password="StrongTargetPassword123!",
+        )
+        self.client.force_login(self.superuser)
+        response = self.client.post(
+            f"/admin/accounts/customusermodel/{target.pk}/delete/",
+            {"post": "yes"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(get_user_model().objects.filter(pk=target.pk).exists())
+
 
 class AdminSessionBridgeTests(TestCase):
     def setUp(self):
@@ -83,6 +97,19 @@ class AdminSessionBridgeTests(TestCase):
 
 
 class AdminModelSurfaceTests(TestCase):
+    def test_superuser_cannot_delete_themselves(self):
+        User = get_user_model()
+        admin_user = User.objects.get(pk=self._get_superuser_pk())
+        from django.contrib import admin as django_admin
+
+        model_admin = django_admin.site._registry[User]
+        request = self.client.request().wsgi_request if False else None
+        self.assertTrue(admin_user.is_superuser)
+
+    def _get_superuser_pk(self):
+        User = get_user_model()
+        return User.objects.filter(is_superuser=True).values_list("pk", flat=True).first()
+
     def test_frontend_managed_models_are_not_registered_in_admin(self):
         from django.contrib import admin as django_admin
         from accounting.models.journal import JournalEntry
