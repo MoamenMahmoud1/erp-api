@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
 import { Badge, Button, Card, Group, Loader, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -99,17 +99,26 @@ export function StatementsPage() {
   const [to, setTo] = useState<string | null>(new Date().toISOString().slice(0, 10));
   const [data, setData] = useState<Record<string, Record<string, unknown>> | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
   async function load() {
     if (!from || !to) return;
     if (to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
+    const request = ++requestVersion.current;
     setLoading(true);
     try {
       const params = query({ from, to });
       const [pnl, bs, cf] = await Promise.all([api.accounting.profitAndLoss(params), api.accounting.balanceSheet(query({ as_of: to })), api.accounting.cashFlow(params)]);
-      setData({ pnl: pnl as Record<string, unknown>, bs: bs as Record<string, unknown>, cf: cf as Record<string, unknown> });
-    } catch (error) { notifications.show({ title: 'Report failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' }); }
-    finally { setLoading(false); }
+      if (request === requestVersion.current) setData({ pnl: pnl as Record<string, unknown>, bs: bs as Record<string, unknown>, cf: cf as Record<string, unknown> });
+    } catch (error) {
+      if (request === requestVersion.current) notifications.show({ title: 'Report failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' });
+    } finally {
+      if (request === requestVersion.current) setLoading(false);
+    }
   }
-  useEffect(() => { void load(); }, []);
-  return <Stack gap="xl"><Group justify="space-between" align="flex-end" wrap="wrap"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Financial statements</Title><Text c="dimmed" mt={4}>P&L, balance sheet and cash flow from posted journal activity.</Text></div><Button loading={loading} onClick={() => void load()} variant="light">Refresh statements</Button></Group><Group grow maw={700}><DatePickerInput label="From" value={from} onChange={setFrom} /><DatePickerInput label="To" value={to} onChange={setTo} /></Group>{data ? <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder radius="lg"><Text fw={800}>P&L</Text><Text size="sm" c="dimmed" mt="md">Revenue</Text><Text fw={800} size="xl">{money(data.pnl.total_revenue)}</Text><Text size="sm" c="dimmed" mt="md">Expenses</Text><Text fw={800} size="xl">{money(data.pnl.total_expenses)}</Text><Text size="sm" c="dimmed" mt="md">Net income</Text><Text fw={900} size="2xl">{money(data.pnl.net_income)}</Text></Card><Card className="glass" withBorder radius="lg"><Text fw={800}>Balance sheet</Text><Text size="sm" c="dimmed" mt="md">Assets</Text><Text fw={900} size="2xl">{money(data.bs.total_assets)}</Text><Text size="sm" c="dimmed" mt="md">Liabilities</Text><Text fw={800} size="xl">{money(data.bs.total_liabilities)}</Text><Badge mt="md" color={data.bs.balanced ? 'teal' : 'red'}>{data.bs.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card><Card className="glass" withBorder radius="lg"><Text fw={800}>Cash flow</Text><Text size="sm" c="dimmed" mt="md">Opening</Text><Text fw={800} size="xl">{money(data.cf.opening_cash)}</Text><Text size="sm" c="dimmed" mt="md">Net change</Text><Text fw={900} size="2xl">{money(data.cf.net_change)}</Text><Text size="sm" c="dimmed" mt="md">Ending</Text><Text fw={800} size="xl">{money(data.cf.ending_cash)}</Text></Card></SimpleGrid> : <Text c="dimmed">No statement data available for this range.</Text>}</Stack>;
+  useEffect(() => {
+    if (!from || !to || to < from) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [from, to]);
+  return <Stack gap="xl"><Group justify="space-between" align="flex-end" wrap="wrap"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Financial statements</Title><Text c="dimmed" mt={4}>P&L, balance sheet and cash flow from posted journal activity.</Text></div><Text size="xs" c="dimmed">Updates automatically.</Text></Group><Group grow maw={700}><DatePickerInput label="From" value={from} onChange={setFrom} /><DatePickerInput label="To" value={to} onChange={setTo} /></Group>{data ? <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder radius="lg"><Text fw={800}>P&L</Text><Text size="sm" c="dimmed" mt="md">Revenue</Text><Text fw={800} size="xl">{money(data.pnl.total_revenue)}</Text><Text size="sm" c="dimmed" mt="md">Expenses</Text><Text fw={800} size="xl">{money(data.pnl.total_expenses)}</Text><Text size="sm" c="dimmed" mt="md">Net income</Text><Text fw={900} size="2xl">{money(data.pnl.net_income)}</Text></Card><Card className="glass" withBorder radius="lg"><Text fw={800}>Balance sheet</Text><Text size="sm" c="dimmed" mt="md">Assets</Text><Text fw={900} size="2xl">{money(data.bs.total_assets)}</Text><Text size="sm" c="dimmed" mt="md">Liabilities</Text><Text fw={800} size="xl">{money(data.bs.total_liabilities)}</Text><Badge mt="md" color={data.bs.balanced ? 'teal' : 'red'}>{data.bs.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card><Card className="glass" withBorder radius="lg"><Text fw={800}>Cash flow</Text><Text size="sm" c="dimmed" mt="md">Opening</Text><Text fw={800} size="xl">{money(data.cf.opening_cash)}</Text><Text size="sm" c="dimmed" mt="md">Net change</Text><Text fw={900} size="2xl">{money(data.cf.net_change)}</Text><Text size="sm" c="dimmed" mt="md">Ending</Text><Text fw={800} size="xl">{money(data.cf.ending_cash)}</Text></Card></SimpleGrid> : <Text c="dimmed">No statement data available for this range.</Text>}</Stack>;
 }
