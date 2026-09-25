@@ -21,7 +21,7 @@ fetch("/api/v1/notifications/web-config/", {
     if (!config?.enabled) return;
 
     firebase.initializeApp(config.firebase);
-    const messaging = firebase.messaging();
+    firebase.messaging();
 
     // FCM automatically displays notification payloads while the app is in
     // the background. Do not render them again here to avoid duplicates.
