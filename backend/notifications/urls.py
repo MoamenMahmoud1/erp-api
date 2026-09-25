@@ -1,12 +1,12 @@
 from django.urls import path
 
 from .views import (
+    FirebaseWebConfigView,
     NotificationListView,
     NotificationMarkAllReadView,
     NotificationMarkReadView,
     PushDeviceRegistrationDeleteView,
     PushDeviceRegistrationView,
-    FirebaseWebConfigView,
 )
 
 app_name = "notifications"
