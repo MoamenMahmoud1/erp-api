@@ -28,7 +28,14 @@ export function ExpensesPage({ user }: { user: UserProfile }) {
 
   const expenseList = (requestQuery: string) => api.accounting.expenses(requestQuery) as Promise<Paginated>;
 
-  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList} create={can(user, 'accounting.add_expense') ? api.accounting.createExpense : undefined} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
+  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList}
+    filters={[
+      { key: 'expense_date_from', label: 'From date', type: 'date' },
+      { key: 'expense_date_to', label: 'To date', type: 'date' },
+      { key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions },
+      { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions },
+      { key: 'created_by_name', label: 'Created by', type: 'text', placeholder: 'Name or username' },
+    ]} create={can(user, 'accounting.add_expense') ? api.accounting.createExpense : undefined} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
 }
 
 export function PeriodsPage({ user }: { user: UserProfile }) {
