@@ -49,7 +49,6 @@ class AuthSessionAdmin(admin.ModelAdmin):
     )
     list_filter = (
         RevokedStatusFilter,
-        ("user", admin.RelatedOnlyFieldListFilter),
         "created_at",
         "expires_at",
     )
