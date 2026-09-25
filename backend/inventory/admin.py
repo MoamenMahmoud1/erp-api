@@ -13,7 +13,6 @@ class StockTransferRequestItemInline(admin.TabularInline):
     readonly_fields = ("product", "quantity", "invoice_item")
 
 
-
 @admin.register(StockTransferRequest)
 class StockTransferRequestAdmin(admin.ModelAdmin):
     list_display = (
@@ -34,9 +33,6 @@ class StockTransferRequestAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("created_at", "reviewed_at", "approved_by", "approved_movement", "invoice_return")
     inlines = (StockTransferRequestItemInline,)
-
-
-
 
 
 @admin.register(StockMovementItem)
