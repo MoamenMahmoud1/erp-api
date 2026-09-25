@@ -38,13 +38,15 @@ class AuthSessionAdminTests(TestCase):
             revoked_at=revoked_at,
         )
 
-    def test_admin_can_filter_sessions_by_status_user_and_date(self):
+    def test_admin_can_filter_sessions_by_status_and_date(self):
         self.assertEqual(self.model_admin.list_filter[0].__name__, "RevokedStatusFilter")
-        self.assertIn(
+        self.assertNotIn(
             ("user", admin.RelatedOnlyFieldListFilter),
             self.model_admin.list_filter,
         )
         self.assertEqual(self.model_admin.date_hierarchy, "created_at")
+        self.assertIn("user__username", self.model_admin.search_fields)
+        self.assertIn("user__email", self.model_admin.search_fields)
 
         active = self.create_session()
         revoked = self.create_session(revoked_at=timezone.now())
