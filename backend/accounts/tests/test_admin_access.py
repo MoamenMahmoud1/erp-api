@@ -80,3 +80,49 @@ class AdminSessionBridgeTests(TestCase):
 
         admin_response = self.admin_browser.get("/admin/")
         self.assertEqual(admin_response.status_code, 404)
+
+
+class AdminModelSurfaceTests(TestCase):
+    def test_frontend_managed_models_are_not_registered_in_admin(self):
+        from django.contrib import admin as django_admin
+        from inventory.models import StockBalance, StockBatchBalance, StockLocation, StockMovement
+        from organization.models import Department, Site
+        from accounts.models import Employee
+        from products.models import Product, CartonPricing
+        from customers.models import Customer
+        from suppliers.models import Supplier
+
+        hidden_models = (
+            Employee,
+            Product,
+            CartonPricing,
+            Customer,
+            Supplier,
+            Site,
+            Department,
+            StockLocation,
+            StockBalance,
+            StockBatchBalance,
+            StockMovement,
+        )
+        for model in hidden_models:
+            self.assertNotIn(model, django_admin.site._registry)
+
+    def test_internal_models_remain_available_in_admin(self):
+        from django.contrib import admin as django_admin
+        from authsession.models import AuthSession
+        from customer_assignments.models import CustomerAssignment
+        from inventory.models import StockMovementItem, StockTransferRequest
+        from accounts.models import RoleProfile
+        from django.contrib.auth import get_user_model
+
+        visible_models = (
+            get_user_model(),
+            RoleProfile,
+            AuthSession,
+            CustomerAssignment,
+            StockTransferRequest,
+            StockMovementItem,
+        )
+        for model in visible_models:
+            self.assertIn(model, django_admin.site._registry)
