@@ -1,5 +1,5 @@
-import firebase_admin
 from django.conf import settings
+import firebase_admin
 from firebase_admin import credentials, messaging
 
 from .models import Notification, NotificationDelivery, PushDevice
