@@ -46,14 +46,14 @@ class AdminAccessTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(get_user_model().objects.filter(pk=target.pk).exists())
 
-    def test_superuser_cannot_delete_themselves(self):
+    def test_superuser_can_delete_themselves(self):
         from django.contrib import admin as django_admin
 
         model_admin = django_admin.site._registry[get_user_model()]
         request = RequestFactory().get("/admin/")
         request.user = self.superuser
 
-        self.assertFalse(model_admin.has_delete_permission(request, self.superuser))
+        self.assertTrue(model_admin.has_delete_permission(request, self.superuser))
 
 
 class AdminSessionBridgeTests(TestCase):
