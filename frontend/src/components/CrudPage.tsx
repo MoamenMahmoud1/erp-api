@@ -120,15 +120,21 @@ export function CrudPage({
   }
 
   async function applyFilters() {
-    setPage(1);
-    await load(1, filterValues);
+    if (page === 1) {
+      await load(1, filterValues);
+    } else {
+      setPage(1);
+    }
   }
 
   async function clearFilters() {
     const cleared = Object.fromEntries(filters.map((filter) => [filter.key, '']));
     setFilterValues(cleared);
-    setPage(1);
-    await load(1, cleared);
+    if (page === 1) {
+      await load(1, cleared);
+    } else {
+      setPage(1);
+    }
   }
 
   function openCreate() {
