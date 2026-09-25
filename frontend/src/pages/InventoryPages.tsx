@@ -16,7 +16,6 @@ export function InventoryLocationsPage() {
       searchPlaceholder="Search locations by name, site or employee…"
       filters={[
         { key: 'location_type', label: 'Type', type: 'select', options: [{ value: 'MAIN_WAREHOUSE', label: 'Main warehouse' }, { value: 'SALES_VEHICLE', label: 'Sales vehicle' }] },
-        { key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
       ]}
       list={api.inventory.locations}
       columns={[
