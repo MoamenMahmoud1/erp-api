@@ -219,7 +219,7 @@ export function RecordsPage({
             <Button radius="md" onClick={() => void searchRecords()}>Search</Button>
             {search && <Button radius="md" variant="subtle" onClick={() => { setSearch(''); setPage(1); void load(1, '', filterValues); }}>Clear</Button>}
           </Group>
-        </Paper>
+        </Paper>}
         {filters.length > 0 && (
           <Paper p="md" radius="md" withBorder>
             <Group gap="xs" mb="sm">
