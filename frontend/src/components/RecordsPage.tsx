@@ -42,6 +42,7 @@ type Props = {
   reloadKey?: number;
   clientPaginated?: boolean;
   searchPlaceholder?: string;
+  searchable?: boolean;
 };
 
 function format(value: unknown) {
