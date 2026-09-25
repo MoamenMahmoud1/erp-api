@@ -55,6 +55,37 @@ class AdminAccessTests(TestCase):
 
         self.assertTrue(model_admin.has_delete_permission(request, self.superuser))
 
+    def test_superuser_can_delete_user_with_auth_sessions(self):
+        from authsession.models import AuthSession
+        from django.contrib import admin as django_admin
+        from django.utils import timezone
+        import uuid
+        from datetime import timedelta
+
+        target = get_user_model().objects.create_user(
+            username="cascade-target",
+            email="cascade-target@example.com",
+            password="StrongTargetPassword123!",
+        )
+        AuthSession.objects.create(
+            user=target,
+            device_id=uuid.uuid4(),
+            current_refresh_jti=uuid.uuid4(),
+            expires_at=timezone.now() + timedelta(days=30),
+        )
+
+        model_admin = django_admin.site._registry[get_user_model()]
+        request = RequestFactory().get("/admin/")
+        request.user = self.superuser
+
+        _deleted_objects, _model_count, perms_needed, protected = model_admin.get_deleted_objects(
+            get_user_model().objects.filter(pk=target.pk),
+            request,
+        )
+
+        self.assertNotIn(AuthSession._meta.verbose_name, perms_needed)
+        self.assertFalse(protected)
+
 
 class AdminSessionBridgeTests(TestCase):
     def setUp(self):
