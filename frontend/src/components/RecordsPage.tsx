@@ -120,8 +120,11 @@ export function RecordsPage({
   useEffect(() => { void load(page); }, [page, reloadKey]);
 
   async function searchRecords() {
-    setPage(1);
-    await load(1, search, filterValues);
+    if (page === 1) {
+      await load(1, search, filterValues);
+    } else {
+      setPage(1);
+    }
   }
 
   function updateFilter(key: string, value: string | null) {
@@ -129,15 +132,21 @@ export function RecordsPage({
   }
 
   async function applyFilters() {
-    setPage(1);
-    await load(1, search, filterValues);
+    if (page === 1) {
+      await load(1, search, filterValues);
+    } else {
+      setPage(1);
+    }
   }
 
   async function clearFilters() {
     const cleared = Object.fromEntries(filters.map((filter) => [filter.key, '']));
     setFilterValues(cleared);
-    setPage(1);
-    await load(1, search, cleared);
+    if (page === 1) {
+      await load(1, search, cleared);
+    } else {
+      setPage(1);
+    }
   }
 
   async function runAction(action: Action, row: Record<string, unknown>) {
