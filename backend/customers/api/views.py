@@ -17,7 +17,6 @@ class CustomerViewSet(viewsets.ModelViewSet):
     permission_classes = (ReadAuthenticatedWriteStaffPermission,)
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     search_fields = ("name", "phone", "address")
-    filterset_fields = ("is_active",)
     ordering_fields = ("name", "created_at", "updated_at")
     ordering = ("name", "pk")
 
