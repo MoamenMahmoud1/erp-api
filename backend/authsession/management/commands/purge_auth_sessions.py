@@ -1,6 +1,5 @@
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand, CommandError
+
 from authsession.services.cleanup import purge_auth_sessions
 
 
