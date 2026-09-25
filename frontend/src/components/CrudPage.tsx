@@ -125,7 +125,7 @@ export function CrudPage({
       setPage(1);
       return;
     }
-    const timer = window.setTimeout(() => { void load(1, filterValues); }, filterChanged ? 200 : 0);
+    const timer = window.setTimeout(() => { void load(filterChanged ? 1 : page, filterValues); }, filterChanged ? 200 : 0);
     return () => window.clearTimeout(timer);
   }, [page, filterKey]);
 
