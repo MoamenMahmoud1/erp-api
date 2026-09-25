@@ -11,6 +11,10 @@ export function CouponsPage({ user }: { user: UserProfile }) {
     <CrudPage
       title="Coupons"
       subtitle="Discount rules available to sales invoices."
+      filters={[
+        { key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+        { key: 'discount_type', label: 'Discount type', type: 'select', options: [{ value: 'fixed', label: 'Fixed amount' }, { value: 'percentage', label: 'Percentage' }] },
+      ]}
       list={api.coupons.list}
       create={can(user, 'coupons.add_coupon') ? api.coupons.create : undefined}
       update={api.coupons.update}
@@ -63,6 +67,7 @@ export function CartonPricingPage({ user }: { user: UserProfile }) {
     <CrudPage
       title="Carton pricing"
       subtitle="Pack sizes and carton prices for the product catalog."
+      filters={[{ key: 'product', label: 'Product', type: 'select', options: productOptions }]}
       list={api.products.cartonPricings}
       create={can(user, 'products.add_cartonpricing') ? api.products.createCartonPricing : undefined}
       update={api.products.updateCartonPricing}
