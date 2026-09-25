@@ -1,5 +1,8 @@
 from django.contrib import admin
+from django.db import transaction
+from django.utils import timezone
 
+from authsession.cache import delete_auth_session_caches
 from authsession.models import AuthSession
 
 
@@ -14,8 +17,15 @@ class AuthSessionAdmin(admin.ModelAdmin):
         "last_refreshed_at",
         "expires_at",
         "revoked_at",
+        "status",
     )
-    list_filter = ("created_at", "expires_at", "revoked_at")
+    list_filter = (
+        ("user", admin.RelatedOnlyFieldListFilter),
+        "revoked_at",
+        "created_at",
+        "expires_at",
+    )
+    date_hierarchy = "created_at"
     search_fields = ("user__username", "user__email", "device_name", "ip_address")
     ordering = ("-created_at",)
     list_select_related = ("user",)
@@ -32,12 +42,51 @@ class AuthSessionAdmin(admin.ModelAdmin):
         "expires_at",
         "revoked_at",
     )
+    actions = ("revoke_sessions",)
 
     def has_add_permission(self, request):
         return False
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @admin.display(description="Status", ordering="revoked_at")
+    def status(self, obj):
+        if obj.revoked_at is not None:
+            return "Revoked"
+        if obj.expires_at <= timezone.now():
+            return "Expired"
+        return "Active"
+
+    @admin.action(description="Revoke selected sessions")
+    def revoke_sessions(self, request, queryset):
+        session_ids = tuple(
+            queryset.filter(revoked_at__isnull=True).values_list("pk", flat=True)
+        )
+        if not session_ids:
+            self.message_user(
+                request,
+                "No active sessions were selected.",
+                level="warning",
+            )
+            return
+
+        revoked_at = timezone.now()
+        with transaction.atomic():
+            updated = AuthSession.objects.filter(
+                pk__in=session_ids,
+                revoked_at__isnull=True,
+            ).update(revoked_at=revoked_at)
+            if updated:
+                transaction.on_commit(
+                    lambda ids=session_ids: delete_auth_session_caches(ids)
+                )
+
+        self.message_user(
+            request,
+            f"Revoked {updated} session(s).",
+            level="success",
+        )
