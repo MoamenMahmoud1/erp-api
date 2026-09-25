@@ -202,7 +202,7 @@ export function RecordsPage({
       </Group>
 
       <Stack gap="sm">
-        <Paper className="records-toolbar" p="sm" radius="md" withBorder>
+        {searchable && <Paper className="records-toolbar" p="sm" radius="md" withBorder>
           <Group gap="sm" wrap="wrap">
             <TextInput
               className="records-search"
