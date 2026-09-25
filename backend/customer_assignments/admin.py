@@ -14,5 +14,4 @@ class CustomerAssignmentAdmin(admin.ModelAdmin):
         "employee__user__first_name",
         "employee__user__last_name",
     )
-    autocomplete_fields = ("customer",)
     list_select_related = ("customer", "employee")
