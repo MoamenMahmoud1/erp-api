@@ -102,6 +102,7 @@ export function RecordsPage({
     targetSearch = search,
     targetFilters = filterValues,
   ) {
+    const request = ++requestVersion.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(targetPage), page_size: String(clientPaginated ? 500 : pageSize) });
@@ -114,15 +115,28 @@ export function RecordsPage({
       const nextData = clientPaginated
         ? { ...result, results: result.results.slice((targetPage - 1) * pageSize, targetPage * pageSize), count: result.results.length }
         : result;
-      setData(nextData);
+      if (request === requestVersion.current) setData(nextData);
     } catch (error) {
-      notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      if (request === requestVersion.current) {
+        notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      }
     } finally {
-      setLoading(false);
+      if (request === requestVersion.current) setLoading(false);
     }
   }
 
-  useEffect(() => { void load(page); }, [page, reloadKey]);
+  useEffect(() => {
+    const filterChanged = previousFilterKey.current !== filterKey;
+    previousFilterKey.current = filterKey;
+    if (filterChanged && page !== 1) {
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void load(filterChanged ? 1 : page, search, filterValues);
+    }, filterChanged ? 200 : 0);
+    return () => window.clearTimeout(timer);
+  }, [page, filterKey, reloadKey]);
 
   async function searchRecords() {
     if (page === 1) {
