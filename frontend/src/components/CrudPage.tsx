@@ -95,6 +95,7 @@ export function CrudPage({
   const requestVersion = useRef(0);
   const filterKey = JSON.stringify(filterValues);
   const previousFilterKey = useRef(filterKey);
+  const previousSearch = useRef(search);
   const itemTitle = singularTitle || title.replace(/s$/i, '');
 
   async function load(targetPage = page, targetFilters = filterValues) {
@@ -120,14 +121,18 @@ export function CrudPage({
 
   useEffect(() => {
     const filterChanged = previousFilterKey.current !== filterKey;
+    const searchChanged = previousSearch.current !== search;
     previousFilterKey.current = filterKey;
-    if (filterChanged && page !== 1) {
+    previousSearch.current = search;
+    if ((filterChanged || searchChanged) && page !== 1) {
       setPage(1);
       return;
     }
-    const timer = window.setTimeout(() => { void load(filterChanged ? 1 : page, filterValues); }, filterChanged ? 200 : 0);
+    const timer = window.setTimeout(() => {
+      void load(1, filterValues);
+    }, filterChanged || searchChanged ? 200 : 0);
     return () => window.clearTimeout(timer);
-  }, [page, filterKey]);
+  }, [page, filterKey, search]);
 
   function updateFilter(key: string, value: string | null) {
     setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
@@ -208,8 +213,7 @@ export function CrudPage({
       <Stack gap="sm">
         <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
           <Group gap="sm" wrap="wrap">
-            <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setPage(1); void load(1); } }} />
-            <Button radius="sm" variant="light" color="erp" onClick={() => { setPage(1); void load(1); }}>Search</Button>
+            <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Escape') setSearch(''); }} />
           </Group>
         </Paper>
         {filters.length > 0 && (
