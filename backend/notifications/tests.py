@@ -14,6 +14,7 @@ from .views import (
     NotificationListView,
     NotificationMarkReadView,
     PushDeviceRegistrationView,
+    FirebaseWebConfigView,
 )
 
 
@@ -151,6 +152,61 @@ class NotificationApiTests(TestCase):
         self.assertEqual(device.user_id, self.user.pk)
         self.assertTrue(device.is_active)
 
+    def test_device_registration_accepts_web_platform(self):
+        request = APIRequestFactory().post(
+            "/api/v1/notifications/devices/",
+            {
+                "installation_id": "fid-web-1",
+                "platform": "web",
+                "firebase_app_id": "web-app-id",
+            },
+            format="json",
+        )
+        force_authenticate(request, user=self.user)
+
+        response = PushDeviceRegistrationView.as_view()(request)
+
+        self.assertEqual(response.status_code, 201)
+        device = PushDevice.objects.get(installation_id="fid-web-1")
+        self.assertEqual(device.platform, PushDevice.Platform.WEB)
+
+    def test_web_config_returns_disabled_when_web_credentials_are_missing(self):
+        request = APIRequestFactory().get("/api/v1/notifications/web-config/")
+        with self.settings(
+            FIREBASE_ENABLED=True,
+            FIREBASE_PROJECT_ID="project",
+            FIREBASE_WEB_API_KEY="",
+            FIREBASE_WEB_MESSAGING_SENDER_ID="sender",
+            FIREBASE_WEB_APP_ID="app",
+            FIREBASE_WEB_VAPID_KEY="vapid",
+        ):
+            response = FirebaseWebConfigView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["enabled"])
+
+    def test_web_config_exposes_only_public_client_configuration(self):
+        request = APIRequestFactory().get("/api/v1/notifications/web-config/")
+        with self.settings(
+            FIREBASE_ENABLED=True,
+            FIREBASE_PROJECT_ID="project",
+            FIREBASE_WEB_API_KEY="api-key",
+            FIREBASE_WEB_AUTH_DOMAIN="project.firebaseapp.com",
+            FIREBASE_WEB_STORAGE_BUCKET="project.firebasestorage.app",
+            FIREBASE_WEB_MESSAGING_SENDER_ID="sender",
+            FIREBASE_WEB_APP_ID="app-id",
+            FIREBASE_WEB_MEASUREMENT_ID="G-test",
+            FIREBASE_WEB_VAPID_KEY="public-vapid",
+        ):
+            response = FirebaseWebConfigView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["enabled"])
+        self.assertEqual(response.data["firebase"]["projectId"], "project")
+        self.assertEqual(response.data["firebase"]["appId"], "app-id")
+        self.assertEqual(response.data["vapid_key"], "public-vapid")
+        self.assertNotIn("credentials", response.data)
+
     def test_device_registration_reassigns_device_when_user_logs_into_same_installation(self):
         device = PushDevice.objects.create(
             user=self.user,
@@ -230,3 +286,28 @@ class PushDeliveryTests(TestCase):
         )
         self.assertEqual(pending_delivery.status, NotificationDelivery.Status.SENT)
         self.assertEqual(sent_delivery.attempt_count, 1)
+
+    @patch("notifications.push._firebase_app", return_value=object())
+    @patch("notifications.push.messaging.send_each_for_multicast")
+    def test_webpush_click_link_is_attached_for_https(self, send_mock, _firebase_mock):
+        web_device = PushDevice.objects.create(
+            user=self.user,
+            installation_id="fid-web-delivery",
+            platform=PushDevice.Platform.WEB,
+        )
+        send_mock.return_value = SimpleNamespace(
+            responses=[SimpleNamespace(success=True, message_id="web-message-1", exception=None)]
+        )
+
+        with self.settings(
+            FIREBASE_ENABLED=True,
+            FIREBASE_WEB_NOTIFICATION_LINK="https://erp.example.com/",
+        ):
+            self.assertEqual(send_notification_push(self.notification.pk), 1)
+
+        message = send_mock.call_args.args[0]
+        self.assertEqual(message.fids, [web_device.installation_id])
+        self.assertEqual(
+            message.webpush.fcm_options.link,
+            "https://erp.example.com/",
+        )
