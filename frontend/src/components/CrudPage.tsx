@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActionIcon,
   Badge,
@@ -92,9 +92,13 @@ export function CrudPage({
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>({});
   const pageSize = 20;
+  const requestVersion = useRef(0);
+  const filterKey = JSON.stringify(filterValues);
+  const previousFilterKey = useRef(filterKey);
   const itemTitle = singularTitle || title.replace(/s$/i, '');
 
   async function load(targetPage = page, targetFilters = filterValues) {
+    const request = ++requestVersion.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(targetPage), page_size: String(pageSize) });
@@ -103,36 +107,34 @@ export function CrudPage({
         const value = targetFilters[filter.key];
         if (value !== undefined && value !== '') params.set(filter.key, value);
       });
-      setData(await list(`?${params.toString()}`));
+      const result = await list(`?${params.toString()}`);
+      if (request === requestVersion.current) setData(result);
     } catch (error) {
-      notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      if (request === requestVersion.current) {
+        notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      }
     } finally {
-      setLoading(false);
+      if (request === requestVersion.current) setLoading(false);
     }
   }
 
-  useEffect(() => { void load(page); }, [page]);
+  useEffect(() => {
+    const filterChanged = previousFilterKey.current !== filterKey;
+    previousFilterKey.current = filterKey;
+    if (filterChanged && page !== 1) {
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => { void load(1, filterValues); }, filterChanged ? 200 : 0);
+    return () => window.clearTimeout(timer);
+  }, [page, filterKey]);
 
   function updateFilter(key: string, value: string | null) {
     setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
   }
 
-  async function applyFilters() {
-    if (page === 1) {
-      await load(1, filterValues);
-    } else {
-      setPage(1);
-    }
-  }
-
-  async function clearFilters() {
-    const cleared = Object.fromEntries(filters.map((filter) => [filter.key, '']));
-    setFilterValues(cleared);
-    if (page === 1) {
-      await load(1, cleared);
-    } else {
-      setPage(1);
-    }
+  function clearFilters() {
+    setFilterValues(Object.fromEntries(filters.map((filter) => [filter.key, ''])));
   }
 
   function openCreate() {
@@ -230,7 +232,7 @@ export function CrudPage({
             </SimpleGrid>
             <Group justify="flex-end" mt="md">
               {Object.values(filterValues).some(Boolean) && <Button variant="subtle" onClick={() => void clearFilters()}>Clear filters</Button>}
-              <Button leftSection={<IconFilter size={15} />} onClick={() => void applyFilters()}>Apply filters</Button>
+              <Text size="xs" c="dimmed">Filters update automatically.</Text>
             </Group>
           </Paper>
         )}
