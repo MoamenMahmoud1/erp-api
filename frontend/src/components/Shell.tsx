@@ -19,7 +19,7 @@ const sections: NavSection[] = [
       { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
       { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
       { label: 'Payments', to: '/payments', icon: <IconWallet size={17} />, permission: 'payments.view_paymenttransaction' },
-      { label: 'My shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: false },
+      { label: 'My shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: true },
     ],
   },
   {
