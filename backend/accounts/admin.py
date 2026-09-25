@@ -6,6 +6,8 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 
+from authsession.models import AuthSession
+
 from .models import RoleProfile
 
 User = get_user_model()
@@ -96,8 +98,6 @@ class CustomUserAdmin(BaseUserAdmin):
             request,
         )
         if request.user.is_superuser:
-            from authsession.models import AuthSession
-
             perms_needed.discard(AuthSession._meta.verbose_name)
         return deleted_objects, model_count, perms_needed, protected
 
