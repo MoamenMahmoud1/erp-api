@@ -129,7 +129,7 @@ export function CrudPage({
       return;
     }
     const timer = window.setTimeout(() => {
-      void load(1, filterValues);
+      void load(filterChanged || searchChanged ? 1 : page, filterValues);
     }, filterChanged || searchChanged ? 200 : 0);
     return () => window.clearTimeout(timer);
   }, [page, filterKey, search]);
