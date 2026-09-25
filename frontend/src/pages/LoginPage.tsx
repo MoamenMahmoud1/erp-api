@@ -81,6 +81,65 @@ export function LoginPage() {
           max-width: 430px;
           padding-top: 22px;
         }
+        .login-page-modern .login-ledger-visual {
+          position: relative;
+          max-width: 500px;
+          margin-top: 34px;
+          padding: 15px 16px 10px;
+          border: 1px solid var(--erp-border);
+          border-radius: 13px;
+          background: var(--erp-surface);
+          overflow: hidden;
+        }
+        .login-page-modern .login-ledger-heading {
+          position: relative;
+          z-index: 2;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 6px;
+          color: var(--erp-muted);
+          font-size: 0.64rem;
+          font-weight: 800;
+          letter-spacing: .1em;
+        }
+        .login-page-modern .login-ledger-heading span:last-child {
+          color: var(--erp-success);
+        }
+        .login-page-modern .login-ledger-grid {
+          position: absolute;
+          inset: 34px 16px 10px;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          grid-template-rows: repeat(3, 1fr);
+          opacity: .42;
+        }
+        .login-page-modern .login-ledger-grid span {
+          border-right: 1px solid var(--erp-border);
+          border-top: 1px solid var(--erp-border);
+        }
+        .login-page-modern .login-ledger-line {
+          position: relative;
+          z-index: 2;
+          display: block;
+          width: 100%;
+          height: 88px;
+        }
+        .login-page-modern .login-ledger-line path {
+          fill: none;
+          stroke: var(--erp-primary);
+          stroke-width: 2.5;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          stroke-dasharray: 560;
+          stroke-dashoffset: 560;
+          animation: login-line-draw 800ms cubic-bezier(.22, .61, .36, 1) 80ms forwards;
+        }
+        @keyframes login-line-draw {
+          to { stroke-dashoffset: 0; }
+        }
+
         .login-page-modern .login-form-panel {
           min-height: 600px;
           padding: 50px;
