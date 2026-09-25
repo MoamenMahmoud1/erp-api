@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, viewsets
 
 from common.permissions import ModelAccessPermission
 from organization.api.serializers import DepartmentSerializer
@@ -12,6 +13,11 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     permission_classes = (ModelAccessPermission,)
     http_method_names = ("get", "post", "patch", "head", "options")
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_fields = ("site", "is_active")
+    search_fields = ("code", "name", "description", "site__name", "site__code")
+    ordering_fields = ("code", "name", "created_at", "updated_at")
+    ordering = ("code", "pk")
 
     def get_queryset(self):
         queryset = super().get_queryset()
