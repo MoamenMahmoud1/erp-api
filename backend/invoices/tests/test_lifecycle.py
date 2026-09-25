@@ -18,6 +18,7 @@ class InvoiceLifecycleTests(InvoiceTestMixin, TransactionTestCase):
     def create_invoice(self, *, status=Invoice.Status.DRAFT, quantity=1):
         invoice = Invoice.objects.create(
             customer=self.customer,
+            site=self.site,
             created_by=self.user,
             status=status,
         )
