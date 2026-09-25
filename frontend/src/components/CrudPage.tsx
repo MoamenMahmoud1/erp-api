@@ -22,10 +22,8 @@ import {
   Title,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
-import { IconEdit, IconSearch, IconTrash } from '@tabler/icons-react';
+import { IconEdit, IconFilter, IconSearch, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
-
-import { IconFilter } from '@tabler/icons-react';
 
 import { type RecordFilter } from './RecordsPage';
 import type { Json, Paginated } from '../lib/api';
