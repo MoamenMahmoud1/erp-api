@@ -12,6 +12,32 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext();
 const page = await context.newPage();
 
+let forcedExpiredAccess = false;
+let refreshCalls = 0;
+
+await page.route('**/api/v1/accounting/analytics/overview/**', async (route) => {
+  if (!forcedExpiredAccess && route.request().method() === 'GET') {
+    forcedExpiredAccess = true;
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ detail: 'Authentication credentials were not provided.' }),
+    });
+    return;
+  }
+  await route.continue();
+});
+
+page.on('response', async (response) => {
+  const url = response.url();
+  if (url.includes('/auth/refresh/')) {
+    refreshCalls += 1;
+  }
+  if (url.includes('/api/v1/')) {
+    console.log(`API ${response.status()} ${response.request().method()} ${url.replace(baseUrl, '')}`);
+  }
+});
+
 page.on('response', async (response) => {
   const url = response.url();
   if (url.includes('/api/v1/')) {
@@ -43,7 +69,11 @@ try {
     timeout: 15_000,
   });
 
-  console.log('Web E2E passed: login -> authenticated dashboard -> API-backed metrics.');
+  if (!forcedExpiredAccess || refreshCalls < 1) {
+    throw new Error(`Automatic access-token refresh was not exercised. forced401=${forcedExpiredAccess}, refreshCalls=${refreshCalls}`);
+  }
+
+  console.log('Web E2E passed: login -> forced expired access token -> automatic refresh -> dashboard.');
 } catch (error) {
   await page.screenshot({ path: 'e2e-failure.png', fullPage: true }).catch(() => {});
   throw error;
