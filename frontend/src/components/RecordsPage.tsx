@@ -96,6 +96,7 @@ export function RecordsPage({
   const requestVersion = useRef(0);
   const filterKey = JSON.stringify(filterValues);
   const previousFilterKey = useRef(filterKey);
+  const previousSearch = useRef(search);
 
   async function load(
     targetPage = page,
@@ -127,24 +128,18 @@ export function RecordsPage({
 
   useEffect(() => {
     const filterChanged = previousFilterKey.current !== filterKey;
+    const searchChanged = previousSearch.current !== search;
     previousFilterKey.current = filterKey;
-    if (filterChanged && page !== 1) {
+    previousSearch.current = search;
+    if ((filterChanged || searchChanged) && page !== 1) {
       setPage(1);
       return;
     }
     const timer = window.setTimeout(() => {
-      void load(filterChanged ? 1 : page, search, filterValues);
-    }, filterChanged ? 200 : 0);
+      void load(1, search, filterValues);
+    }, filterChanged || searchChanged ? 200 : 0);
     return () => window.clearTimeout(timer);
-  }, [page, filterKey, reloadKey]);
-
-  async function searchRecords() {
-    if (page === 1) {
-      await load(1, search, filterValues);
-    } else {
-      setPage(1);
-    }
-  }
+  }, [page, filterKey, search, reloadKey]);
 
   function updateFilter(key: string, value: string | null) {
     setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
@@ -215,12 +210,11 @@ export function RecordsPage({
               placeholder={searchPlaceholder}
               value={search}
               onChange={(event) => setSearch(event.currentTarget.value)}
-              onKeyDown={(event) => { if (event.key === 'Enter') void searchRecords(); if (event.key === 'Escape') { setSearch(''); void load(1, '', filterValues); setPage(1); } }}
+              onKeyDown={(event) => { if (event.key === 'Escape') setSearch(''); }}
               radius="md"
               aria-label={`Search ${title}`}
             />
-            <Button radius="md" onClick={() => void searchRecords()}>Search</Button>
-            {search && <Button radius="md" variant="subtle" onClick={() => { setSearch(''); setPage(1); void load(1, '', filterValues); }}>Clear</Button>}
+            {search && <Button radius="md" variant="subtle" onClick={() => setSearch('')}>Clear</Button>}
           </Group>
         </Paper>}
         {filters.length > 0 && (
