@@ -157,8 +157,9 @@ class AccountingPeriodViewSet(viewsets.ModelViewSet):
     serializer_class = AccountingPeriodSerializer
     permission_classes = (AccountingModelPermission,)
     http_method_names = ("get", "post", "head", "options")
-    filter_backends = (DjangoFilterBackend, filters.OrderingFilter)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_fields = ("is_closed", "start_date", "end_date")
+    search_fields = ("name",)
     ordering_fields = ("start_date", "end_date", "created_at")
     ordering = ("-start_date",)
 
