@@ -7,8 +7,6 @@ from django.utils import timezone
 
 from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
 from authsession.models import AuthSession
-from authsession.services import start_auth_session
-from authsession.http import ClientContext
 from core.testing.auth import authenticate_stateful_client
 from rest_framework.test import APIClient
 
