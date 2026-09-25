@@ -11,10 +11,10 @@ from .models import Notification, NotificationDelivery, PushDevice
 from .push import send_notification_push
 from .tasks import create_notification_for_approval_event
 from .views import (
+    FirebaseWebConfigView,
     NotificationListView,
     NotificationMarkReadView,
     PushDeviceRegistrationView,
-    FirebaseWebConfigView,
 )
 
 
