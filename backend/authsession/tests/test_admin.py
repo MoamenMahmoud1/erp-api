@@ -38,12 +38,27 @@ class AuthSessionAdminTests(TestCase):
             revoked_at=revoked_at,
         )
 
-    def test_admin_can_filter_sessions_by_user_and_date(self):
+    def test_admin_can_filter_sessions_by_status_user_and_date(self):
+        self.assertEqual(self.model_admin.list_filter[0].__name__, "RevokedStatusFilter")
         self.assertIn(
             ("user", admin.RelatedOnlyFieldListFilter),
             self.model_admin.list_filter,
         )
         self.assertEqual(self.model_admin.date_hierarchy, "created_at")
+
+        active = self.create_session()
+        revoked = self.create_session(revoked_at=timezone.now())
+        expired = self.create_session()
+        expired.expires_at = timezone.now() - timedelta(hours=1)
+        expired.save(update_fields=("expires_at",))
+
+        request = RequestFactory().get("/admin/authsession/authsession/")
+        status_filter = self.model_admin.list_filter[0]
+        # The filter can be instantiated directly to verify its queryset semantics.
+        filter_class = status_filter
+        for value, expected_id in (("active", active.pk), ("revoked", revoked.pk), ("expired", expired.pk)):
+            instance = filter_class(request, {"session_status": value}, AuthSession, self.model_admin)
+            self.assertEqual(list(instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)), [expected_id])
 
     def test_admin_can_revoke_selected_sessions_and_clear_cache(self):
         session = self.create_session()
