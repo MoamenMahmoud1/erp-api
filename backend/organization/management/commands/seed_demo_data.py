@@ -270,7 +270,12 @@ class Command(BaseCommand):
         draft_purchase = Purchase.objects.create(supplier=suppliers["delta_foods"], created_by=actor_for_demo, reference="PO-DRAFT-2026-0910")
         PurchaseItem.objects.create(purchase=draft_purchase, product=products["coffee"], quantity=20, unit_purchase_price=Decimal("122.00"))
 
-        draft_invoice = Invoice.objects.create(\n            customer=customers["walk_in"],\n            site=branch,\n            created_by=users["sales_2"],\n            status=Invoice.Status.DRAFT,\n        )
+        draft_invoice = Invoice.objects.create(
+            customer=customers["walk_in"],
+            site=branch,
+            created_by=users["sales_2"],
+            status=Invoice.Status.DRAFT,
+        )
         InvoiceItem.objects.create(invoice=draft_invoice, product=products["coffee"], quantity=4, unit_price=products["coffee"].selling_price, cost_price=products["coffee"].purchase_price)
 
         self.stdout.write(self.style.SUCCESS("Realistic ERP demo data created successfully."))
