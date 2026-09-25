@@ -31,6 +31,11 @@ export function InventoryBatchesPage() {
       title="Batches & expiry"
       subtitle="Trace received lots, production dates, expiry dates and quantity still available at each location."
       searchPlaceholder="Search by product, batch or location…"
+      filters={[
+        { key: 'expiry_after', label: 'Expiry from', type: 'date' },
+        { key: 'expiry_before', label: 'Expiry to', type: 'date' },
+        { key: 'expired', label: 'Expiry status', type: 'select', options: [{ value: 'true', label: 'Expired' }, { value: 'false', label: 'Not expired' }] },
+      ]}
       list={api.inventory.batches}
       columns={[
         { key: 'product_name', label: 'Product' },
