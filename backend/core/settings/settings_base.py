@@ -137,6 +137,9 @@ if IDEMPOTENCY_RETENTION_DAYS < 1:
     raise ValueError("IDEMPOTENCY_RETENTION_DAYS must be >= 1")
 AUTH_SESSION_MIN_AGE = timedelta(hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int))
 AUTH_SESSION_VERIFICATION_TTL = timedelta(minutes=config("AUTH_SESSION_VERIFICATION_MINUTES", default=15, cast=int))
+AUTH_SESSION_REVOKED_RETENTION_DAYS = config("AUTH_SESSION_REVOKED_RETENTION_DAYS", default=30, cast=int)
+if AUTH_SESSION_REVOKED_RETENTION_DAYS < 0:
+    raise ValueError("AUTH_SESSION_REVOKED_RETENTION_DAYS must be >= 0")
 CORS_ALLOW_CREDENTIALS = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOG_LEVEL = config("LOG_LEVEL", default="INFO").upper()
@@ -202,6 +205,10 @@ CELERY_BEAT_SCHEDULE = {
     "purge-idempotency-keys": {
         "task": "payments.tasks.purge_idempotency_keys",
         "schedule": crontab(hour=3, minute=15),
+    },
+    "purge-auth-sessions": {
+        "task": "authsession.tasks.purge_auth_sessions",
+        "schedule": crontab(hour=3, minute=30),
     },
 }
 
