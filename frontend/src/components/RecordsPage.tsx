@@ -136,7 +136,7 @@ export function RecordsPage({
       return;
     }
     const timer = window.setTimeout(() => {
-      void load(1, search, filterValues);
+      void load(filterChanged || searchChanged ? 1 : page, search, filterValues);
     }, filterChanged || searchChanged ? 200 : 0);
     return () => window.clearTimeout(timer);
   }, [page, filterKey, search, reloadKey]);
