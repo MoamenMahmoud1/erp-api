@@ -82,6 +82,7 @@ export function RecordsPage({
   reloadKey = 0,
   clientPaginated = false,
   searchPlaceholder = 'Search records…',
+  searchable = true,
 }: Props) {
   const [data, setData] = useState<Paginated>({ count: 0, next: null, previous: null, results: [] });
   const [search, setSearch] = useState('');
