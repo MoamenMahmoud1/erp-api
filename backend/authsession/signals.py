@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import m2m_changed, post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
 from accounts.models import RoleProfile
@@ -49,6 +49,16 @@ def invalidate_user_direct_permissions(sender, instance, action, **kwargs):
 def invalidate_group_permissions(sender, instance, action, **kwargs):
     if action in {"post_add", "post_remove", "post_clear"}:
         _invalidate_group_users(instance.pk)
+
+
+@receiver(pre_delete, sender=User)
+def invalidate_deleted_user_session_cache(sender, instance, **kwargs):
+    """Invalidate Redis auth snapshots before User CASCADE deletes AuthSession rows."""
+    session_ids = AuthSession.objects.filter(
+        user_id=instance.pk,
+        revoked_at__isnull=True,
+    ).values_list("pk", flat=True)
+    delete_auth_session_caches(session_ids)
 
 
 @receiver(post_save, sender=User)
