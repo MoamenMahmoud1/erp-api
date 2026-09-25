@@ -90,6 +90,17 @@ class CustomUserAdmin(BaseUserAdmin):
     def has_delete_permission(self, request, obj=None):
         return bool(request.user and request.user.is_superuser)
 
+    def get_deleted_objects(self, objs, request):
+        deleted_objects, model_count, perms_needed, protected = super().get_deleted_objects(
+            objs,
+            request,
+        )
+        if request.user.is_superuser:
+            from authsession.models import AuthSession
+
+            perms_needed.discard(AuthSession._meta.verbose_name)
+        return deleted_objects, model_count, perms_needed, protected
+
 
 class RoleProfileInline(admin.StackedInline):
     model = RoleProfile
