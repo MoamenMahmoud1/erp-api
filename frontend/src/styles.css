@@ -183,6 +183,272 @@ a { color: inherit; text-decoration: none; }
   to { opacity: 1; }
 }
 
+/* The workspace uses restrained, finance-oriented motion: transform/opacity only. */
+.welcome-panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(300px, .95fr);
+  gap: 28px;
+  min-height: 220px;
+  margin-bottom: 20px;
+  padding: 28px 32px;
+  overflow: hidden;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: var(--erp-radius-lg);
+  background:
+    linear-gradient(180deg, var(--erp-surface-raised), var(--erp-surface)),
+    var(--erp-surface);
+  box-shadow: var(--erp-shadow-sm);
+}
+
+.welcome-panel::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--erp-border-strong), transparent);
+}
+
+.welcome-copy {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  align-self: center;
+  padding-right: 16px;
+}
+
+.welcome-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--erp-primary);
+}
+
+.welcome-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--erp-success);
+  box-shadow: 0 0 0 4px var(--erp-success-soft);
+}
+
+.welcome-title {
+  margin-top: 10px;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  line-height: 1.08;
+  letter-spacing: -.042em;
+}
+
+.welcome-subtitle {
+  max-width: 670px;
+  margin-top: 10px;
+  color: var(--erp-text-secondary);
+  font-size: .95rem;
+  line-height: 1.65;
+}
+
+.welcome-meta {
+  margin-top: 18px;
+}
+
+.welcome-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--erp-border);
+  border-radius: 999px;
+  background: var(--erp-surface-muted);
+  color: var(--erp-text-secondary);
+  font-size: .74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.welcome-visual {
+  position: relative;
+  min-height: 164px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-self: stretch;
+  overflow: hidden;
+  padding: 16px 16px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius-md);
+  background: var(--erp-surface);
+}
+
+.welcome-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 35px,
+      var(--erp-border) 36px
+    );
+  opacity: .45;
+  pointer-events: none;
+}
+
+.welcome-visual-label,
+.welcome-visual-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.welcome-visual-label span,
+.welcome-visual-footer span {
+  color: var(--erp-muted);
+  font-size: .67rem;
+  font-weight: 800;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.welcome-visual-label strong {
+  color: var(--erp-text-secondary);
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.welcome-ledger-chart {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 106px;
+  overflow: visible;
+}
+
+.welcome-grid path {
+  fill: none;
+  stroke: var(--erp-border);
+  stroke-width: 1;
+}
+
+.welcome-chart-base {
+  fill: none;
+  stroke: var(--erp-border-strong);
+  stroke-width: 1;
+}
+
+.welcome-chart-line {
+  fill: none;
+  stroke: var(--erp-primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 620;
+  stroke-dashoffset: 620;
+  animation: welcome-draw-line 850ms cubic-bezier(.22, .61, .36, 1) forwards;
+}
+
+.welcome-chart-point {
+  fill: var(--erp-primary);
+  opacity: 0;
+  animation: welcome-point-in 220ms ease-out 760ms forwards;
+}
+
+@keyframes welcome-draw-line {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes welcome-point-in {
+  to { opacity: 1; }
+}
+
+.welcome-dismiss {
+  position: absolute;
+  top: 11px;
+  right: 12px;
+  z-index: 4;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--erp-muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.welcome-dismiss:hover,
+.welcome-dismiss:focus-visible {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-muted);
+  color: var(--erp-text);
+  outline: none;
+}
+
+@media (max-width: 980px) {
+  .welcome-panel {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    min-height: 0;
+  }
+
+  .welcome-copy { padding-right: 30px; }
+
+  .welcome-visual {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 640px) {
+  .welcome-panel {
+    gap: 14px;
+    margin-bottom: 14px;
+    padding: 20px;
+    border-radius: var(--erp-radius-md);
+  }
+
+  .welcome-title {
+    padding-right: 20px;
+    font-size: 1.55rem;
+  }
+
+  .welcome-subtitle {
+    font-size: .88rem;
+    line-height: 1.55;
+  }
+
+  .welcome-meta {
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .welcome-meta span {
+    font-size: .68rem;
+  }
+
+  .welcome-visual {
+    min-height: 132px;
+    padding: 12px 12px 9px;
+  }
+
+  .welcome-ledger-chart {
+    height: 82px;
+  }
+
+  .topbar-search { max-width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-chart-line,
+  .welcome-chart-point { animation: none; stroke-dashoffset: 0; opacity: 1; }
+}
+
 .kpi-number {
   letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
