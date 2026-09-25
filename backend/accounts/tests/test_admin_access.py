@@ -1,5 +1,11 @@
+import uuid
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import Client, RequestFactory, TestCase
+from django.utils import timezone
+
+from authsession.models import AuthSession
 from rest_framework.test import APIClient
 
 
@@ -56,12 +62,7 @@ class AdminAccessTests(TestCase):
         self.assertTrue(model_admin.has_delete_permission(request, self.superuser))
 
     def test_superuser_can_delete_user_with_auth_sessions(self):
-        from authsession.models import AuthSession
         from django.contrib import admin as django_admin
-        from django.utils import timezone
-        import uuid
-        from datetime import timedelta
-
         target = get_user_model().objects.create_user(
             username="cascade-target",
             email="cascade-target@example.com",
