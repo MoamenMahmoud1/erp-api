@@ -14,15 +14,20 @@ import {
   Paper,
   ScrollArea,
   Select,
+  SimpleGrid,
   Stack,
   Table,
   Text,
   TextInput,
   Title,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { IconEdit, IconSearch, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
+import { IconFilter } from '@tabler/icons-react';
+
+import { type RecordFilter } from './RecordsPage';
 import type { Json, Paginated } from '../lib/api';
 
 export type CrudOption = { value: string; label: string };
@@ -49,6 +54,7 @@ type Props = {
   fields: CrudField[];
   columns: CrudColumn[];
   list: (query: string) => Promise<Paginated>;
+  filters?: RecordFilter[];
   create?: (body: Json) => Promise<unknown>;
   update?: (id: number, body: Json) => Promise<unknown>;
   remove?: (id: number) => Promise<unknown>;
@@ -71,6 +77,7 @@ export function CrudPage({
   fields,
   columns,
   list,
+  filters = [],
   create,
   update,
   remove,
@@ -80,6 +87,7 @@ export function CrudPage({
 }: Props) {
   const [data, setData] = useState<Paginated>({ count: 0, next: null, previous: null, results: [] });
   const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -88,11 +96,15 @@ export function CrudPage({
   const pageSize = 20;
   const itemTitle = singularTitle || title.replace(/s$/i, '');
 
-  async function load(targetPage = page) {
+  async function load(targetPage = page, targetFilters = filterValues) {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(targetPage), page_size: String(pageSize) });
       if (search.trim()) params.set('search', search.trim());
+      filters.forEach((filter) => {
+        const value = targetFilters[filter.key];
+        if (value !== undefined && value !== '') params.set(filter.key, value);
+      });
       setData(await list(`?${params.toString()}`));
     } catch (error) {
       notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
@@ -102,6 +114,22 @@ export function CrudPage({
   }
 
   useEffect(() => { void load(page); }, [page]);
+
+  function updateFilter(key: string, value: string | null) {
+    setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
+  }
+
+  async function applyFilters() {
+    setPage(1);
+    await load(1, filterValues);
+  }
+
+  async function clearFilters() {
+    const cleared = Object.fromEntries(filters.map((filter) => [filter.key, '']));
+    setFilterValues(cleared);
+    setPage(1);
+    await load(1, cleared);
+  }
 
   function openCreate() {
     if (!create) return;
@@ -171,12 +199,38 @@ export function CrudPage({
         {create && <Button onClick={openCreate} color="erp" radius="sm">Add {itemTitle}</Button>}
       </Group>
 
-      <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
-        <Group gap="sm" wrap="wrap">
-          <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setPage(1); void load(1); } }} />
-          <Button radius="sm" variant="light" color="erp" onClick={() => { setPage(1); void load(1); }}>Search</Button>
-        </Group>
-      </Paper>
+      <Stack gap="sm">
+        <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
+          <Group gap="sm" wrap="wrap">
+            <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setPage(1); void load(1); } }} />
+            <Button radius="sm" variant="light" color="erp" onClick={() => { setPage(1); void load(1); }}>Search</Button>
+          </Group>
+        </Paper>
+        {filters.length > 0 && (
+          <Paper p="md" radius="sm" withBorder>
+            <Group gap="xs" mb="sm"><IconFilter size={17} /><Text fw={700}>Filters</Text>{Object.values(filterValues).filter(Boolean).length > 0 && <Badge variant="light">{Object.values(filterValues).filter(Boolean).length} active</Badge>}</Group>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: Math.min(filters.length, 4) }} spacing="sm">
+              {filters.map((filter) => {
+                const value = filterValues[filter.key] || '';
+                if (filter.type === 'date') {
+                  return <DatePickerInput key={filter.key} label={filter.label} placeholder={filter.placeholder || 'Select date'} value={value || null} onChange={(nextValue) => updateFilter(filter.key, nextValue)} clearable />;
+                }
+                if (filter.type === 'select') {
+                  return <Select key={filter.key} label={filter.label} placeholder={filter.placeholder || 'Any'} data={filter.options || []} value={value || null} onChange={(nextValue) => updateFilter(filter.key, nextValue)} clearable searchable={Boolean((filter.options || []).length > 8)} />;
+                }
+                if (filter.type === 'number') {
+                  return <NumberInput key={filter.key} label={filter.label} placeholder={filter.placeholder} value={value} onChange={(nextValue) => updateFilter(filter.key, String(nextValue ?? ''))} min={0} clampBehavior="strict" />;
+                }
+                return <TextInput key={filter.key} label={filter.label} placeholder={filter.placeholder} value={value} onChange={(event) => updateFilter(filter.key, event.currentTarget.value)} />;
+              })}
+            </SimpleGrid>
+            <Group justify="flex-end" mt="md">
+              {Object.values(filterValues).some(Boolean) && <Button variant="subtle" onClick={() => void clearFilters()}>Clear filters</Button>}
+              <Button leftSection={<IconFilter size={15} />} onClick={() => void applyFilters()}>Apply filters</Button>
+            </Group>
+          </Paper>
+        )}
+      </Stack>
 
       <Paper className="surface-panel records-panel" radius="sm" withBorder>
         <ScrollArea>
