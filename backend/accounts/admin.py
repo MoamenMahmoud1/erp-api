@@ -88,20 +88,6 @@ class CustomUserAdmin(BaseUserAdmin):
         return super().has_change_permission(request, obj)
 
 
-@admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "manager", "work_site", "department")
-    search_fields = (
-        "user__username",
-        "user__email",
-        "user__first_name",
-        "user__last_name",
-    )
-    list_filter = ("work_site", "department")
-    list_select_related = ("user", "manager", "work_site", "department")
-    autocomplete_fields = ("user", "manager", "work_site", "department")
-
-
 class RoleProfileInline(admin.StackedInline):
     model = RoleProfile
     extra = 1
