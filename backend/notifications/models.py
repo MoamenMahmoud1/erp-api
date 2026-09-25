@@ -9,6 +9,7 @@ class PushDevice(models.Model):
     class Platform(models.TextChoices):
         ANDROID = "android", "Android"
         IOS = "ios", "iOS"
+        WEB = "web", "Web"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
