@@ -7,6 +7,35 @@ from authsession.models import AuthSession
 
 
 @admin.register(AuthSession)
+class RevokedStatusFilter(admin.SimpleListFilter):
+    title = "Session status"
+    parameter_name = "session_status"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("active", "Active"),
+            ("revoked", "Revoked"),
+            ("expired", "Expired"),
+        )
+
+    def queryset(self, request, queryset):
+        now = timezone.now()
+        if self.value() == "active":
+            return queryset.filter(
+                revoked_at__isnull=True,
+                expires_at__gt=now,
+            )
+        if self.value() == "revoked":
+            return queryset.filter(revoked_at__isnull=False)
+        if self.value() == "expired":
+            return queryset.filter(
+                revoked_at__isnull=True,
+                expires_at__lte=now,
+            )
+        return queryset
+
+
+@admin.register(AuthSession)
 class AuthSessionAdmin(admin.ModelAdmin):
     list_display = (
         "id",
@@ -20,8 +49,8 @@ class AuthSessionAdmin(admin.ModelAdmin):
         "status",
     )
     list_filter = (
+        RevokedStatusFilter,
         ("user", admin.RelatedOnlyFieldListFilter),
-        "revoked_at",
         "created_at",
         "expires_at",
     )
