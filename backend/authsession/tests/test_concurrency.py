@@ -61,8 +61,10 @@ class AuthSessionConcurrencyTests(TransactionTestCase):
         )
 
         successes = [result for result in results if isinstance(result, AuthSessionResult)]
+        conflicts = [result for result in results if isinstance(result, ActiveAuthSession)]
 
-        self.assertEqual(len(successes), 2)
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(conflicts), 1)
         self.assertEqual(
             AuthSession.objects.filter(
                 user=self.user,
