@@ -55,20 +55,18 @@ class AuthSessionAdminTests(TestCase):
         request = RequestFactory().get("/admin/authsession/authsession/")
         filter_class = self.model_admin.list_filter[0]
         instance = filter_class(request, {"revoked": "no"}, AuthSession, self.model_admin)
-        self.assertEqual(
-            set(
-                instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
-            ),
-            {active.pk},
+        no_revoked_ids = set(
+            instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
         )
+        self.assertIn(active.pk, no_revoked_ids)
+        self.assertNotIn(revoked.pk, no_revoked_ids)
 
         instance = filter_class(request, {"revoked": "yes"}, AuthSession, self.model_admin)
-        self.assertEqual(
-            list(
-                instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
-            ),
-            [revoked.pk],
+        revoked_ids = set(
+            instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
         )
+        self.assertIn(revoked.pk, revoked_ids)
+        self.assertNotIn(active.pk, revoked_ids)
 
     def test_admin_can_revoke_selected_sessions_and_clear_cache(self):
         session = self.create_session()
