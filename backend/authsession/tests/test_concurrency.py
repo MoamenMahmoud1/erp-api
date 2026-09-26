@@ -2,27 +2,28 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
+from django.contrib.auth import get_user_model
 from django.db import connection, connections
 from django.test import TransactionTestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from authsession.http import ClientContext
 from authsession.models import AuthSession
-from authsession.services.auth_session import InvalidAuthSession, refresh_auth_session, start_auth_session
-
-from django.contrib.auth import get_user_model
+from authsession.services.auth_session import (
+    InvalidAuthSession,
+    RefreshSessionResult,
+    refresh_auth_session,
+    start_auth_session,
+)
 
 
 class AuthSessionConcurrencyTests(TransactionTestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = get_user_model().objects.create_user(
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
             username="concurrency-user",
             email="concurrency@example.com",
             password="StrongPass123!",
         )
-
-    def setUp(self):
         self.context = ClientContext(
             device_id=uuid.uuid4(),
             device_name="Test Device",
@@ -57,7 +58,7 @@ class AuthSessionConcurrencyTests(TransactionTestCase):
             ),
         )
 
-        successes = [result for result in results if not isinstance(result, Exception)]
+        successes = [result for result in results if isinstance(result, tuple) is False and not isinstance(result, Exception)]
 
         self.assertEqual(len(successes), 2)
         self.assertEqual(
@@ -86,7 +87,7 @@ class AuthSessionConcurrencyTests(TransactionTestCase):
             ),
         )
 
-        successes = [result for result in results if not isinstance(result, InvalidAuthSession)]
+        successes = [result for result in results if isinstance(result, RefreshSessionResult)]
         failures = [result for result in results if isinstance(result, InvalidAuthSession)]
 
         self.assertEqual(len(successes), 1)
