@@ -12,6 +12,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 from authsession.cache import cache_active_session, delete_auth_session_cache, delete_auth_session_caches
 from authsession.http import ClientContext
 from authsession.models import AuthSession
+from common.exceptions import ActiveAuthSession
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,8 +139,6 @@ def verify_current_auth_session(
 
 
 def start_auth_session(*, user, client_context: ClientContext):
-    session_id = uuid.uuid4()
-
     with transaction.atomic():
         locked_user = (
             user.__class__._default_manager.select_for_update().get(pk=user.pk)
@@ -147,6 +146,25 @@ def start_auth_session(*, user, client_context: ClientContext):
         if not locked_user.is_active:
             raise InvalidAuthSession
 
+        existing_session = (
+            AuthSession.objects
+            .filter(
+                user_id=locked_user.pk,
+                device_id=client_context.device_id,
+                revoked_at__isnull=True,
+            )
+            .first()
+        )
+        if existing_session is not None:
+            if existing_session.expires_at > timezone.now():
+                raise ActiveAuthSession
+            existing_session.revoked_at = timezone.now()
+            existing_session.save(update_fields=("revoked_at",))
+            transaction.on_commit(
+                lambda session_id=existing_session.pk: delete_auth_session_cache(session_id)
+            )
+
+        session_id = uuid.uuid4()
         refresh = RefreshToken.for_user(locked_user)
         refresh["sid"] = str(session_id)
         access = refresh.access_token
