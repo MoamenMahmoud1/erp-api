@@ -169,12 +169,8 @@ class AdminSessionBridgeTests(TestCase):
         self.admin_browser.cookies.update(self.client.cookies)
 
         logout_client = APIClient()
-        logout_client.cookies.update(
-            {
-                name: self.client.cookies[name].value
-                for name in ("refresh_token", "device_id")
-            }
-        )
+        for name in ("refresh_token", "device_id"):
+            logout_client.cookies[name] = self.client.cookies[name].value
         logout_client.credentials(
             HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
         )
