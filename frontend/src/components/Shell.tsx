@@ -155,9 +155,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
 
     window.addEventListener('erp-webpush-registered', handleRegistered);
     window.addEventListener('erp-webpush-unregistered', handleUnregistered);
-    window.addEventListener('erp-webpush-message', () => {
-      window.dispatchEvent(new Event('erp-notifications-refresh'));
-    });
 
     webPush.ready.then(async (state) => {
       if (state.permission === 'granted') {
@@ -181,7 +178,6 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     return () => {
       window.removeEventListener('erp-webpush-registered', handleRegistered);
       window.removeEventListener('erp-webpush-unregistered', handleUnregistered);
-      // NotificationCenter owns the push-message listener; this effect only bridges push delivery to refresh state.
     };
   }, [user.id]);
 
