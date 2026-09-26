@@ -157,7 +157,7 @@ def start_auth_session(*, user, client_context: ClientContext):
         )
         if existing_session is not None:
             if existing_session.expires_at > timezone.now():
-                raise ActiveAuthSession
+                raise ActiveAuthSession("An active authentication session already exists on this device.")
             existing_session.revoked_at = timezone.now()
             existing_session.save(update_fields=("revoked_at",))
             transaction.on_commit(
