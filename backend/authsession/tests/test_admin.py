@@ -52,16 +52,27 @@ class AuthSessionAdminTests(TestCase):
         active = self.create_session()
         revoked = self.create_session(revoked_at=timezone.now())
 
-        request = RequestFactory().get("/admin/authsession/authsession/")
+        request = RequestFactory().get("/admin/authsession/authsession/?revoked=no")
         filter_class = self.model_admin.list_filter[0]
-        instance = filter_class(request, {"revoked": "no"}, AuthSession, self.model_admin)
+        instance = filter_class(
+            request,
+            request.GET.copy(),
+            AuthSession,
+            self.model_admin,
+        )
         no_revoked_ids = set(
             instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
         )
         self.assertIn(active.pk, no_revoked_ids)
         self.assertNotIn(revoked.pk, no_revoked_ids)
 
-        instance = filter_class(request, {"revoked": "yes"}, AuthSession, self.model_admin)
+        request = RequestFactory().get("/admin/authsession/authsession/?revoked=yes")
+        instance = filter_class(
+            request,
+            request.GET.copy(),
+            AuthSession,
+            self.model_admin,
+        )
         revoked_ids = set(
             instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
         )
