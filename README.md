@@ -103,6 +103,14 @@ ENV_FILE=.env.prod docker compose --env-file .env.prod up -d --build
 
 This is useful for CI validation without committing real secrets.
 
+## Scheduled tasks
+
+Celery Beat uses the Django database scheduler. Task implementations stay in code, while each periodic task's schedule and enabled state are stored in the database through `django-celery-beat`.
+
+Manage periodic tasks from Django Admin under **Periodic Tasks**. The Beat service only schedules enabled records; Celery workers execute the tasks.
+
+The Compose stack runs a separate Celery worker and Beat process. Beat is started with `celery -A core beat -l info` and uses the database scheduler configured in Django settings.
+
 ## Local backend development without the full stack
 
 \`\`\`bash
