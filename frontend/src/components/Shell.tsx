@@ -153,20 +153,11 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
       }
     };
 
-    const handleMessage = (event: Event) => {
-      const detail = (event as CustomEvent<{ payload?: { notification?: { title?: string; body?: string } } }>).detail;
-      const notification = detail?.payload?.notification;
-      if (!notification) return;
-      notifications.show({
-        title: notification.title || 'ERP notification',
-        message: notification.body || '',
-        autoClose: 6000,
-      });
-    };
-
     window.addEventListener('erp-webpush-registered', handleRegistered);
     window.addEventListener('erp-webpush-unregistered', handleUnregistered);
-    window.addEventListener('erp-webpush-message', handleMessage);
+    window.addEventListener('erp-webpush-message', () => {
+      window.dispatchEvent(new Event('erp-notifications-refresh'));
+    });
 
     webPush.ready.then(async (state) => {
       if (state.permission === 'granted') {
@@ -190,7 +181,7 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     return () => {
       window.removeEventListener('erp-webpush-registered', handleRegistered);
       window.removeEventListener('erp-webpush-unregistered', handleUnregistered);
-      window.removeEventListener('erp-webpush-message', handleMessage);
+      // NotificationCenter owns the push-message listener; this effect only bridges push delivery to refresh state.
     };
   }, [user.id]);
 
@@ -305,25 +296,11 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               styles={{ input: { borderRadius: 'var(--erp-radius-sm)' } }}
             />
             <Group gap="xs">
-              <Tooltip label={
-                webPushStatus === 'enabled'
-                  ? 'Desktop notifications enabled'
-                  : webPushStatus === 'denied'
-                    ? 'Notifications blocked by browser'
-                    : 'Enable desktop notifications'
-              }>
-                <ActionIcon
-                  variant={webPushStatus === 'enabled' ? 'light' : 'subtle'}
-                  radius="sm"
-                  size="lg"
-                  onClick={enableDesktopNotifications}
-                  loading={webPushLoading}
-                  disabled={webPushStatus === 'denied' || webPushStatus === 'unsupported'}
-                  aria-label="Desktop notifications"
-                >
-                  <IconBell size={18} />
-                </ActionIcon>
-              </Tooltip>
+              <NotificationCenter
+                webPushStatus={webPushStatus}
+                webPushLoading={webPushLoading}
+                onEnableDesktopNotifications={enableDesktopNotifications}
+              />
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
                 <ActionIcon variant="subtle" radius="sm" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
