@@ -7,7 +7,7 @@ from django.utils import timezone
 
 from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
 from authsession.models import AuthSession
-from core.testing.auth import authenticate_stateful_client
+from core.testing.auth import authenticate_stateful_client, login_client
 from rest_framework.test import APIClient
 
 
@@ -127,7 +127,7 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_non_superuser_cannot_create_admin_session(self):
-        self.client.force_authenticate(user=self.staff_user)
+        authenticate_stateful_client(self.client, user=self.staff_user)
         response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(response.status_code, 403)
 
@@ -159,7 +159,11 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(admin_response["Location"], "/login")
 
     def test_erp_logout_clears_admin_session(self):
-        authenticate_stateful_client(self.client, user=self.superuser)
+        login_client(
+            self.client,
+            user=self.superuser,
+            password="StrongAdminPassword123!",
+        )
         session_response = self.client.post("/api/v1/auth/admin/session/", {})
         self.assertEqual(session_response.status_code, 200)
         self.admin_browser.cookies.update(self.client.cookies)
