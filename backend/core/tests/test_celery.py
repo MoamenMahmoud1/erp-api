@@ -10,30 +10,13 @@ class CeleryConfigurationTests(SimpleTestCase):
         self.assertEqual(app.main, "erp_api")
         self.assertEqual(app.conf.broker_url, settings.CELERY_BROKER_URL)
 
-    def test_expected_background_tasks_are_scheduled(self):
-        schedule = settings.CELERY_BEAT_SCHEDULE
+    def test_celery_uses_database_beat_scheduler(self):
         self.assertEqual(
-            set(schedule),
-            {
-                "reconcile-company-counters",
-                "rebuild-recent-approval-notifications",
-                "purge-idempotency-keys",
-                "purge-auth-sessions",
-            },
+            settings.CELERY_BEAT_SCHEDULER,
+            "django_celery_beat.schedulers:DatabaseScheduler",
         )
         self.assertEqual(
-            schedule["reconcile-company-counters"]["task"],
-            "organization.tasks.reconcile_company_counters",
+            app.conf.beat_scheduler,
+            settings.CELERY_BEAT_SCHEDULER,
         )
-        self.assertEqual(
-            schedule["rebuild-recent-approval-notifications"]["task"],
-            "notifications.tasks.rebuild_recent_approval_notifications",
-        )
-        self.assertEqual(
-            schedule["purge-idempotency-keys"]["task"],
-            "payments.tasks.purge_idempotency_keys",
-        )
-        self.assertEqual(
-            schedule["purge-auth-sessions"]["task"],
-            "authsession.tasks.purge_auth_sessions",
-        )
+        self.assertFalse(hasattr(settings, "CELERY_BEAT_SCHEDULE"))
