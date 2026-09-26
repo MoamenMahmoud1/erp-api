@@ -234,6 +234,19 @@ export const api = {
   },
 };
 
+export type NotificationItem = {
+  id: number;
+  notification_type: 'approval_requested' | 'approval_approved' | 'approval_rejected' | string;
+  title: string;
+  body: string;
+  target_type: string;
+  target_id: number | null;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+};
+
 export type Paginated = { count: number; next: string | null; previous: string | null; results: Record<string, unknown>[] };
 export type EmployeeRole = { id: number; name: string; level: number; scope: 'company' | 'branch' | 'site'; requires_shift: boolean; description: string };
 export type EmployeeSite = { id: number; name: string; code: string; type: string; parent_id: number | null };
