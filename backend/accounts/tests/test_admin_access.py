@@ -159,7 +159,7 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(admin_response["Location"], "/login")
 
     def test_erp_logout_clears_admin_session(self):
-        login_client(
+        login_response = login_client(
             self.client,
             user=self.superuser,
             password="StrongAdminPassword123!",
@@ -168,7 +168,18 @@ class AdminSessionBridgeTests(TestCase):
         self.assertEqual(session_response.status_code, 200)
         self.admin_browser.cookies.update(self.client.cookies)
 
-        logout_response = self.client.post("/api/v1/auth/logout/", {})
+        logout_client = APIClient()
+        logout_client.cookies.update(
+            {
+                name: self.client.cookies[name].value
+                for name in ("refresh_token", "device_id")
+            }
+        )
+        logout_client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}"
+        )
+
+        logout_response = logout_client.post("/api/v1/auth/logout/", {})
         self.assertEqual(logout_response.status_code, 204)
 
         admin_response = self.admin_browser.get("/admin/")
