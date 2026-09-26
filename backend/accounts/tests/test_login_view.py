@@ -148,7 +148,10 @@ class LoginViewTests(TestCase):
 
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
         self.assertEqual(second_response.status_code, status.HTTP_409_CONFLICT)
-        self.assertFalse(second_response.data.get("detail") is None)
+        self.assertEqual(
+            second_response.data["detail"],
+            "An active authentication session already exists on this device.",
+        )
         self.assertIsNone(first_session.revoked_at)
         self.assertEqual(
             AuthSession.objects.filter(
