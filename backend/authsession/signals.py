@@ -61,9 +61,33 @@ def invalidate_deleted_user_session_cache(sender, instance, **kwargs):
     delete_auth_session_caches(session_ids)
 
 
+AUTH_SESSION_CACHE_USER_FIELDS = frozenset(
+    {
+        "username",
+        "email",
+        "first_name",
+        "last_name",
+        "is_active",
+        "is_staff",
+        "is_superuser",
+        "password",
+        "password_changed_at",
+    }
+)
+
+
 @receiver(post_save, sender=User)
-def invalidate_user_session_cache(sender, instance, **kwargs):
-    """Drop cached auth state when activation or privileged flags change."""
+def invalidate_user_session_cache(sender, instance, created, update_fields=None, **kwargs):
+    """Invalidate cached auth state only when authentication data can change."""
+    if created:
+        _invalidate_users((instance.pk,))
+        return
+
+    if update_fields is not None and not (
+        set(update_fields) & AUTH_SESSION_CACHE_USER_FIELDS
+    ):
+        return
+
     _invalidate_users((instance.pk,))
 
 

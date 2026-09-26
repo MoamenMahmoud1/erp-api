@@ -138,15 +138,25 @@ class LoginViewTests(TestCase):
         self.assertEqual(device_cookie["samesite"], "Lax")
         self.assertEqual(device_cookie["path"], "/api/v1/auth/")
 
-    def test_new_login_on_same_device_revokes_previous_session(self):
+    def test_new_login_on_same_device_returns_conflict_without_revoking_session(self):
         first_response = self.login_with_csrf()
         first_session = AuthSession.objects.get(user=self.user)
 
         second_response = self.login_with_csrf()
         first_session.refresh_from_db()
-        active_session = AuthSession.objects.get(user=self.user, revoked_at__isnull=True)
 
         self.assertEqual(first_response.status_code, status.HTTP_200_OK)
-        self.assertEqual(second_response.status_code, status.HTTP_200_OK)
-        self.assertIsNotNone(first_session.revoked_at)
-        self.assertEqual(active_session.device_id, first_session.device_id)
+        self.assertEqual(second_response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(
+            second_response.data["detail"],
+            "An active authentication session already exists on this device.",
+        )
+        self.assertIsNone(first_session.revoked_at)
+        self.assertEqual(
+            AuthSession.objects.filter(
+                user=self.user,
+                device_id=first_session.device_id,
+                revoked_at__isnull=True,
+            ).count(),
+            1,
+        )

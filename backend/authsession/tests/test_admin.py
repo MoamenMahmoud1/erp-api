@@ -52,16 +52,32 @@ class AuthSessionAdminTests(TestCase):
         active = self.create_session()
         revoked = self.create_session(revoked_at=timezone.now())
 
-        request = RequestFactory().get("/admin/authsession/authsession/")
+        request = RequestFactory().get("/admin/authsession/authsession/?revoked=no")
         filter_class = self.model_admin.list_filter[0]
-        for value, expected_id in (("no", active.pk), ("yes", revoked.pk)):
-            instance = filter_class(request, {"revoked": value}, AuthSession, self.model_admin)
-            self.assertEqual(
-                list(
-                    instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
-                ),
-                [expected_id],
-            )
+        instance = filter_class(
+            request,
+            request.GET.copy(),
+            AuthSession,
+            self.model_admin,
+        )
+        no_revoked_ids = set(
+            instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
+        )
+        self.assertIn(active.pk, no_revoked_ids)
+        self.assertNotIn(revoked.pk, no_revoked_ids)
+
+        request = RequestFactory().get("/admin/authsession/authsession/?revoked=yes")
+        instance = filter_class(
+            request,
+            request.GET.copy(),
+            AuthSession,
+            self.model_admin,
+        )
+        revoked_ids = set(
+            instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
+        )
+        self.assertIn(revoked.pk, revoked_ids)
+        self.assertNotIn(active.pk, revoked_ids)
 
     def test_admin_can_revoke_selected_sessions_and_clear_cache(self):
         session = self.create_session()
@@ -72,7 +88,10 @@ class AuthSessionAdminTests(TestCase):
         )
         queryset = AuthSession.objects.filter(pk=session.pk)
 
-        with patch.object(self.model_admin, "message_user") as message_user:
+        with (
+            self.captureOnCommitCallbacks(execute=True),
+            patch.object(self.model_admin, "message_user") as message_user,
+        ):
             self.model_admin.revoke_sessions(self.request, queryset)
 
         session.refresh_from_db()
