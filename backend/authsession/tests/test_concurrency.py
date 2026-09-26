@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from authsession.http import ClientContext
 from authsession.models import AuthSession
 from authsession.services.auth_session import (
+    AuthSessionResult,
     InvalidAuthSession,
     RefreshSessionResult,
     refresh_auth_session,
@@ -58,7 +59,7 @@ class AuthSessionConcurrencyTests(TransactionTestCase):
             ),
         )
 
-        successes = [result for result in results if isinstance(result, tuple) is False and not isinstance(result, Exception)]
+        successes = [result for result in results if isinstance(result, AuthSessionResult)]
 
         self.assertEqual(len(successes), 2)
         self.assertEqual(
