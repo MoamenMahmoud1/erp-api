@@ -25,7 +25,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint-web.sh && \
 FROM base AS worker
 USER appuser
 
-# The Compose file supplies the concrete Celery worker/beat command.
+# Compose overrides this command for the beat service.
 CMD ["celery", "-A", "core", "worker", "-l", "info"]
 
 FROM base AS web

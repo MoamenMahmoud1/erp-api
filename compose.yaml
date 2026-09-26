@@ -29,7 +29,7 @@ services:
   migrate:
     build:
       context: ./backend
-      target: web
+      target: worker
     restart: "no"
     env_file:
       - ${ENV_FILE:-.env}
@@ -45,8 +45,6 @@ services:
     command: python manage.py migrate --noinput
     depends_on:
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
   api:
@@ -85,9 +83,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    expose:
-      - "8000"
-
   worker:
     build:
       context: ./backend
@@ -109,6 +104,7 @@ services:
       FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
       FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+    command: celery -A core worker -l info
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -133,11 +129,7 @@ services:
       DB_PORT: 5432
       REDIS_URL: redis://redis:6379/1
       CELERY_BROKER_URL: redis://redis:6379/1
-      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
-      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-      FIREBASE_CREDENTIALS_FILE: ${FIREBASE_CREDENTIALS_FILE:-}
-      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
-      FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
+    command: celery -A core beat -l info
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -156,9 +148,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    expose:
-      - "80"
-
   gateway:
     build:
       context: ./infra/gateway
@@ -175,7 +164,7 @@ services:
       retries: 5
       start_period: 5s
     ports:
-      - "8080:80"
+      - "${GATEWAY_PORT:-8080}:80"
 
 volumes:
   postgres_data:
