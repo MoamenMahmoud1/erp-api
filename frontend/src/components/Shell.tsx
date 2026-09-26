@@ -6,6 +6,7 @@ import { notifications } from '@mantine/notifications';
 import { IconBell, IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconSettings, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
+import { NotificationCenter } from './NotificationCenter';
 import { api, type UserProfile } from '../lib/api';
 
 type NavItem = { label: string; to: string; icon: ReactNode; permission: string; hideWithoutShift?: boolean };
