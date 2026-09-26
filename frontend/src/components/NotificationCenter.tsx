@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActionIcon,
   Badge,
@@ -97,7 +97,6 @@ export function NotificationCenter({
 
   useEffect(() => {
     void refresh();
-    return () => undefined;
   }, [refresh]);
 
   useEffect(() => {
@@ -120,12 +119,14 @@ export function NotificationCenter({
     return () => window.removeEventListener('erp-webpush-message', handlePush);
   }, [refresh]);
 
-  const pushLabel = useMemo(() => {
-    if (webPushStatus === 'enabled') return 'Desktop push enabled';
-    if (webPushStatus === 'denied') return 'Desktop push blocked';
-    if (webPushStatus === 'unsupported') return 'Desktop push unavailable';
-    return 'Enable desktop push';
-  }, [webPushStatus]);
+  const pushLabel =
+    webPushStatus === 'enabled'
+      ? 'Desktop push enabled'
+      : webPushStatus === 'denied'
+        ? 'Desktop push blocked'
+        : webPushStatus === 'unsupported'
+          ? 'Desktop push unavailable'
+          : 'Enable desktop push';
 
   async function handleRead(notification: NotificationItem) {
     try {
