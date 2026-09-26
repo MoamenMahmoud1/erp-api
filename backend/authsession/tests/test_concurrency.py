@@ -16,6 +16,7 @@ from authsession.services.auth_session import (
     refresh_auth_session,
     start_auth_session,
 )
+from common.exceptions import ActiveAuthSession
 
 
 class AuthSessionConcurrencyTests(TransactionTestCase):
