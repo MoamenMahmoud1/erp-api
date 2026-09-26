@@ -54,14 +54,21 @@ class AuthSessionAdminTests(TestCase):
 
         request = RequestFactory().get("/admin/authsession/authsession/")
         filter_class = self.model_admin.list_filter[0]
-        for value, expected_id in (("no", active.pk), ("yes", revoked.pk)):
-            instance = filter_class(request, {"revoked": value}, AuthSession, self.model_admin)
-            self.assertEqual(
-                list(
-                    instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
-                ),
-                [expected_id],
-            )
+        instance = filter_class(request, {"revoked": "no"}, AuthSession, self.model_admin)
+        self.assertEqual(
+            set(
+                instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
+            ),
+            {active.pk},
+        )
+
+        instance = filter_class(request, {"revoked": "yes"}, AuthSession, self.model_admin)
+        self.assertEqual(
+            list(
+                instance.queryset(request, AuthSession.objects.all()).values_list("pk", flat=True)
+            ),
+            [revoked.pk],
+        )
 
     def test_admin_can_revoke_selected_sessions_and_clear_cache(self):
         session = self.create_session()
@@ -72,7 +79,10 @@ class AuthSessionAdminTests(TestCase):
         )
         queryset = AuthSession.objects.filter(pk=session.pk)
 
-        with patch.object(self.model_admin, "message_user") as message_user:
+        with (
+            self.captureOnCommitCallbacks(execute=True),
+            patch.object(self.model_admin, "message_user") as message_user,
+        ):
             self.model_admin.revoke_sessions(self.request, queryset)
 
         session.refresh_from_db()
