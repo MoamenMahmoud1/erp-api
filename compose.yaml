@@ -106,6 +106,7 @@ services:
       FCM_ANDROID_CHANNEL_ID: ${FCM_ANDROID_CHANNEL_ID:-erp_notifications}
     command: celery -A core worker -l info
     depends_on:
+      migrate:
         condition: service_completed_successfully
       db:
         condition: service_healthy
