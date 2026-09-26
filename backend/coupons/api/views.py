@@ -1,3 +1,4 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.response import Response
 
@@ -16,9 +17,11 @@ class CouponViewSet(viewsets.ModelViewSet):
     serializer_class = CouponSerializer
 
     filter_backends = (
+        DjangoFilterBackend,
         filters.SearchFilter,
         filters.OrderingFilter,
     )
+    filterset_fields = ("is_active", "discount_type")
 
     search_fields = ("code",)
 

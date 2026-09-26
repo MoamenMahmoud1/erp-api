@@ -7,6 +7,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from accounts.api.filters import EmployeeFilter
 from accounts.api.serializers import EmployeeSerializer, GroupSummarySerializer, RoleSummarySerializer, UserSummarySerializer
 from accounts.models import Employee, RoleProfile
 from accounts.permissions import EmployeeAccessPermission
@@ -21,7 +22,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     permission_classes = (EmployeeAccessPermission,)
     pagination_class = StandardPagination
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
-    filterset_fields = ("work_site", "department", "manager")
+    filterset_class = EmployeeFilter
     search_fields = (
         "user__username",
         "user__email",

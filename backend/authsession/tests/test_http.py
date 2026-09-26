@@ -5,6 +5,9 @@ from django.test import RequestFactory, SimpleTestCase, override_settings
 
 from authsession.http import (
     DEVICE_COOKIE_NAME,
+    get_browser_name,
+    get_device_name,
+    get_device_type,
     DEVICE_COOKIE_SALT,
     clear_login_cookies,
     get_client_context,
@@ -35,6 +38,16 @@ class AuthenticationHttpTests(SimpleTestCase):
         self.assertEqual(context.device_name, "A" * 100)
         self.assertEqual(context.user_agent, "B" * 1000)
         self.assertEqual(context.ip_address, "192.0.2.10")
+
+    def test_device_name_is_human_readable_from_user_agent(self):
+        request = self.factory.get(
+            "/api/v1/auth/login/",
+            HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1",
+        )
+
+        self.assertEqual(get_device_type(request.headers.get("User-Agent", "")), "iPhone")
+        self.assertEqual(get_browser_name(request.headers.get("User-Agent", "")), "Safari")
+        self.assertEqual(get_device_name(request), "iPhone · Safari")
 
     def test_existing_signed_device_cookie_is_reused(self):
         device_id = uuid.uuid4()
@@ -79,11 +92,11 @@ class AuthenticationHttpTests(SimpleTestCase):
         self.assertEqual(get_client_ip(request), "198.51.100.8")
 
     @override_settings(TRUSTED_PROXY_IPS=("10.0.0.0/8",))
-    def test_trusted_proxy_chain_returns_nearest_untrusted_address(self):
+    def test_trusted_proxy_chain_returns_original_client_address(self):
         request = self.factory.get(
             "/api/v1/auth/login/",
             REMOTE_ADDR="10.0.0.2",
-            HTTP_X_FORWARDED_FOR="203.0.113.9, 10.0.0.1",
+            HTTP_X_FORWARDED_FOR="203.0.113.9, 198.51.100.7",
         )
 
         self.assertEqual(get_client_ip(request), "203.0.113.9")

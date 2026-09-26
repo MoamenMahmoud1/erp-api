@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DatePickerInput } from '@mantine/dates';
 import { Badge, Button, Card, Group, Loader, Modal, Select, SimpleGrid, Stack, Text, TextInput, Title, NumberInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -28,7 +28,14 @@ export function ExpensesPage({ user }: { user: UserProfile }) {
 
   const expenseList = (requestQuery: string) => api.accounting.expenses(requestQuery) as Promise<Paginated>;
 
-  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList} create={can(user, 'accounting.add_expense') ? api.accounting.createExpense : undefined} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
+  return <CrudPage title="Expenses" subtitle="Record operating expenses against a payment account." list={expenseList}
+    filters={[
+      { key: 'expense_date_from', label: 'From date', type: 'date' },
+      { key: 'expense_date_to', label: 'To date', type: 'date' },
+      { key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions },
+      { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions },
+      { key: 'created_by_name', label: 'Created by', type: 'text', placeholder: 'Name or username' },
+    ]} create={can(user, 'accounting.add_expense') ? api.accounting.createExpense : undefined} canEdit={false} canDelete={false} fields={[{ key: 'expense_account', label: 'Expense account', type: 'select', options: accountOptions, required: true }, { key: 'payment_account', label: 'Payment account', type: 'select', options: accountOptions, required: true }, { key: 'amount', label: 'Amount', type: 'number', required: true }, { key: 'expense_date', label: 'Date', required: true }, { key: 'description', label: 'Description', required: true }, { key: 'reference', label: 'Reference' }]} columns={[{ key: 'id', label: '#' }, { key: 'expense_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'amount', label: 'Amount' }, { key: 'expense_account', label: 'Expense account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }, { key: 'payment_account', label: 'Payment account', render: (value) => accountOptions.find((option) => option.value === String(value ?? ''))?.label || '—' }]} />;
 }
 
 export function PeriodsPage({ user }: { user: UserProfile }) {
@@ -59,7 +66,7 @@ function PeriodWorkspace({ user }: { user: UserProfile }) {
     } finally { setSaving(false); }
   }
 
-  return <Stack gap="xl"><Group justify="space-between" align="flex-end"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Periods</Title><Text c="dimmed" mt={4}>Control which accounting dates are open for posting.</Text></div>{can(user, 'accounting.add_accountingperiod') && <Button onClick={() => setModal(true)} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>New period</Button>}</Group><RecordsPage reloadKey={reloadKey} eyebrow="ACCOUNTING" title="Open and closed periods" subtitle="Period locking is enforced by the accounting posting service." list={api.accounting.periods} columns={[{ key: 'name', label: 'Period' }, { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' }, { key: 'is_closed', label: 'Closed' }, { key: 'closed_at', label: 'Closed at' }]} actions={[{ label: 'Close', color: 'red', visible: (row) => can(user, 'accounting.close_accountingperiod') && !row.is_closed, run: (row) => api.accounting.closePeriod(Number(row.id)) }]} /><Modal opened={modal} onClose={() => !saving && setModal(false)} title="New accounting period" centered><Stack><TextInput label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} required /><DatePickerInput label="Start date" value={start} onChange={setStart} required /><DatePickerInput label="End date" value={end} onChange={setEnd} required />{can(user, 'accounting.add_accountingperiod') && <Button loading={saving} onClick={() => void create()}>Create period</Button>}</Stack></Modal></Stack>;
+  return <Stack gap="xl"><Group justify="space-between" align="flex-end"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Periods</Title><Text c="dimmed" mt={4}>Control which accounting dates are open for posting.</Text></div>{can(user, 'accounting.add_accountingperiod') && <Button onClick={() => setModal(true)} variant="gradient" gradient={{ from: 'indigo', to: 'cyan', deg: 120 }}>New period</Button>}</Group><RecordsPage reloadKey={reloadKey} eyebrow="ACCOUNTING" title="Open and closed periods" subtitle="Period locking is enforced by the accounting posting service." filters={[{ key: 'is_closed', label: 'Status', type: 'select', options: [{ value: 'false', label: 'Open' }, { value: 'true', label: 'Closed' }] }]} list={api.accounting.periods} columns={[{ key: 'name', label: 'Period' }, { key: 'start_date', label: 'Start' }, { key: 'end_date', label: 'End' }, { key: 'is_closed', label: 'Closed' }, { key: 'closed_at', label: 'Closed at' }]} actions={[{ label: 'Close', color: 'red', visible: (row) => can(user, 'accounting.close_accountingperiod') && !row.is_closed, run: (row) => api.accounting.closePeriod(Number(row.id)) }]} /><Modal opened={modal} onClose={() => !saving && setModal(false)} title="New accounting period" centered><Stack><TextInput label="Name" value={name} onChange={(event) => setName(event.currentTarget.value)} required /><DatePickerInput label="Start date" value={start} onChange={setStart} required /><DatePickerInput label="End date" value={end} onChange={setEnd} required />{can(user, 'accounting.add_accountingperiod') && <Button loading={saving} onClick={() => void create()}>Create period</Button>}</Stack></Modal></Stack>;
 }
 
 export function GeneralLedgerPage() {
@@ -69,19 +76,31 @@ export function GeneralLedgerPage() {
   const [to, setTo] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
   useEffect(() => { api.accounting.accounts('?page_size=50').then(setAccounts).catch((error) => notifications.show({ title: 'Unable to load accounts', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' })); }, []);
   async function load() {
-    if (!account) { notifications.show({ title: 'Select an account', message: 'Choose an account before loading the ledger.', color: 'yellow' }); return; }
-    if (from && to && to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
+    if (!account || (from && to && to < from)) return;
+    const request = ++requestVersion.current;
     setLoading(true);
-    try { setData(await api.accounting.generalLedger(query({ account: Number(account), from: from || undefined, to: to || undefined })) as Record<string, unknown>); }
-    catch (error) { notifications.show({ title: 'Ledger failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
-    finally { setLoading(false); }
+    try {
+      const result = await api.accounting.generalLedger(query({ account: Number(account), from: from || undefined, to: to || undefined })) as Record<string, unknown>;
+      if (request === requestVersion.current) setData(result);
+    } catch (error) {
+      if (request === requestVersion.current) notifications.show({ title: 'Ledger failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' });
+    } finally {
+      if (request === requestVersion.current) setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    if (!account || (from && to && to < from)) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [account, from, to]);
   const selected = data?.account as Record<string, unknown> | undefined;
   const lines = (data?.lines || []) as Record<string, unknown>[];
   const accountOptions = accounts.results.map((row) => ({ value: String(row.id), label: `${row.code || 'No code'} · ${row.name || 'Unnamed account'}` }));
-  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>General ledger</Title><Text c="dimmed" mt={4}>Inspect every posted debit, credit and running balance for an account.</Text></div><Card className="glass" radius="lg" withBorder><SimpleGrid cols={{ base: 1, md: 4 }}><Select label="Account" searchable data={accountOptions} value={account} onChange={(value) => setAccount(value || '')} /><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Button mt={25} loading={loading} onClick={() => void load()}>Load ledger</Button></SimpleGrid></Card>{selected && <Card className="glass bento-card" radius="lg" withBorder><Group justify="space-between"><div><Text fw={800}>{String(selected.name)}</Text><Text size="sm" c="dimmed">{String(selected.code)}</Text></div><Badge variant="light">{String(selected.account_type)}</Badge></Group><SimpleGrid cols={{ base: 1, md: 3 }} mt="lg"><Text>Entries <b>{lines.length}</b></Text><Text>Last balance <b>{String(lines.at(-1)?.balance ?? '0.00')}</b></Text><Text>Normal side <b>{String(selected.normal_side || '—')}</b></Text></SimpleGrid></Card>}{!!lines.length && <RecordsPage clientPaginated eyebrow="LEDGER" title="Transactions" subtitle="Posted journal lines ordered chronologically." list={async () => ({ count: lines.length, next: null, previous: null, results: lines })} columns={[{ key: 'entry_number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
+  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>General ledger</Title><Text c="dimmed" mt={4}>Inspect every posted debit, credit and running balance for an account.</Text></div><Card className="glass" radius="lg" withBorder><SimpleGrid cols={{ base: 1, md: 4 }}><Select label="Account" searchable data={accountOptions} value={account} onChange={(value) => setAccount(value || '')} /><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Text size="xs" c="dimmed" mt={25}>Updates automatically.</Text></SimpleGrid></Card>{selected && <Card className="glass bento-card" radius="lg" withBorder><Group justify="space-between"><div><Text fw={800}>{String(selected.name)}</Text><Text size="sm" c="dimmed">{String(selected.code)}</Text></div><Badge variant="light">{String(selected.account_type)}</Badge></Group><SimpleGrid cols={{ base: 1, md: 3 }} mt="lg"><Text>Entries <b>{lines.length}</b></Text><Text>Last balance <b>{String(lines.at(-1)?.balance ?? '0.00')}</b></Text><Text>Normal side <b>{String(selected.normal_side || '—')}</b></Text></SimpleGrid></Card>}{!!lines.length && <RecordsPage searchable={false} clientPaginated eyebrow="LEDGER" title="Transactions" subtitle="Posted journal lines ordered chronologically." list={async () => ({ count: lines.length, next: null, previous: null, results: lines })} columns={[{ key: 'entry_number', label: '#' }, { key: 'entry_date', label: 'Date' }, { key: 'description', label: 'Description' }, { key: 'reference', label: 'Reference' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
 }
 
 export function TrialBalancePage() {
@@ -89,13 +108,26 @@ export function TrialBalancePage() {
   const [to, setTo] = useState<string | null>(null);
   const [data, setData] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
   async function load() {
-    if (from && to && to < from) { notifications.show({ title: 'Invalid dates', message: 'The end date must be on or after the start date.', color: 'red' }); return; }
+    if (from && to && to < from) return;
+    const request = ++requestVersion.current;
     setLoading(true);
-    try { setData(await api.accounting.trialBalance(query({ from: from || undefined, to: to || undefined })) as Record<string, unknown>); }
-    catch (error) { notifications.show({ title: 'Trial balance failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
-    finally { setLoading(false); }
+    try {
+      const result = await api.accounting.trialBalance(query({ from: from || undefined, to: to || undefined })) as Record<string, unknown>;
+      if (request === requestVersion.current) setData(result);
+    } catch (error) {
+      if (request === requestVersion.current) notifications.show({ title: 'Trial balance failed', message: error instanceof Error ? error.message : 'Request failed', color: 'red' });
+    } finally {
+      if (request === requestVersion.current) setLoading(false);
+    }
   }
+
+  useEffect(() => {
+    if (from && to && to < from) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [from, to]);
   const rows = (data?.rows || []) as Record<string, unknown>[];
-  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Trial balance</Title><Text c="dimmed" mt={4}>A compact control report that verifies total debits equal total credits.</Text></div><Card className="glass" withBorder radius="lg"><Group align="flex-end"><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Button loading={loading} onClick={() => void load()}>Run report</Button></Group></Card>{data && <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL DEBIT</Text><Text size="xl" fw={900}>{money(data.total_debit)}</Text></Card><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL CREDIT</Text><Text size="xl" fw={900}>{money(data.total_credit)}</Text></Card><Card className="glass" withBorder><Badge color={data.balanced ? 'teal' : 'red'} size="lg">{data.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card></SimpleGrid>}{data && <RecordsPage clientPaginated eyebrow="CONTROL REPORT" title="Account totals" subtitle="Grouped posted journal activity by account." list={async () => ({ count: rows.length, next: null, previous: null, results: rows })} columns={[{ key: 'account__code', label: 'Code' }, { key: 'account__name', label: 'Account' }, { key: 'account__account_type', label: 'Type' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
+  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>Trial balance</Title><Text c="dimmed" mt={4}>A compact control report that verifies total debits equal total credits.</Text></div><Card className="glass" withBorder radius="lg"><Group align="flex-end"><DatePickerInput label="From" value={from} onChange={setFrom} clearable /><DatePickerInput label="To" value={to} onChange={setTo} clearable /><Text size="xs" c="dimmed" mt={8}>Updates automatically.</Text></Group></Card>{data && <SimpleGrid cols={{ base: 1, md: 3 }}><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL DEBIT</Text><Text size="xl" fw={900}>{money(data.total_debit)}</Text></Card><Card className="glass" withBorder><Text c="dimmed" size="xs">TOTAL CREDIT</Text><Text size="xl" fw={900}>{money(data.total_credit)}</Text></Card><Card className="glass" withBorder><Badge color={data.balanced ? 'teal' : 'red'} size="lg">{data.balanced ? 'Balanced' : 'Unbalanced'}</Badge></Card></SimpleGrid>}{data && <RecordsPage searchable={false} clientPaginated eyebrow="CONTROL REPORT" title="Account totals" subtitle="Grouped posted journal activity by account." list={async () => ({ count: rows.length, next: null, previous: null, results: rows })} columns={[{ key: 'account__code', label: 'Code' }, { key: 'account__name', label: 'Account' }, { key: 'account__account_type', label: 'Type' }, { key: 'debit', label: 'Debit' }, { key: 'credit', label: 'Credit' }, { key: 'balance', label: 'Balance' }]} />}</Stack>;
 }

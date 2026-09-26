@@ -195,7 +195,7 @@ export function DashboardPage({ user }: { user: UserProfile }) {
         </Card>
       ) : data ? (
         <>
-          <SimpleGrid cols={{ base: 1, sm: 2, lg: 4 }} spacing="md">
+          <SimpleGrid cols={{ base: 2, sm: 2, lg: 4 }} spacing={{ base: 'sm', lg: 'md' }}>
             <Metric label="Net sales" value={asMoney(data.sales.gross_sales)} meta={`${number.format(data.sales.invoice_count)} invoices`} />
             <Metric label="Net income" value={asMoney(data.pnl.net_income)} meta={`${asMoney(data.pnl.total_expenses)} expenses`} />
             <Metric label="Cash & bank" value={asMoney(data.cash_flow.ending_cash)} meta={`${asMoney(data.cash_flow.net_change)} net change`} />

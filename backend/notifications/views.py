@@ -1,11 +1,52 @@
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import generics, status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import Notification, PushDevice
 from .serializers import NotificationSerializer, PushDeviceRegistrationSerializer
+
+
+class FirebaseWebConfigView(APIView):
+    """Expose only the public Firebase web-app configuration required by FCM."""
+
+    authentication_classes = ()
+    permission_classes = (AllowAny,)
+
+    def get(self, request):
+        required = (
+            settings.FIREBASE_ENABLED,
+            settings.FIREBASE_WEB_API_KEY,
+            settings.FIREBASE_PROJECT_ID,
+            settings.FIREBASE_WEB_MESSAGING_SENDER_ID,
+            settings.FIREBASE_WEB_APP_ID,
+            settings.FIREBASE_WEB_VAPID_KEY,
+        )
+        if not all(required):
+            return Response({"enabled": False})
+
+        firebase_config = {
+            "apiKey": settings.FIREBASE_WEB_API_KEY,
+            "projectId": settings.FIREBASE_PROJECT_ID,
+            "messagingSenderId": settings.FIREBASE_WEB_MESSAGING_SENDER_ID,
+            "appId": settings.FIREBASE_WEB_APP_ID,
+        }
+        if settings.FIREBASE_WEB_AUTH_DOMAIN:
+            firebase_config["authDomain"] = settings.FIREBASE_WEB_AUTH_DOMAIN
+        if settings.FIREBASE_WEB_STORAGE_BUCKET:
+            firebase_config["storageBucket"] = settings.FIREBASE_WEB_STORAGE_BUCKET
+        if settings.FIREBASE_WEB_MEASUREMENT_ID:
+            firebase_config["measurementId"] = settings.FIREBASE_WEB_MEASUREMENT_ID
+
+        return Response(
+            {
+                "enabled": True,
+                "firebase": firebase_config,
+                "vapid_key": settings.FIREBASE_WEB_VAPID_KEY,
+            }
+        )
 
 
 class NotificationListView(generics.ListAPIView):

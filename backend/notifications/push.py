@@ -1,5 +1,5 @@
-import firebase_admin
 from django.conf import settings
+import firebase_admin
 from firebase_admin import credentials, messaging
 
 from .models import Notification, NotificationDelivery, PushDevice
@@ -119,6 +119,15 @@ def send_notification_push(notification_id: int) -> int:
                 payload=messaging.APNSPayload(
                     aps=messaging.Aps(sound="default"),
                 ),
+            ),
+            webpush=(
+                messaging.WebpushConfig(
+                    fcm_options=messaging.WebpushFCMOptions(
+                        link=settings.FIREBASE_WEB_NOTIFICATION_LINK,
+                    ),
+                )
+                if settings.FIREBASE_WEB_NOTIFICATION_LINK.lower().startswith("https://")
+                else None
             ),
         )
         response = messaging.send_each_for_multicast(message, app=app)

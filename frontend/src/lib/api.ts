@@ -1,6 +1,6 @@
 export type Json = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE = import.meta.env.DEV ? '/api/v1' : (import.meta.env.VITE_API_URL || '/api/v1');
 let accessToken: string | null = null;
 const AUTH_EXPIRED_EVENT = 'erp-auth-expired';
 
@@ -85,10 +85,33 @@ async function refreshAccessToken() {
   refreshing = true;
   refreshPromise = (async () => {
     try {
-      if (!csrfToken) await getCsrfToken();
-      const response = await fetch(`${API_BASE}/auth/refresh/`, { method: 'POST', credentials: 'include', headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken } });
+      // Re-issue the CSRF token before every refresh attempt so a rotated or
+      // stale client-side token cannot turn a valid refresh session into logout.
+      await getCsrfToken();
+
+      let response = await fetch(`${API_BASE}/auth/refresh/`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
+      });
+
+      // A stale CSRF secret can happen after a long-lived tab/session. Refresh
+      // it once and retry the refresh before treating the auth session as lost.
+      if (response.status === 403) {
+        csrfToken = '';
+        await getCsrfToken();
+        response = await fetch(`${API_BASE}/auth/refresh/`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { Accept: 'application/json', 'X-CSRFToken': csrfToken },
+        });
+      }
+
       const data = (await parseResponse(response)) as { access?: string } | null;
-      if (!response.ok || !data?.access) { setAccessToken(null); return false; }
+      if (!response.ok || !data?.access) {
+        setAccessToken(null);
+        return false;
+      }
       setAccessToken(data.access);
       return true;
     } catch {
@@ -154,6 +177,7 @@ export const api = {
     refresh: refreshAccessToken,
     logout: () => jsonRequest('/auth/logout/', 'POST').finally(() => setAccessToken(null)),
     logoutAll: () => jsonRequest('/auth/logout-all/', 'POST').finally(() => setAccessToken(null)),
+    openAdmin: () => jsonRequest<{ url: string }>('/auth/admin/session/', 'POST'),
   },
   organization: {
     company: () => request('/organization/company/'), updateCompany: (body: Json) => jsonRequest('/organization/company/', 'PATCH', body),
@@ -167,7 +191,7 @@ export const api = {
   },
   products: {
     list: (query = '') => request<Paginated>(`/products/${query}`), get: (id: number) => request(`/products/${id}/`), create: (body: Json) => jsonRequest('/products/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/products/${id}/`, 'PATCH', body), delete: (id: number) => request(`/products/${id}/`, { method: 'DELETE' }),
-    cartonPricings: (query = '') => request<Paginated>(`/carton-pricings/${query}`), createCartonPricing: (body: Json) => jsonRequest('/carton-pricings/', 'POST', body), updateCartonPricing: (id: number, body: Json) => jsonRequest(`/carton-pricings/${id}/`, 'PATCH', body), deleteCartonPricing: (id: number) => request(`/carton-pricings/${id}/`, { method: 'DELETE' }),
+    cartonPricings: (query = '') => request<Paginated>(`/products/carton-pricings/${query}`), createCartonPricing: (body: Json) => jsonRequest('/products/carton-pricings/', 'POST', body), updateCartonPricing: (id: number, body: Json) => jsonRequest(`/products/carton-pricings/${id}/`, 'PATCH', body), deleteCartonPricing: (id: number) => request(`/products/carton-pricings/${id}/`, { method: 'DELETE' }),
   },
   customers: { list: (query = '') => request<Paginated>(`/customers/${query}`), get: (id: number) => request(`/customers/${id}/`), create: (body: Json) => jsonRequest('/customers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/customers/${id}/`, 'PATCH', body), delete: (id: number) => request(`/customers/${id}/`, { method: 'DELETE' }) },
   suppliers: { list: (query = '') => request<Paginated>(`/suppliers/${query}`), get: (id: number) => request(`/suppliers/${id}/`), create: (body: Json) => jsonRequest('/suppliers/', 'POST', body), update: (id: number, body: Json) => jsonRequest(`/suppliers/${id}/`, 'PATCH', body) },
@@ -197,6 +221,13 @@ export const api = {
     approveTransfer: (id: number) => request(`/payments/transactions/${id}/approve-transfer/`, { method: 'POST' }),
   },
   inventory: { locations: (query = '') => request<Paginated>(`/inventory/locations/${query}`), stock: (query = '') => request<Paginated>(`/inventory/stock/${query}`), batches: (query = '') => request<Paginated>(`/inventory/batches/${query}`), movements: (query = '') => request<Paginated>(`/inventory/movements/${query}`), transfer: (body: Json) => jsonRequest('/inventory/transfers/', 'POST', body) },
+  notifications: {
+    list: (query = '') => request<Paginated>(`/notifications/${query}`),
+    markRead: (id: number) => request(`/notifications/${id}/read/`, { method: 'POST' }),
+    markAllRead: () => request('/notifications/read-all/', { method: 'POST' }),
+    registerDevice: (body: { installation_id: string; platform: 'android' | 'ios' | 'web'; firebase_app_id?: string }) => jsonRequest('/notifications/devices/', 'POST', body),
+    unregisterDevice: (installationId: string) => request(`/notifications/devices/${encodeURIComponent(installationId)}/`, { method: 'DELETE' }),
+  },
   accounting: {
     dashboardOverview: (query = '') => request<DashboardOverview>(`/accounting/analytics/overview/${query}`), accounts: (query = '') => request<Paginated>(`/accounting/accounts/${query}`), createAccount: (body: Json) => jsonRequest('/accounting/accounts/', 'POST', body), updateAccount: (id: number, body: Json) => jsonRequest(`/accounting/accounts/${id}/`, 'PATCH', body), deleteAccount: (id: number) => request(`/accounting/accounts/${id}/`, { method: 'DELETE' }),
     journalEntries: (query = '') => request<Paginated>(`/accounting/journal-entries/${query}`), journalEntry: (id: number) => request(`/accounting/journal-entries/${id}/`), createJournalEntry: (body: Json) => jsonRequest('/accounting/journal-entries/', 'POST', body), postJournalEntry: (id: number) => request(`/accounting/journal-entries/${id}/post/`, { method: 'POST' }), expenses: (query = '') => request(`/accounting/expenses/${query}`), createExpense: (body: Json) => jsonRequest('/accounting/expenses/', 'POST', body), periods: (query = '') => request<Paginated>(`/accounting/periods/${query}`), createPeriod: (body: Json) => jsonRequest('/accounting/periods/', 'POST', body), closePeriod: (id: number) => request(`/accounting/periods/${id}/close/`, { method: 'POST' }), generalLedger: (query = '') => request(`/accounting/general-ledger/${query}`), trialBalance: (query = '') => request(`/accounting/trial-balance/${query}`), openingBalance: (body: Json) => jsonRequest('/accounting/opening-balance/', 'POST', body), profitAndLoss: (query = '') => request(`/accounting/statements/profit-and-loss/${query}`), balanceSheet: (query = '') => request(`/accounting/statements/balance-sheet/${query}`), cashFlow: (query = '') => request(`/accounting/statements/cash-flow/${query}`), customerBalances: (query = '') => request(`/accounting/reports/customer-balances/${query}`), supplierBalances: (query = '') => request(`/accounting/reports/supplier-balances/${query}`), customerAging: (query = '') => request(`/accounting/reports/customer-aging/${query}`), supplierAging: (query = '') => request(`/accounting/reports/supplier-aging/${query}`), salesAnalytics: (query = '') => request(`/accounting/analytics/sales/${query}`), purchaseAnalytics: (query = '') => request(`/accounting/analytics/purchases/${query}`), inventoryAnalytics: (query = '') => request(`/accounting/analytics/inventory/${query}`), topProducts: (query = '') => request(`/accounting/analytics/top-products/${query}`), salesByEmployee: (query = '') => request(`/accounting/analytics/sales-by-employee/${query}`),

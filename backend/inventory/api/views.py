@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import generics, status
+from rest_framework import filters, generics, status
 from rest_framework.response import Response
 
 from accounts.models import RoleProfile
@@ -28,6 +28,18 @@ class LocationListView(generics.ListAPIView):
     permission_classes = (InventoryReadPermission,)
     permission_codename = "inventory.view_stocklocation"
     pagination_class = StandardPagination
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    filterset_fields = ("site", "location_type", "is_active")
+    search_fields = (
+        "name",
+        "site__name",
+        "site__code",
+        "employee__username",
+        "employee__first_name",
+        "employee__last_name",
+    )
+    ordering_fields = ("name", "location_type", "created_at")
+    ordering = ("name", "pk")
 
     def get_queryset(self):
         return _visible_operational_locations(self.request.user).active()
@@ -38,8 +50,11 @@ class StockBalanceListView(generics.ListAPIView):
     permission_classes = (InventoryReadPermission,)
     permission_codename = "inventory.view_stockbalance"
     pagination_class = StandardPagination
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = StockBalanceFilter
+    search_fields = ("product__name", "product__category", "location__name", "location__site__name")
+    ordering_fields = ("quantity", "updated_at", "product__name", "location__name")
+    ordering = ("location__name", "product__name", "pk")
 
     def get_queryset(self):
         return (
@@ -54,8 +69,11 @@ class StockBatchBalanceListView(generics.ListAPIView):
     permission_classes = (InventoryReadPermission,)
     permission_codename = "inventory.view_stockbalance"
     pagination_class = StandardPagination
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = StockBatchBalanceFilter
+    search_fields = ("batch__product__name", "batch__batch_number", "location__name", "location__site__name")
+    ordering_fields = ("quantity", "updated_at", "batch__expiry_date", "batch__product__name")
+    ordering = ("batch__expiry_date", "batch__product__name", "location__name", "pk")
 
     def get_queryset(self):
         return (
@@ -70,8 +88,20 @@ class MovementListView(generics.ListAPIView):
     permission_classes = (InventoryReadPermission,)
     permission_codename = "inventory.view_stockmovement"
     pagination_class = StandardPagination
-    filter_backends = (DjangoFilterBackend,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = StockMovementFilter
+    search_fields = (
+        "reference",
+        "created_by__username",
+        "created_by__email",
+        "created_by__first_name",
+        "created_by__last_name",
+        "source_location__name",
+        "destination_location__name",
+        "items__product__name",
+    )
+    ordering_fields = ("created_at", "movement_type")
+    ordering = ("-created_at", "-id")
 
     def get_queryset(self):
         queryset = (

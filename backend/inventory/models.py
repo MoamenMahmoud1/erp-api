@@ -42,6 +42,10 @@ class StockLocation(models.Model):
 
     class Meta:
         ordering = ("name",)
+        indexes = [
+            models.Index(fields=("site", "is_active"), name="stock_loc_site_active_idx"),
+            models.Index(fields=("location_type", "is_active"), name="stock_loc_type_active_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=("site",),
@@ -159,6 +163,13 @@ class StockMovement(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=("created_by", "created_at"), name="stock_move_creator_created_idx"),
+            models.Index(fields=("shift", "created_at"), name="stock_move_shift_created_idx"),
+            models.Index(fields=("source_location", "created_at"), name="stock_move_source_created_idx"),
+            models.Index(fields=("destination_location", "created_at"), name="stock_move_dest_created_idx"),
+            models.Index(fields=("created_at", "id"), name="stock_move_created_id_idx"),
+        ]
         permissions = [
             ("transfer_stock", "Can transfer stock"),
             ("approve_stock_transfer", "Can approve stock transfer requests"),
@@ -216,6 +227,9 @@ class StockBalance(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        indexes = [
+            models.Index(fields=("product",), name="stock_balance_product_idx"),
+        ]
         constraints = [
             models.UniqueConstraint(fields=("location", "product"), name="stock_balance_unique_location_product"),
             models.CheckConstraint(condition=Q(total_cost__gte=Decimal("0")), name="stock_balance_total_cost_non_negative"),
@@ -288,6 +302,9 @@ class StockTransferRequestItem(models.Model):
 
     class Meta:
         ordering = ("id",)
+        indexes = [
+            models.Index(fields=("product",), name="stock_req_item_product_idx"),
+        ]
         constraints = [
             models.CheckConstraint(condition=Q(quantity__gte=1), name="stock_req_item_quantity_positive"),
             models.UniqueConstraint(fields=("request", "product"), name="stock_req_item_unique_product"),

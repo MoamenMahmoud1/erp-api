@@ -1,3 +1,5 @@
+from django.contrib.auth import logout as django_logout
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -26,6 +28,8 @@ class LogoutView(NoStoreResponseMixin, APIView):
                 device_id=device_id,
             )
 
+        django_logout(request)
+
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)
         return response
@@ -36,6 +40,7 @@ class LogoutAllView(NoStoreResponseMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         revoke_all_sessions(user_id=request.user.pk)
+        django_logout(request)
 
         response = Response(status=status.HTTP_204_NO_CONTENT)
         clear_login_cookies(response)

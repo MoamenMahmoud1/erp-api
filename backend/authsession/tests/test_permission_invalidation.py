@@ -84,3 +84,11 @@ class PermissionInvalidationTests(TestCase):
         self.user.save(update_fields=("is_active",))
 
         self.assertIsNone(cache.get(auth_session_cache_key(session_id)))
+
+    def test_user_delete_invalidates_active_session_cache_before_cascade(self):
+        session_id = self._session()
+        self.assertIsNotNone(cache.get(auth_session_cache_key(session_id)))
+
+        self.user.delete()
+
+        self.assertIsNone(cache.get(auth_session_cache_key(session_id)))

@@ -63,7 +63,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = (InvoicePermission,)
     filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
     filterset_class = InvoiceFilter
-    search_fields = ("customer__name",)
+    search_fields = (
+        "customer__name",
+        "created_by__username",
+        "created_by__email",
+        "created_by__first_name",
+        "created_by__last_name",
+        "reference",
+    )
     ordering_fields = ("created_at", "updated_at", "status")
     ordering = ("-created_at", "-id")
     http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")

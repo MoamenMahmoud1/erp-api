@@ -41,7 +41,30 @@ class StockMovementFilter(django_filters.FilterSet):
     source_location = django_filters.NumberFilter(field_name="source_location_id")
     destination_location = django_filters.NumberFilter(field_name="destination_location_id")
     created_by = django_filters.NumberFilter(field_name="created_by_id")
+    created_date_from = django_filters.DateFilter(field_name="created_at", lookup_expr="date__gte")
+    created_date_to = django_filters.DateFilter(field_name="created_at", lookup_expr="date__lte")
+    created_by_name = django_filters.CharFilter(method="filter_created_by_name")
 
     class Meta:
         model = StockMovement
-        fields = ("movement_type", "source_location", "destination_location", "created_by")
+        fields = (
+            "movement_type",
+            "source_location",
+            "destination_location",
+            "created_by",
+            "created_date_from",
+            "created_date_to",
+            "created_by_name",
+        )
+
+    def filter_created_by_name(self, queryset, name, value):
+        from django.db.models import Q
+        value = value.strip()
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(created_by__username__icontains=value)
+            | Q(created_by__email__icontains=value)
+            | Q(created_by__first_name__icontains=value)
+            | Q(created_by__last_name__icontains=value)
+        )

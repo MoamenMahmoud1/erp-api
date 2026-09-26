@@ -28,9 +28,13 @@ export function BalancesPage() {
     } catch (error) { notifications.show({ title: 'Balance report failed', message: error instanceof Error ? error.message : 'Request failed.', color: 'red' }); }
     finally { setLoading(false); }
   };
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    if (!asOf) return;
+    const timer = window.setTimeout(() => { void load(); }, 200);
+    return () => window.clearTimeout(timer);
+  }, [asOf]);
   const table = (rows: Record<string, unknown>[], nameKey: string, totalKey: string) => <Table highlightOnHover><Table.Thead><Table.Tr><Table.Th>Party</Table.Th><Table.Th>{totalKey === 'invoiced' ? 'Invoiced' : 'Purchased'}</Table.Th><Table.Th>Paid</Table.Th><Table.Th>Returns</Table.Th><Table.Th>Balance</Table.Th></Table.Tr></Table.Thead><Table.Tbody>{rows.map((row) => <Table.Tr key={String(row.customer_id || row.supplier_id)}><Table.Td>{String(row[nameKey] || '')}</Table.Td><Table.Td>{money(row[totalKey])}</Table.Td><Table.Td>{money(row.paid)}</Table.Td><Table.Td>{money(row.returns)}</Table.Td><Table.Td fw={800}>{money(row.balance)}</Table.Td></Table.Tr>)}</Table.Tbody></Table>;
-  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>AR / AP</Title><Text c="dimmed" mt={4}>Customer receivables and supplier payables as of a selected date.</Text></div><Group justify="flex-end"><DatePickerInput value={asOf} onChange={setAsOf} /><Button loading={loading} onClick={() => void load()}>Refresh</Button></Group><SimpleGrid cols={{ base: 1, lg: 2 }}><Card className="glass" withBorder radius="lg"><Text fw={800} mb="md">Customer balances</Text>{table(customerRows, 'customer_name', 'invoiced')}</Card><Card className="glass" withBorder radius="lg"><Text fw={800} mb="md">Supplier balances</Text>{table(supplierRows, 'supplier_name', 'purchased')}</Card></SimpleGrid><AgingSection asOf={asOf} loading={loading} onRefresh={load} /></Stack>;
+  return <Stack gap="xl"><div><Text size="sm" c="indigo.3" fw={800}>ACCOUNTING</Text><Title order={1} mt={4}>AR / AP</Title><Text c="dimmed" mt={4}>Customer receivables and supplier payables as of a selected date.</Text></div><Group justify="flex-end"><DatePickerInput value={asOf} onChange={setAsOf} /><Text size="xs" c="dimmed">Updates automatically.</Text></Group><SimpleGrid cols={{ base: 1, lg: 2 }}><Card className="glass" withBorder radius="lg"><Text fw={800} mb="md">Customer balances</Text>{table(customerRows, 'customer_name', 'invoiced')}</Card><Card className="glass" withBorder radius="lg"><Text fw={800} mb="md">Supplier balances</Text>{table(supplierRows, 'supplier_name', 'purchased')}</Card></SimpleGrid><AgingSection asOf={asOf} loading={loading} onRefresh={load} /></Stack>;
 }
 
 function AgingSection({ asOf, loading, onRefresh }: { asOf: string | null; loading: boolean; onRefresh: () => Promise<void> }) {

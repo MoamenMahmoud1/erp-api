@@ -1,5 +1,6 @@
 from django.db import transaction
-from rest_framework import status, viewsets
+from rest_framework import filters, status, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.response import Response
 
 from common.exceptions import InvalidBusinessOperation
@@ -14,6 +15,10 @@ class CustomerViewSet(viewsets.ModelViewSet):
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = (ReadAuthenticatedWriteStaffPermission,)
+    filter_backends = (DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter)
+    search_fields = ("name", "phone", "address")
+    ordering_fields = ("name", "created_at", "updated_at")
+    ordering = ("name", "pk")
 
     def get_queryset(self):
         return assigned_customer_queryset(self.request.user)

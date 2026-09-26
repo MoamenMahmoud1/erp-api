@@ -7,9 +7,6 @@ RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
-ARG VITE_API_URL=/api/v1
-ENV VITE_API_URL=${VITE_API_URL}
-
 RUN npm run build
 
 FROM nginx:1.29-alpine AS runtime

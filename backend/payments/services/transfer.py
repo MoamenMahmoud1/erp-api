@@ -34,6 +34,11 @@ def approve_bank_transfer(*, transaction_id, actor_id, actor=None):
             "Only payments containing a bank transfer can be approved."
         )
 
+    if actor is not None and payment.collected_by_id == actor.pk:
+        raise TransferApprovalError(
+            "The collector cannot approve their own bank transfer."
+        )
+
     if payment.transfer_accepted:
         payment._transfer_approved = True
         return payment

@@ -12,7 +12,7 @@ _INVOICE_SALE_STATUSES = ("confirmed", "paid")
 
 class Product(models.Model):
     name = models.CharField(max_length=200)
-    category = models.CharField(max_length=100, default="General", db_index=True)
+    category = models.CharField(max_length=100, default="General")
     purchase_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     selling_price = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0"))])
     is_active = models.BooleanField(default=True, db_index=True)

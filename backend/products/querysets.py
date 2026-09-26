@@ -8,6 +8,7 @@ class ProductQuerySet(models.QuerySet):
     def with_stock_stats(self):
         from django.db.models import ExpressionWrapper, IntegerField, OuterRef, Subquery, Sum, Value
         from django.db.models.functions import Coalesce
+        from inventory.models import StockBalance
         from invoices.models import Invoice, InvoiceItem, InvoiceReturnItem
 
         sold = (
@@ -26,9 +27,9 @@ class ProductQuerySet(models.QuerySet):
             .values("total")
         )
         stock = (
-            self.model.objects.filter(pk=OuterRef("pk"))
-            .values("pk")
-            .annotate(total=Sum("stock_balances__quantity"))
+            StockBalance.objects.filter(product=OuterRef("pk"))
+            .values("product")
+            .annotate(total=Sum("quantity"))
             .values("total")
         )
         sold_quantity = ExpressionWrapper(

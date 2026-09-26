@@ -10,6 +10,7 @@ from authsession.services.auth_session import (
     get_current_auth_session,
     start_auth_session,
 )
+from common.exceptions import ActiveAuthSession
 
 
 class AuthSessionServiceTests(TestCase):
@@ -64,16 +65,19 @@ class AuthSessionServiceTests(TestCase):
 
         self.assertEqual(auth_session.pk, result.session_id)
 
-    def test_new_session_on_same_device_revokes_previous_session(self):
+    def test_new_session_on_same_device_raises_active_session_conflict(self):
         context = self.make_context()
         first_result = self.start_session(context=context)
         first_session = AuthSession.objects.get(id=first_result.session_id)
 
-        second_result = self.start_session(context=context)
-        first_session.refresh_from_db()
+        with self.assertRaisesMessage(
+            ActiveAuthSession,
+            "An active authentication session already exists on this device.",
+        ):
+            self.start_session(context=context)
 
-        self.assertIsNotNone(first_session.revoked_at)
-        self.assertNotEqual(first_result.session_id, second_result.session_id)
+        first_session.refresh_from_db()
+        self.assertIsNone(first_session.revoked_at)
         self.assertEqual(
             AuthSession.objects.filter(
                 user=self.user,

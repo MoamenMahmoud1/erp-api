@@ -29,6 +29,8 @@ class PaymentTransaction(models.Model):
             models.Index(fields=("customer", "created_at"), name="pay_tx_cust_created_idx"),
             models.Index(fields=("site", "created_at"), name="pay_tx_site_created_idx"),
             models.Index(fields=("shift", "created_at"), name="pay_tx_shift_created_idx"),
+            models.Index(fields=("collected_by", "created_at"), name="pay_tx_collector_created_idx"),
+            models.Index(fields=("created_at", "id"), name="pay_tx_created_id_idx"),
         ]
         constraints = [
             models.CheckConstraint(condition=Q(cash_amount__gte=Decimal("0")), name="payment_tx_cash_non_negative"),
@@ -38,6 +40,7 @@ class PaymentTransaction(models.Model):
         permissions = [
             ("process_collection", "Can process a payment collection"),
             ("refund_payment", "Can refund a payment"),
+            ("approve_bank_transfer", "Can approve a bank transfer"),
         ]
 
     @property
@@ -104,13 +107,12 @@ class PaymentAllocation(models.Model):
 
     @property
     def effective_total_amount(self) -> Decimal:
+        approved = getattr(self, "_transfer_approved", None)
+        if approved is None:
+            approved = self.transaction.transfer_accepted
         return quantize_money(
             self.cash_amount
-            + (
-                self.transfer_amount
-                if self.transaction.transfer_accepted
-                else Decimal("0.00")
-            )
+            + (self.transfer_amount if approved else Decimal("0.00"))
         )
 
     @property
@@ -159,7 +161,7 @@ class PaymentRefund(models.Model):
 
 
 class IdempotencyKey(models.Model):
-    key = models.CharField(max_length=128, db_index=True)
+    key = models.CharField(max_length=128)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="idempotency_keys")
     path = models.CharField(max_length=500)
     request_signature = models.CharField(max_length=64)

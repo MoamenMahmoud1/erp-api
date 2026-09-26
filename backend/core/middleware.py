@@ -6,7 +6,10 @@ import uuid
 from contextvars import ContextVar
 
 from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.utils import timezone
 
+from authsession.constants import ADMIN_AUTH_SESSION_SESSION_KEY
 from core.proxy import is_trusted_proxy, normalize_ip
 
 CORRELATION_HEADER = "HTTP_X_REQUEST_ID"
@@ -100,4 +103,45 @@ class TrustedProxyHeadersMiddleware:
 
     def __call__(self, request):
         self._strip_headers(request)
+        return self.get_response(request)
+
+
+class AdminAccessMiddleware:
+    """Allow Django Admin only through an active ERP AuthSession bridge."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    @staticmethod
+    def _frontend_login_url():
+        # Keep the redirect on the same origin so the gateway serves the SPA
+        # entrypoint for /login consistently in local and production.
+        return "/login"
+
+    def __call__(self, request):
+        if request.path == "/admin" or request.path.startswith("/admin/"):
+            # Django imports middleware while configuring logging, before the
+            # application registry is ready. Import app-dependent objects only
+            # when an actual Admin request reaches this middleware.
+            from django.contrib.auth import logout as django_logout
+
+            from authsession.models import AuthSession
+
+            user = getattr(request, "user", None)
+            if not user or not user.is_authenticated or not user.is_superuser:
+                return HttpResponseRedirect(self._frontend_login_url())
+
+            session_id = request.session.get(ADMIN_AUTH_SESSION_SESSION_KEY)
+            active_admin_session = False
+            if session_id:
+                active_admin_session = AuthSession.objects.filter(
+                    pk=session_id,
+                    user_id=user.pk,
+                    revoked_at__isnull=True,
+                    expires_at__gt=timezone.now(),
+                ).exists()
+
+            if not active_admin_session:
+                django_logout(request)
+                return HttpResponseRedirect(self._frontend_login_url())
         return self.get_response(request)

@@ -6,7 +6,9 @@ from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group
 
-from .models import Employee, RoleProfile
+from authsession.models import AuthSession
+
+from .models import RoleProfile
 
 User = get_user_model()
 
@@ -87,19 +89,17 @@ class CustomUserAdmin(BaseUserAdmin):
             return False
         return super().has_change_permission(request, obj)
 
+    def has_delete_permission(self, request, obj=None):
+        return bool(request.user and request.user.is_superuser)
 
-@admin.register(Employee)
-class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "manager", "work_site", "department")
-    search_fields = (
-        "user__username",
-        "user__email",
-        "user__first_name",
-        "user__last_name",
-    )
-    list_filter = ("work_site", "department")
-    list_select_related = ("user", "manager", "work_site", "department")
-    autocomplete_fields = ("user", "manager", "work_site", "department")
+    def get_deleted_objects(self, objs, request):
+        deleted_objects, model_count, perms_needed, protected = super().get_deleted_objects(
+            objs,
+            request,
+        )
+        if request.user.is_superuser:
+            perms_needed.discard(AuthSession._meta.verbose_name)
+        return deleted_objects, model_count, perms_needed, protected
 
 
 class RoleProfileInline(admin.StackedInline):

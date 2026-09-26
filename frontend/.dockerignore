@@ -8,7 +8,7 @@ build
 coverage
 .git
 .gitignore
-.env
 .env.*
-!.env.example
+!.env
+.env.local
 .DS_Store

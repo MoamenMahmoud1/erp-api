@@ -33,6 +33,7 @@ class JournalEntry(models.Model):
             models.Index(fields=("company", "entry_date"), name="journal_company_date_idx"),
             models.Index(fields=("company", "status"), name="journal_company_status_idx"),
             models.Index(fields=("company", "source_type", "source_id"), name="journal_source_lookup_idx"),
+            models.Index(fields=("company", "reference"), name="journal_company_reference_idx"),
         ]
         permissions = [
             ("post_journal_entry", "Can post journal entries"),

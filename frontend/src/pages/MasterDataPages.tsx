@@ -7,7 +7,7 @@ import type { UserProfile } from '../lib/api';
 import { api, type Paginated } from '../lib/api';
 
 export function ProductsPage({ user }: { user: UserProfile }) {
-  return <CrudPage title="Products" subtitle="Catalog, pricing and live stock visibility." searchPlaceholder="Search products by name or category" list={api.products.list} create={can(user, 'products.add_product') ? api.products.create : undefined} update={api.products.update} remove={api.products.delete} canEdit={can(user, 'products.change_product')} canDelete={can(user, 'products.delete_product')} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Purchase price', type: 'number', required: true }, { key: 'selling_price', label: 'Selling price', type: 'number', required: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Product' }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Buy price' }, { key: 'selling_price', label: 'Sell price' }, { key: 'stock_quantity', label: 'Stock' }, { key: 'sold_quantity', label: 'Sold' }, { key: 'is_active', label: 'Status' }]} />;
+  return <CrudPage title="Products" subtitle="Catalog, pricing and live stock visibility." searchPlaceholder="Search products by name or category" filters={[{ key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }]} list={api.products.list} create={can(user, 'products.add_product') ? api.products.create : undefined} update={api.products.update} remove={api.products.delete} canEdit={can(user, 'products.change_product')} canDelete={can(user, 'products.delete_product')} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Purchase price', type: 'number', required: true }, { key: 'selling_price', label: 'Selling price', type: 'number', required: true }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Product' }, { key: 'category', label: 'Category' }, { key: 'purchase_price', label: 'Buy price' }, { key: 'selling_price', label: 'Sell price' }, { key: 'stock_quantity', label: 'Stock' }, { key: 'sold_quantity', label: 'Sold' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
 export function CustomersPage({ user }: { user: UserProfile }) {
@@ -15,7 +15,7 @@ export function CustomersPage({ user }: { user: UserProfile }) {
 }
 
 export function SuppliersPage({ user }: { user: UserProfile }) {
-  return <CrudPage title="Suppliers" subtitle="Supplier master data and purchasing contacts." list={api.suppliers.list} create={can(user, 'suppliers.add_supplier') ? api.suppliers.create : undefined} update={api.suppliers.update} canEdit={can(user, 'suppliers.change_supplier')} canDelete={false} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Supplier' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'is_active', label: 'Status' }]} />;
+  return <CrudPage title="Suppliers" subtitle="Supplier master data and purchasing contacts." filters={[{ key: 'is_active', label: 'Status', type: 'select', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }]} list={api.suppliers.list} create={can(user, 'suppliers.add_supplier') ? api.suppliers.create : undefined} update={api.suppliers.update} canEdit={can(user, 'suppliers.change_supplier')} canDelete={false} fields={[{ key: 'name', label: 'Name', required: true }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'address', label: 'Address' }, { key: 'is_active', label: 'Active', type: 'boolean' }]} columns={[{ key: 'name', label: 'Supplier' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' }, { key: 'is_active', label: 'Status' }]} />;
 }
 
 type EmployeePageOptions = {
@@ -119,6 +119,12 @@ export function EmployeesPage({ user }: { user: UserProfile }) {
       title="Employees"
       subtitle="Staff directory, reporting structure and organizational assignment."
       searchPlaceholder="Search by username, name or email"
+      filters={[
+        { key: 'employee', label: 'Employee', type: 'text', placeholder: 'Name, username or email' },
+        { key: 'work_site', label: 'Work site', type: 'select', options: siteOptions },
+        { key: 'department', label: 'Department', type: 'select', options: departmentOptions },
+        { key: 'manager', label: 'Reports to', type: 'select', options: managerOptions },
+      ]}
       list={api.employees.list}
       create={can(user, 'accounts.add_employee') ? api.employees.create : undefined}
       update={api.employees.update}

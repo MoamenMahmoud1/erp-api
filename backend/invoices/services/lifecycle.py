@@ -62,12 +62,12 @@ def sales_source_location(invoice, shift=None):
     return queryset.select_for_update().first()
 
 
-def _record_sale_movement(invoice, source_location, shift=None):
+def _record_sale_movement(invoice, source_location, shift=None, actor=None):
     movement = StockMovement.objects.create(
         movement_type=StockMovement.MovementType.SALE,
         source_location=source_location,
         shift=shift,
-        created_by=invoice.created_by,
+        created_by=actor if actor is not None else invoice.created_by,
         reference=build_source_reference(
             source_type="invoice.sale",
             source_id=invoice.pk,
@@ -121,19 +121,20 @@ def confirm_invoice(invoice_id, actor=None):
     source = sales_source_location(invoice, shift=shift)
     if source is None:
         raise InvalidBusinessOperation("The invoice creator has no active sales location for this branch.")
-    movement = _record_sale_movement(invoice, source, shift=shift)
+    movement = _record_sale_movement(invoice, source, shift=shift, actor=actor)
     company = get_default_company()
-    post_sales_invoice(invoice=invoice, actor_id=invoice.created_by_id, company=company)
+    effective_actor_id = actor.pk if actor is not None else invoice.created_by_id
+    post_sales_invoice(invoice=invoice, actor_id=effective_actor_id, company=company)
     if shift is not None and invoice.shift_id is None:
         invoice.shift = shift
     invoice.status = Invoice.Status.CONFIRMED
     invoice.save(update_fields=("status", "shift", "updated_at"))
-    log_operation("invoice.confirm", user=invoice.created_by_id, invoice=invoice.pk)
+    log_operation("invoice.confirm", user=effective_actor_id, invoice=invoice.pk)
     record_event(
         action="invoice.confirm",
         entity_type="Invoice",
         entity_id=invoice.pk,
-        actor_id=invoice.created_by_id,
+        actor_id=effective_actor_id,
         metadata={
             "status": invoice.status,
             "stock_location_id": source.pk,
@@ -192,6 +193,7 @@ def cancel_invoice(invoice_id, actor=None):
     if actor is not None:
         require_customer_assignment(customer=invoice.customer, user=actor)
     shift = _required_shift(actor, invoice)
+    effective_actor_id = actor.pk if actor is not None else invoice.created_by_id
     if invoice.net_paid_amount > 0:
         raise InvalidStateTransition("A paid invoice must be fully refunded before it can be cancelled.")
     if invoice.status == Invoice.Status.CONFIRMED:
@@ -221,7 +223,7 @@ def cancel_invoice(invoice_id, actor=None):
             movement_type=StockMovement.MovementType.SALEABLE_RETURN,
             destination_location=sale.source_location,
             shift=shift or invoice.shift,
-            created_by=invoice.created_by,
+            created_by_id=effective_actor_id,
             reference=build_source_reference(
                 source_type="invoice.cancellation",
                 source_id=invoice.pk,
@@ -253,19 +255,19 @@ def cancel_invoice(invoice_id, actor=None):
             raise InvalidBusinessOperation("Cannot reverse sale: accounting entry is missing.")
         reverse_source_entry(
             source_entry=original_entry,
-            actor_id=invoice.created_by_id,
+            actor_id=effective_actor_id,
             source_type="invoice.sale",
             source_id=invoice.pk,
             company=get_default_company(),
         )
     invoice.status = Invoice.Status.CANCELLED
     invoice.save(update_fields=("status", "updated_at"))
-    log_operation("invoice.cancel", user=invoice.created_by_id, invoice=invoice.pk)
+    log_operation("invoice.cancel", user=effective_actor_id, invoice=invoice.pk)
     record_event(
         action="invoice.cancel",
         entity_type="Invoice",
         entity_id=invoice.pk,
-        actor_id=invoice.created_by_id,
+        actor_id=effective_actor_id,
         metadata={
             "status": invoice.status,
             "site_id": invoice.site_id,

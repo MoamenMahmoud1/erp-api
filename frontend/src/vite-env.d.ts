@@ -8,3 +8,15 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface ErpWebPushApi {
+  ready: Promise<{ available: boolean; permission: NotificationPermission | "unsupported" }>;
+  getPermission: () => NotificationPermission | "unsupported";
+  enable: (options?: { requestPermission?: boolean }) => Promise<{ status: string }>;
+  sync: () => Promise<{ status: string }>;
+  disable: () => Promise<string | null>;
+}
+
+interface Window {
+  erpWebPush?: ErpWebPushApi;
+}

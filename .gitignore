@@ -27,3 +27,4 @@ frontend/.cache/
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
 frontend/.env.*.local
+frontend/.env.example

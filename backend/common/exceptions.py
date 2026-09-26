@@ -19,6 +19,10 @@ class InvalidBusinessOperation(DomainError):
     """Raised when a requested business operation is invalid for the object."""
 
 
+class ActiveAuthSession(DomainError):
+    """Raised when a device already has an active authentication session."""
+
+
 class InvalidMoney(DomainError):
     """Raised when a monetary value breaks the money convention."""
 

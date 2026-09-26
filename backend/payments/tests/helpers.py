@@ -40,6 +40,16 @@ class PaymentTestMixin:
             selling_price=Decimal("100.00"),
         )
 
+    def make_transfer_approver(self):
+        user = get_user_model().objects.create_user(
+            username="transfer-approver",
+            email="transfer-approver@example.com",
+            password="StrongPass123!",
+            is_staff=True,
+        )
+        Employee.objects.create(user=user, work_site=self.site)
+        return user
+
     def create_invoice(self, *, total="100.00", status=Invoice.Status.CONFIRMED):
         invoice = Invoice.objects.create(
             customer=self.customer,

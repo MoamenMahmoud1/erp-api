@@ -32,3 +32,12 @@ REPORT_CACHE_TTL = 0
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_URL = "memory://"
+
+# Django Admin templates require predictable static URLs in tests. Production
+# uses a hashed manifest, but the test suite does not run collectstatic.
+STORAGES = {
+    **STORAGES,
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}

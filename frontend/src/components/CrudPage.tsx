@@ -1,5 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActionIcon,
   Badge,
@@ -14,15 +14,18 @@ import {
   Paper,
   ScrollArea,
   Select,
+  SimpleGrid,
   Stack,
   Table,
   Text,
   TextInput,
   Title,
 } from '@mantine/core';
-import { IconEdit, IconSearch, IconTrash } from '@tabler/icons-react';
+import { DatePickerInput } from '@mantine/dates';
+import { IconEdit, IconFilter, IconSearch, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 
+import { type RecordFilter } from './RecordsPage';
 import type { Json, Paginated } from '../lib/api';
 
 export type CrudOption = { value: string; label: string };
@@ -49,6 +52,7 @@ type Props = {
   fields: CrudField[];
   columns: CrudColumn[];
   list: (query: string) => Promise<Paginated>;
+  filters?: RecordFilter[];
   create?: (body: Json) => Promise<unknown>;
   update?: (id: number, body: Json) => Promise<unknown>;
   remove?: (id: number) => Promise<unknown>;
@@ -71,6 +75,7 @@ export function CrudPage({
   fields,
   columns,
   list,
+  filters = [],
   create,
   update,
   remove,
@@ -80,28 +85,62 @@ export function CrudPage({
 }: Props) {
   const [data, setData] = useState<Paginated>({ count: 0, next: null, previous: null, results: [] });
   const [search, setSearch] = useState('');
+  const [filterValues, setFilterValues] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Record<string, unknown> | null>(null);
   const [form, setForm] = useState<Record<string, unknown>>({});
   const pageSize = 20;
+  const requestVersion = useRef(0);
+  const filterKey = JSON.stringify(filterValues);
+  const previousFilterKey = useRef(filterKey);
+  const previousSearch = useRef(search);
   const itemTitle = singularTitle || title.replace(/s$/i, '');
 
-  async function load(targetPage = page) {
+  async function load(targetPage = page, targetFilters = filterValues) {
+    const request = ++requestVersion.current;
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(targetPage), page_size: String(pageSize) });
       if (search.trim()) params.set('search', search.trim());
-      setData(await list(`?${params.toString()}`));
+      filters.forEach((filter) => {
+        const value = targetFilters[filter.key];
+        if (value !== undefined && value !== '') params.set(filter.key, value);
+      });
+      const result = await list(`?${params.toString()}`);
+      if (request === requestVersion.current) setData(result);
     } catch (error) {
-      notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      if (request === requestVersion.current) {
+        notifications.show({ title: `Unable to load ${title.toLowerCase()}`, message: error instanceof Error ? error.message : 'Request failed.', color: 'red' });
+      }
     } finally {
-      setLoading(false);
+      if (request === requestVersion.current) setLoading(false);
     }
   }
 
-  useEffect(() => { void load(page); }, [page]);
+  useEffect(() => {
+    const filterChanged = previousFilterKey.current !== filterKey;
+    const searchChanged = previousSearch.current !== search;
+    previousFilterKey.current = filterKey;
+    previousSearch.current = search;
+    if ((filterChanged || searchChanged) && page !== 1) {
+      setPage(1);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void load(filterChanged || searchChanged ? 1 : page, filterValues);
+    }, filterChanged || searchChanged ? 200 : 0);
+    return () => window.clearTimeout(timer);
+  }, [page, filterKey, search]);
+
+  function updateFilter(key: string, value: string | null) {
+    setFilterValues((current) => ({ ...current, [key]: value ?? '' }));
+  }
+
+  function clearFilters() {
+    setFilterValues(Object.fromEntries(filters.map((filter) => [filter.key, ''])));
+  }
 
   function openCreate() {
     if (!create) return;
@@ -171,12 +210,37 @@ export function CrudPage({
         {create && <Button onClick={openCreate} color="erp" radius="sm">Add {itemTitle}</Button>}
       </Group>
 
-      <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
-        <Group gap="sm" wrap="wrap">
-          <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Enter') { setPage(1); void load(1); } }} />
-          <Button radius="sm" variant="light" color="erp" onClick={() => { setPage(1); void load(1); }}>Search</Button>
-        </Group>
-      </Paper>
+      <Stack gap="sm">
+        <Paper className="records-toolbar" p="sm" radius="sm" withBorder>
+          <Group gap="sm" wrap="wrap">
+            <TextInput flex={1} radius="sm" leftSection={<IconSearch size={16} />} placeholder={searchPlaceholder} value={search} onChange={(event) => setSearch(event.currentTarget.value)} onKeyDown={(event) => { if (event.key === 'Escape') setSearch(''); }} />
+          </Group>
+        </Paper>
+        {filters.length > 0 && (
+          <Paper p="md" radius="sm" withBorder>
+            <Group gap="xs" mb="sm"><IconFilter size={17} /><Text fw={700}>Filters</Text>{Object.values(filterValues).filter(Boolean).length > 0 && <Badge variant="light">{Object.values(filterValues).filter(Boolean).length} active</Badge>}</Group>
+            <SimpleGrid cols={{ base: 1, sm: 2, md: Math.min(filters.length, 4) }} spacing="sm">
+              {filters.map((filter) => {
+                const value = filterValues[filter.key] || '';
+                if (filter.type === 'date') {
+                  return <DatePickerInput key={filter.key} label={filter.label} placeholder={filter.placeholder || 'Select date'} value={value || null} onChange={(nextValue) => updateFilter(filter.key, nextValue)} clearable />;
+                }
+                if (filter.type === 'select') {
+                  return <Select key={filter.key} label={filter.label} placeholder={filter.placeholder || 'Any'} data={filter.options || []} value={value || null} onChange={(nextValue) => updateFilter(filter.key, nextValue)} clearable searchable={Boolean((filter.options || []).length > 8)} />;
+                }
+                if (filter.type === 'number') {
+                  return <NumberInput key={filter.key} label={filter.label} placeholder={filter.placeholder} value={value} onChange={(nextValue) => updateFilter(filter.key, String(nextValue ?? ''))} min={0} clampBehavior="strict" />;
+                }
+                return <TextInput key={filter.key} label={filter.label} placeholder={filter.placeholder} value={value} onChange={(event) => updateFilter(filter.key, event.currentTarget.value)} />;
+              })}
+            </SimpleGrid>
+            <Group justify="flex-end" mt="md">
+              {Object.values(filterValues).some(Boolean) && <Button variant="subtle" onClick={() => void clearFilters()}>Clear filters</Button>}
+              <Text size="xs" c="dimmed">Filters update automatically.</Text>
+            </Group>
+          </Paper>
+        )}
+      </Stack>
 
       <Paper className="surface-panel records-panel" radius="sm" withBorder>
         <ScrollArea>

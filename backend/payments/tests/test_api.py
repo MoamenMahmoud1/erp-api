@@ -1,9 +1,12 @@
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from payments.api.views import CollectionView, RefundView, TransactionListView, TransferApprovalView
+from accounts.models import Employee
 from payments.models import PaymentTransaction
 from payments.services import collect
 
@@ -83,7 +86,7 @@ class PaymentAPITests(PaymentTestMixin, TestCase):
         self.assertEqual(PaymentTransaction.objects.count(), 1)
 
 
-    def test_transfer_approval_endpoint(self):
+    def test_transfer_approval_endpoint_requires_a_separate_authorized_actor(self):
         request = self.factory.post(
             "/api/v1/payments/collections/",
             {
@@ -102,12 +105,39 @@ class PaymentAPITests(PaymentTestMixin, TestCase):
         self.assertEqual(response.data["transfer_status"], "pending")
         self.assertEqual(response.data["effective_total_amount"], "0.00")
 
+        self_approve_request = self.factory.post(
+            f"/api/v1/payments/transactions/{transaction_id}/approve-transfer/",
+            {},
+            format="json",
+        )
+        force_authenticate(self_approve_request, user=self.user)
+        self_approved = TransferApprovalView.as_view()(
+            self_approve_request,
+            pk=transaction_id,
+        )
+        self.assertEqual(self_approved.status_code, 400)
+        self.assertIn("collector", self_approved.data["detail"])
+
+        approver = get_user_model().objects.create_user(
+            username="transfer-approver",
+            email="transfer-approver@example.com",
+            password="StrongPass123!",
+            is_staff=True,
+        )
+        approver.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="payments",
+                codename="approve_bank_transfer",
+            )
+        )
+        Employee.objects.create(user=approver, work_site=self.site)
+
         approve_request = self.factory.post(
             f"/api/v1/payments/transactions/{transaction_id}/approve-transfer/",
             {},
             format="json",
         )
-        force_authenticate(approve_request, user=self.user)
+        force_authenticate(approve_request, user=approver)
         approved = TransferApprovalView.as_view()(
             approve_request,
             pk=transaction_id,

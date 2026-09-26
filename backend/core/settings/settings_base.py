@@ -21,6 +21,17 @@ CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
 FIREBASE_ENABLED = config("FIREBASE_ENABLED", default=False, cast=bool)
 FIREBASE_PROJECT_ID = config("FIREBASE_PROJECT_ID", default="")
 FIREBASE_CREDENTIALS_FILE = config("FIREBASE_CREDENTIALS_FILE", default="")
+FIREBASE_WEB_API_KEY = config("FIREBASE_WEB_API_KEY", default="")
+FIREBASE_WEB_AUTH_DOMAIN = config("FIREBASE_WEB_AUTH_DOMAIN", default="")
+FIREBASE_WEB_STORAGE_BUCKET = config("FIREBASE_WEB_STORAGE_BUCKET", default="")
+FIREBASE_WEB_MESSAGING_SENDER_ID = config("FIREBASE_WEB_MESSAGING_SENDER_ID", default="")
+FIREBASE_WEB_APP_ID = config("FIREBASE_WEB_APP_ID", default="")
+FIREBASE_WEB_MEASUREMENT_ID = config("FIREBASE_WEB_MEASUREMENT_ID", default="")
+FIREBASE_WEB_VAPID_KEY = config("FIREBASE_WEB_VAPID_KEY", default="")
+FIREBASE_WEB_NOTIFICATION_LINK = config(
+    "FIREBASE_WEB_NOTIFICATION_LINK",
+    default=FRONTEND_URL,
+)
 FCM_ANDROID_CHANNEL_ID = config("FCM_ANDROID_CHANNEL_ID", default="erp_notifications")
 
 AUTH_USER_MODEL = "accounts.CustomUserModel"
@@ -67,10 +78,12 @@ MIDDLEWARE = [
     "core.middleware.TrustedProxyHeadersMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.AdminAccessMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -135,6 +148,9 @@ if IDEMPOTENCY_RETENTION_DAYS < 1:
     raise ValueError("IDEMPOTENCY_RETENTION_DAYS must be >= 1")
 AUTH_SESSION_MIN_AGE = timedelta(hours=config("AUTH_SESSION_MIN_AGE_HOURS", default=168, cast=int))
 AUTH_SESSION_VERIFICATION_TTL = timedelta(minutes=config("AUTH_SESSION_VERIFICATION_MINUTES", default=15, cast=int))
+AUTH_SESSION_REVOKED_RETENTION_DAYS = config("AUTH_SESSION_REVOKED_RETENTION_DAYS", default=30, cast=int)
+if AUTH_SESSION_REVOKED_RETENTION_DAYS < 0:
+    raise ValueError("AUTH_SESSION_REVOKED_RETENTION_DAYS must be >= 0")
 CORS_ALLOW_CREDENTIALS = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOG_LEVEL = config("LOG_LEVEL", default="INFO").upper()
@@ -200,6 +216,10 @@ CELERY_BEAT_SCHEDULE = {
     "purge-idempotency-keys": {
         "task": "payments.tasks.purge_idempotency_keys",
         "schedule": crontab(hour=3, minute=15),
+    },
+    "purge-auth-sessions": {
+        "task": "authsession.tasks.purge_auth_sessions",
+        "schedule": crontab(hour=3, minute=30),
     },
 }
 

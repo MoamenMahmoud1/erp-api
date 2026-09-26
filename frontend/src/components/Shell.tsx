@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ActionIcon, AppShell, Avatar, Badge, Burger, Divider, Group, Menu, NavLink, ScrollArea, Stack, Text, TextInput, ThemeIcon, Tooltip, useMantineColorScheme } from '@mantine/core';
-import { IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconBell, IconBook, IconBox, IconBuilding, IconCalendarDue, IconChartBar, IconChevronDown, IconClock, IconDashboard, IconFileInvoice, IconMoon, IconPackage, IconPower, IconReceipt, IconSearch, IconSettings, IconShoppingCart, IconSun, IconTruck, IconUsers, IconWallet } from '@tabler/icons-react';
 
 import { can } from './PermissionGuard';
 import { api, type UserProfile } from '../lib/api';
@@ -19,7 +20,7 @@ const sections: NavSection[] = [
       { label: 'Sales', to: '/sales', icon: <IconReceipt size={17} />, permission: 'invoices.view_invoice' },
       { label: 'Purchases', to: '/purchases', icon: <IconShoppingCart size={17} />, permission: 'purchases.view_purchase' },
       { label: 'Payments', to: '/payments', icon: <IconWallet size={17} />, permission: 'payments.view_paymenttransaction' },
-      { label: 'My shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: false },
+      { label: 'My shift', to: '/shift', icon: <IconClock size={17} />, permission: 'accounts.start_employee_shift', hideWithoutShift: true },
     ],
   },
   {
@@ -76,6 +77,13 @@ const sections: NavSection[] = [
 export function Shell({ user, children }: { user: UserProfile; children: ReactNode }) {
   const [opened, setOpened] = useState(false);
   const [search, setSearch] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [webPushStatus, setWebPushStatus] = useState<'checking' | 'enabled' | 'available' | 'denied' | 'unsupported'>('checking');
+  const [webPushLoading, setWebPushLoading] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => (
+    typeof window !== 'undefined' && window.sessionStorage.getItem('erp-show-welcome') === '1'
+  ));
+  const [closingWelcome, setClosingWelcome] = useState(false);
   const { colorScheme, toggleColorScheme } = useMantineColorScheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -113,7 +121,113 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     setOpened(false);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const webPush = window.erpWebPush;
+    if (!webPush) {
+      setWebPushStatus('unsupported');
+      return;
+    }
+
+    const handleRegistered = async (event: Event) => {
+      const detail = (event as CustomEvent<{ installationId?: string; firebaseAppId?: string }>).detail;
+      if (!detail?.installationId) return;
+      try {
+        await api.notifications.registerDevice({
+          installation_id: detail.installationId,
+          platform: 'web',
+          firebase_app_id: detail.firebaseAppId || '',
+        });
+        setWebPushStatus('enabled');
+      } catch {
+        // Push registration is best-effort; the core workspace remains usable.
+      }
+    };
+
+    const handleUnregistered = async (event: Event) => {
+      const detail = (event as CustomEvent<{ installationId?: string }>).detail;
+      if (!detail?.installationId) return;
+      try {
+        await api.notifications.unregisterDevice(detail.installationId);
+      } finally {
+        setWebPushStatus('available');
+      }
+    };
+
+    const handleMessage = (event: Event) => {
+      const detail = (event as CustomEvent<{ payload?: { notification?: { title?: string; body?: string } } }>).detail;
+      const notification = detail?.payload?.notification;
+      if (!notification) return;
+      notifications.show({
+        title: notification.title || 'ERP notification',
+        message: notification.body || '',
+        autoClose: 6000,
+      });
+    };
+
+    window.addEventListener('erp-webpush-registered', handleRegistered);
+    window.addEventListener('erp-webpush-unregistered', handleUnregistered);
+    window.addEventListener('erp-webpush-message', handleMessage);
+
+    webPush.ready.then(async (state) => {
+      if (state.permission === 'granted') {
+        setWebPushStatus('enabled');
+        try {
+          await webPush.sync();
+        } catch {
+          setWebPushStatus('available');
+        }
+        return;
+      }
+      setWebPushStatus(
+        state.permission === 'denied'
+          ? 'denied'
+          : state.permission === 'default'
+            ? 'available'
+            : 'unsupported',
+      );
+    });
+
+    return () => {
+      window.removeEventListener('erp-webpush-registered', handleRegistered);
+      window.removeEventListener('erp-webpush-unregistered', handleUnregistered);
+      window.removeEventListener('erp-webpush-message', handleMessage);
+    };
+  }, [user.id]);
+
+  async function enableDesktopNotifications() {
+    setWebPushLoading(true);
+    try {
+      const result = await window.erpWebPush?.enable({ requestPermission: true });
+      if (result?.status === 'enabled') {
+        setWebPushStatus('enabled');
+        notifications.show({
+          title: 'Desktop notifications enabled',
+          message: 'This browser can now receive ERP push notifications.',
+        });
+      } else if (result?.status === 'denied') {
+        setWebPushStatus('denied');
+      } else {
+        setWebPushStatus('unsupported');
+      }
+    } catch {
+      notifications.show({
+        title: 'Notifications unavailable',
+        message: 'The browser could not enable ERP push notifications.',
+      });
+    } finally {
+      setWebPushLoading(false);
+    }
+  }
+
   async function logout() {
+    try {
+      const installationId = await window.erpWebPush?.disable();
+      if (installationId) {
+        await api.notifications.unregisterDevice(installationId);
+      }
+    } catch {
+      // Continue logout even if push cleanup fails.
+    }
     try { await api.auth.logout(); } finally { navigate('/login'); }
   }
 
@@ -123,8 +237,36 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
     setSearch('');
   }
 
+  async function openAdmin() {
+    setAdminLoading(true);
+    try {
+      const result = await api.auth.openAdmin();
+      window.location.assign(result.url);
+    } finally {
+      setAdminLoading(false);
+    }
+  }
+
   const roleLabel = user.role?.name || (user.is_superuser ? 'Administrator' : 'User');
   const siteLabel = user.employee?.site?.name || 'Company-wide';
+  const firstName = user.first_name || user.username;
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const dateLabel = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  }).format(new Date());
+
+  function dismissWelcome() {
+    if (closingWelcome) return;
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('erp-show-welcome');
+    setClosingWelcome(true);
+    window.setTimeout(() => {
+      setShowWelcome(false);
+      setClosingWelcome(false);
+    }, 320);
+  }
 
   return (
     <div className="app-bg">
@@ -163,6 +305,25 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
               styles={{ input: { borderRadius: 'var(--erp-radius-sm)' } }}
             />
             <Group gap="xs">
+              <Tooltip label={
+                webPushStatus === 'enabled'
+                  ? 'Desktop notifications enabled'
+                  : webPushStatus === 'denied'
+                    ? 'Notifications blocked by browser'
+                    : 'Enable desktop notifications'
+              }>
+                <ActionIcon
+                  variant={webPushStatus === 'enabled' ? 'light' : 'subtle'}
+                  radius="sm"
+                  size="lg"
+                  onClick={enableDesktopNotifications}
+                  loading={webPushLoading}
+                  disabled={webPushStatus === 'denied' || webPushStatus === 'unsupported'}
+                  aria-label="Desktop notifications"
+                >
+                  <IconBell size={18} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label={dark ? 'Use light theme' : 'Use dark theme'}>
                 <ActionIcon variant="subtle" radius="sm" size="lg" onClick={() => toggleColorScheme()} aria-label="Toggle color scheme">
                   {dark ? <IconSun size={18} /> : <IconMoon size={18} />}
@@ -184,8 +345,34 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
                   <Menu.Item closeMenuOnClick={false} disabled leftSection={<IconBuilding size={16} />} rightSection={user.current_shift ? <Badge color="teal" size="sm">Shift open</Badge> : undefined}>
                     {siteLabel}
                   </Menu.Item>
+                  {user.is_superuser && (
+                    <>
+                      <Menu.Divider />
+                      <Menu.Label>Administration</Menu.Label>
+                      <Menu.Item
+                        leftSection={<IconSettings size={16} />}
+                        disabled={adminLoading}
+                        onClick={openAdmin}
+                      >
+                        {adminLoading ? 'Opening admin…' : 'Admin'}
+                      </Menu.Item>
+                    </>
+                  )}
                   <Menu.Divider />
                   <Menu.Label>Account</Menu.Label>
+                  <Menu.Item
+                    leftSection={<IconBell size={16} />}
+                    disabled={webPushStatus === 'denied' || webPushStatus === 'unsupported' || webPushLoading}
+                    onClick={enableDesktopNotifications}
+                  >
+                    {webPushStatus === 'enabled'
+                      ? 'Desktop notifications enabled'
+                      : webPushStatus === 'denied'
+                        ? 'Notifications blocked'
+                        : webPushLoading
+                          ? 'Enabling notifications…'
+                          : 'Enable desktop notifications'}
+                  </Menu.Item>
                   <Menu.Item leftSection={<IconPower size={16} />} color="red" onClick={logout}>Sign out</Menu.Item>
                 </Menu.Dropdown>
               </Menu>
@@ -244,7 +431,52 @@ export function Shell({ user, children }: { user: UserProfile; children: ReactNo
           </div>
         )}
 
-        <AppShell.Main className="page-enter">{children}</AppShell.Main>
+        <AppShell.Main className="page-enter">
+          {showWelcome && (
+            <section className={`welcome-panel${closingWelcome ? ' is-closing' : ''}`} aria-label="Welcome to ERP Workspace">
+              <div className="welcome-copy">
+                <div className="welcome-kicker">
+                  <span className="welcome-status-dot" aria-hidden="true" />
+                  <Text size="xs" fw={800} tt="uppercase" lts=".11em">Workspace ready</Text>
+                </div>
+                <Text className="welcome-title" fw={850}>{greeting}, {firstName}.</Text>
+                <Text className="welcome-subtitle">
+                  Your workspace is ready. Review the numbers, control stock, and keep every transaction traceable.
+                </Text>
+                <Group className="welcome-meta" gap="xs" wrap="wrap">
+                  <span>{roleLabel}</span>
+                  <span>{siteLabel}</span>
+                  <span>{user.current_shift ? 'Shift open' : 'No active shift'}</span>
+                  <span>{dateLabel}</span>
+                </Group>
+              </div>
+
+              <div className="welcome-visual" aria-hidden="true">
+                <div className="welcome-visual-label">
+                  <span>CONTROL VIEW</span>
+                  <strong>Operational pulse</strong>
+                </div>
+                <svg className="welcome-ledger-chart" viewBox="0 0 440 180" role="presentation">
+                  <g className="welcome-grid">
+                    <path d="M12 28H428M12 76H428M12 124H428" />
+                    <path d="M84 12V156M188 12V156M292 12V156M396 12V156" />
+                  </g>
+                  <path className="welcome-chart-line" d="M14 132 C48 126, 56 102, 88 108 S128 122, 154 92 S194 62, 222 78 S256 112, 286 72 S330 34, 360 56 S394 64, 426 28" />
+                  <path className="welcome-chart-base" d="M14 148H426" />
+                  <circle className="welcome-chart-point" cx="426" cy="28" r="5" />
+                </svg>
+                <div className="welcome-visual-footer">
+                  <span>Sales</span>
+                  <span>Inventory</span>
+                  <span>Accounting</span>
+                </div>
+              </div>
+
+              <button className="welcome-dismiss" type="button" onClick={dismissWelcome} aria-label="Dismiss welcome panel">×</button>
+            </section>
+          )}
+          {children}
+        </AppShell.Main>
       </AppShell>
     </div>
   );

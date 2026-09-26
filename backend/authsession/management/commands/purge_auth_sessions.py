@@ -1,10 +1,6 @@
-from datetime import timedelta
-
 from django.core.management.base import BaseCommand, CommandError
-from django.db.models import Q
-from django.utils import timezone
 
-from authsession.models import AuthSession
+from authsession.services.cleanup import purge_auth_sessions
 
 
 class Command(BaseCommand):
@@ -18,10 +14,7 @@ class Command(BaseCommand):
         if retention_days < 0:
             raise CommandError("Retention days cannot be negative.")
 
-        now = timezone.now()
-        revoked_cutoff = now - timedelta(days=retention_days)
-        deleted_count, _ = AuthSession.objects.filter(
-            Q(expires_at__lte=now)
-            | Q(revoked_at__isnull=False, revoked_at__lte=revoked_cutoff)
-        ).delete()
+        deleted_count = purge_auth_sessions(
+            revoked_retention_days=retention_days,
+        )
         self.stdout.write(self.style.SUCCESS(f"Deleted {deleted_count} session rows."))

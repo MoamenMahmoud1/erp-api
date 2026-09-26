@@ -77,7 +77,7 @@ STORAGES = {
         "BACKEND": "storages.backends.s3.S3Storage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.ManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -96,16 +96,17 @@ SECURE_HSTS_PRELOAD = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
-TRUST_PROXY_HEADERS = config("TRUST_PROXY_HEADERS", default=False, cast=bool)
+# Production is served through the Docker gateway reverse proxy.
+# Trust only that proxy (resolved dynamically by Docker DNS), not arbitrary clients.
+TRUST_PROXY_HEADERS = config("TRUST_PROXY_HEADERS", default=True, cast=bool)
 USE_X_FORWARDED_HOST = TRUST_PROXY_HEADERS
 if TRUST_PROXY_HEADERS:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-TRUSTED_PROXY_IPS = config(
-    "TRUSTED_PROXY_IPS",
-    default="",
-    cast=lambda value: tuple(
-        item.strip() for item in value.split(",") if item.strip()
-    ),
+TRUSTED_PROXY_IPS = ("127.0.0.1",)
+TRUSTED_PROXY_HOSTS = tuple(
+    item.strip()
+    for item in config("TRUSTED_PROXY_HOSTS", default="gateway").split(",")
+    if item.strip()
 )
 
 # Email SMTP from ENV
