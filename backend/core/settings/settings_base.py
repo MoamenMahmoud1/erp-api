@@ -5,7 +5,6 @@ Base settings shared between development & production.
 from datetime import timedelta
 from pathlib import Path
 
-from celery.schedules import crontab
 from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -54,6 +53,7 @@ THIRD_PARTY_APPS = [
     "drf_spectacular",
     "phonenumber_field",
     "django_filters",
+    "django_celery_beat",
 ]
 PROJECT_APPS = [
     "auditlog.apps.AuditlogConfig",
@@ -203,25 +203,7 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = config("CELERY_TASK_TIME_LIMIT", default=300, cast=int)
 CELERY_TASK_SOFT_TIME_LIMIT = config("CELERY_TASK_SOFT_TIME_LIMIT", default=240, cast=int)
-
-CELERY_BEAT_SCHEDULE = {
-    "reconcile-company-counters": {
-        "task": "organization.tasks.reconcile_company_counters",
-        "schedule": crontab(hour=2, minute=0),
-    },
-    "rebuild-recent-approval-notifications": {
-        "task": "notifications.tasks.rebuild_recent_approval_notifications",
-        "schedule": crontab(minute="*/1"),
-    },
-    "purge-idempotency-keys": {
-        "task": "payments.tasks.purge_idempotency_keys",
-        "schedule": crontab(hour=3, minute=15),
-    },
-    "purge-auth-sessions": {
-        "task": "authsession.tasks.purge_auth_sessions",
-        "schedule": crontab(hour=3, minute=30),
-    },
-}
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Sales ERP API",
